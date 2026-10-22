@@ -84,8 +84,12 @@ create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade, 
   name text not null, 
   role text check (role in ('student', 'teacher')) default 'student',
+  class_name text,
   created_at timestamptz default now()
 );
+
+-- Pastikan kolom class_name tersedia jika tabel profiles sudah ada sebelumnya
+alter table public.profiles add column if not exists class_name text;
 
 -- 2. TABEL RESULTS (Menyimpan Hasil Evaluasi Pretest & Posttest Siswa)
 create table if not exists public.results (
@@ -188,15 +192,17 @@ create policy "Public read questions" on public.questions for select using (true
 create or replace function public.handle_new_user()
 returns trigger as $$
 begin
-  insert into public.profiles (id, name, role)
+  insert into public.profiles (id, name, role, class_name)
   values (
     new.id,
-    coalesce(new.raw_user_meta_data->>'name', split_part(new.email, '@', 1)),
-    coalesce(new.raw_user_meta_data->>'role', 'student')
+    coalesce(new.raw_user_meta_data->>'name', new.raw_user_meta_data->>'full_name', split_part(new.email, '@', 1)),
+    coalesce(new.raw_user_meta_data->>'role', 'student'),
+    coalesce(new.raw_user_meta_data->>'class_name', '')
   )
   on conflict (id) do update 
     set name = coalesce(excluded.name, profiles.name),
-        role = coalesce(excluded.role, profiles.role);
+        role = coalesce(excluded.role, profiles.role),
+        class_name = coalesce(excluded.class_name, profiles.class_name);
   return new;
 end;
 $$ language plpgsql security definer;
@@ -398,54 +404,77 @@ export async function checkLiveSession() {
   try {
     const { data: { session }, error } = await supabaseClient.auth.getSession();
     if (error || !session || !session.user) {
-      return getCurrentUser();
+      // Jika di cloud tidak ada session aktif, bersihkan cache lokal agar browser/device baru tidak auto-login
+      localStorage.removeItem("netquest_current_user");
+      return null;
     }
 
     let role = session.user.user_metadata?.role || "student";
-    let name = session.user.user_metadata?.name || session.user.email.split("@")[0];
+    let name = session.user.user_metadata?.name || session.user.user_metadata?.full_name || session.user.email.split("@")[0];
+    let className = session.user.user_metadata?.class_name || "";
 
     try {
       const { data: profile } = await supabaseClient
         .from("profiles")
-        .select("name, role")
+        .select("name, role, class_name")
         .eq("id", session.user.id)
         .maybeSingle();
 
       if (profile) {
         if (profile.role) role = profile.role;
         if (profile.name) name = profile.name;
+        if (profile.class_name) className = profile.class_name;
       } else {
         await supabaseClient.from("profiles").upsert({
           id: session.user.id,
           name,
-          role
+          role,
+          class_name: className
         });
       }
     } catch (e) {
       console.warn("Could not sync profile on restore, using fallback metadata:", e);
     }
 
-    const appUser = { user: session.user, role, name };
+    const appUser = { 
+      user: session.user, 
+      role, 
+      name, 
+      className,
+      needsProfileCompletion: role === "student" && (!className || className.trim() === "")
+    };
     localStorage.setItem("netquest_current_user", JSON.stringify(appUser));
     return appUser;
   } catch (err) {
     console.warn("checkLiveSession error:", err);
-    return getCurrentUser();
+    localStorage.removeItem("netquest_current_user");
+    return null;
   }
 }
 
-export async function signUp({ email, password, name, role, teacherCode }) {
+
+export async function signUp({ email, password, name, role, className = "", teacherCode }) {
   if (role === "teacher" && teacherCode !== CONFIG.TEACHER_CODE) {
     throw new Error(
       `Kode guru tidak valid! Hubungi administrator atau periksa TEACHER_CODE (default: ${CONFIG.TEACHER_CODE}).`
     );
   }
 
+  if (role === "student" && (!className || className.trim() === "")) {
+    throw new Error("Kelas wajib diisi untuk siswa baru (Contoh: X TKJ 1 / XI RPL 2).");
+  }
+
   if (isUsingLiveSupabase()) {
     const { data: authData, error: authErr } = await supabaseClient.auth.signUp({
       email,
       password,
-      options: { data: { name, role } }
+      options: { 
+        data: { 
+          name, 
+          role,
+          class_name: className 
+        } 
+      }
     });
     if (authErr) throw authErr;
 
@@ -454,14 +483,21 @@ export async function signUp({ email, password, name, role, teacherCode }) {
         await supabaseClient.from("profiles").upsert({
           id: authData.user.id,
           name,
-          role
+          role,
+          class_name: className
         });
       } catch (profileErr) {
         console.warn("Profile sync warning:", profileErr);
       }
     }
 
-    const session = { user: authData.user, role, name };
+    const session = { 
+      user: authData.user, 
+      role, 
+      name, 
+      className,
+      needsProfileCompletion: false
+    };
     if (authData.session) {
       localStorage.setItem("netquest_current_user", JSON.stringify(session));
     }
@@ -479,12 +515,13 @@ export async function signUp({ email, password, name, role, teacherCode }) {
     email,
     password,
     name,
-    role
+    role,
+    className
   };
   db.users.push(newUser);
   saveMockData(db);
 
-  const session = { user: newUser, role, name };
+  const session = { user: newUser, role: newUser.role, name: newUser.name, className: newUser.className, needsProfileCompletion: false };
   localStorage.setItem("netquest_current_user", JSON.stringify(session));
   return session;
 }
@@ -495,30 +532,39 @@ export async function signIn({ email, password }) {
     if (error) throw error;
 
     let role = data.user.user_metadata?.role || "student";
-    let name = data.user.user_metadata?.name || email.split("@")[0];
+    let name = data.user.user_metadata?.name || data.user.user_metadata?.full_name || email.split("@")[0];
+    let className = data.user.user_metadata?.class_name || "";
 
     try {
       const { data: profile } = await supabaseClient
         .from("profiles")
-        .select("name, role")
+        .select("name, role, class_name")
         .eq("id", data.user.id)
         .maybeSingle();
 
       if (profile) {
         if (profile.role) role = profile.role;
         if (profile.name) name = profile.name;
+        if (profile.class_name) className = profile.class_name;
       } else {
         await supabaseClient.from("profiles").upsert({
           id: data.user.id,
           name,
-          role
+          role,
+          class_name: className
         });
       }
     } catch (e) {
       console.warn("Could not fetch profile, fallback to metadata:", e);
     }
 
-    const session = { user: data.user, role, name };
+    const session = { 
+      user: data.user, 
+      role, 
+      name, 
+      className,
+      needsProfileCompletion: role === "student" && (!className || className.trim() === "")
+    };
     localStorage.setItem("netquest_current_user", JSON.stringify(session));
     return session;
   }
@@ -531,65 +577,86 @@ export async function signIn({ email, password }) {
   if (!found) {
     throw new Error("Email atau kata sandi tidak cocok!");
   }
-  const session = { user: found, role: found.role, name: found.name };
+  const session = { 
+    user: found, 
+    role: found.role, 
+    name: found.name, 
+    className: found.className || "",
+    needsProfileCompletion: found.role === "student" && (!found.className || found.className.trim() === "")
+  };
   localStorage.setItem("netquest_current_user", JSON.stringify(session));
   return session;
 }
 
-export async function signInWithGoogle({ role = "student", email = null, name = null } = {}) {
+export async function updateUserProfile({ name, className }) {
+  const current = getCurrentUser();
+  if (!current || !current.user) return null;
+
+  if (name) current.name = name.trim();
+  if (className) current.className = className.trim();
+  current.needsProfileCompletion = false;
+
   if (isUsingLiveSupabase()) {
     try {
-      const { data, error } = await supabaseClient.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: window.location.origin,
-          queryParams: {
-            access_type: "offline",
-            prompt: "consent"
-          }
-        }
+      await supabaseClient.auth.updateUser({
+        data: { name: current.name, class_name: current.className }
       });
-      if (error) throw error;
-      if (data?.url) {
-        window.location.href = data.url;
-        return { isRedirecting: true, url: data.url };
-      }
-    } catch (err) {
-      console.warn("Live Supabase Google OAuth is not enabled in dashboard:", err.message);
-      // Fallback gracefully so user can immediately test and enter NetQuest
+    } catch (e) {
+      console.warn("auth.updateUser error:", e);
+    }
+
+    try {
+      await supabaseClient.from("profiles").upsert({
+        id: current.user.id,
+        name: current.name,
+        role: current.role || "student",
+        class_name: current.className
+      });
+    } catch (e) {
+      console.warn("profiles.upsert error:", e);
+    }
+  } else {
+    const db = getMockData();
+    const u = db.users.find(user => user.id === current.user.id);
+    if (u) {
+      u.name = current.name;
+      u.className = current.className;
+      saveMockData(db);
     }
   }
 
-  // Google SSO Fallback / Quick Access & Automatic Registration
-  const db = getMockData();
-  const targetEmail = email || (role === "teacher" ? "budi.santoso@guru.sch.id" : "ahmad.reza@siswa.id");
-  let user = db.users.find(u => u.email.toLowerCase() === targetEmail.toLowerCase());
-  let isNewUser = false;
+  localStorage.setItem("netquest_current_user", JSON.stringify(current));
+  return current;
+}
 
-  if (!user) {
-    isNewUser = true;
-    user = {
-      id: "usr-google-" + Date.now().toString(36),
-      email: targetEmail,
-      name: name || (role === "teacher" ? "Drs. Budi Santoso, M.Kom" : "Ahmad Reza Pratama"),
-      role: role,
+export async function signInWithGoogle({ role = "student" } = {}) {
+  if (isUsingLiveSupabase()) {
+    const { data, error } = await supabaseClient.auth.signInWithOAuth({
       provider: "google",
-      createdAt: new Date().toISOString()
-    };
-    db.users.push(user);
-    saveMockData(db);
+      options: {
+        redirectTo: window.location.origin,
+        queryParams: {
+          access_type: "offline",
+          prompt: "consent"
+        }
+      }
+    });
+
+    if (error) {
+      console.error("Live Supabase Google OAuth error:", error);
+      if (error.message?.includes("Unsupported provider") || error.code === 400 || error.error_code === "validation_failed") {
+        throw new Error("PROVIDER_NOT_ENABLED");
+      }
+      throw error;
+    }
+
+    if (data?.url) {
+      window.location.href = data.url;
+      return { isRedirecting: true, url: data.url };
+    }
   }
 
-  const session = { 
-    user, 
-    role: user.role, 
-    name: user.name, 
-    provider: "google", 
-    isSimulated: isUsingLiveSupabase(),
-    isNewUser
-  };
-  localStorage.setItem("netquest_current_user", JSON.stringify(session));
-  return session;
+  throw new Error("GOOGLE_AUTH_UNAVAILABLE");
 }
 
 export async function signOut() {
@@ -670,13 +737,14 @@ export async function getAllStudentResults() {
   if (isUsingLiveSupabase()) {
     const { data, error } = await supabaseClient
       .from("results")
-      .select("id, user_id, type, score, total, created_at, profiles(name, role)")
+      .select("id, user_id, type, score, total, created_at, profiles(name, role, class_name)")
       .order("created_at", { ascending: false });
     if (error) throw error;
     return (data || []).map(r => ({
       id: r.id,
       user_id: r.user_id,
       name: r.profiles ? r.profiles.name : "Siswa",
+      className: r.profiles ? (r.profiles.class_name || "-") : "-",
       type: r.type,
       score: r.score,
       total: r.total,
@@ -691,6 +759,7 @@ export async function getAllStudentResults() {
     return {
       ...r,
       name: u ? u.name : r.name || "Siswa",
+      className: u ? (u.className || u.class_name || "-") : "-",
       email: u ? u.email : r.email || ""
     };
   });

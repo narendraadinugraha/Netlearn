@@ -20,6 +20,7 @@ import {
   signUp,
   signIn,
   signInWithGoogle,
+  updateUserProfile,
   signOut,
   getCurrentUser,
   saveTestResult,
@@ -105,10 +106,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (isUsingLiveSupabase()) {
     try {
       const liveUser = await checkLiveSession();
-      if (liveUser) state.currentUser = liveUser;
+      state.currentUser = liveUser;
     } catch (e) {
       console.warn("Session restore error:", e);
+      state.currentUser = null;
     }
+  } else {
+    state.currentUser = getCurrentUser();
   }
 
   applyTheme(state.theme);
@@ -121,6 +125,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     updateHUD();
     updateNavUser();
     updateRoleAccess();
+    if (state.currentUser.needsProfileCompletion || (state.currentUser.role === "student" && (!state.currentUser.className || state.currentUser.className.trim() === ""))) {
+      showStudentProfileModal(state.currentUser);
+    }
     const isTeacher = state.currentUser.role === "teacher" || state.currentUser.user?.user_metadata?.role === "teacher";
     navigateTo(isTeacher ? "admin" : "dashboard");
   } else {
@@ -294,10 +301,13 @@ function updateNavUser() {
   if (!container) return;
 
   if (state.currentUser) {
-    const meta = state.currentUser.user.user_metadata || {};
-    const name = meta.full_name || state.currentUser.user.email.split("@")[0];
+    const meta = state.currentUser.user?.user_metadata || {};
+    const name = state.currentUser.name || meta.full_name || meta.name || (state.currentUser.user?.email ? state.currentUser.user.email.split("@")[0] : "Pengguna");
     const isTeacher = state.currentUser.role === "teacher" || meta.role === "teacher";
-    const roleText = isTeacher ? (getLang() === "id" ? "Guru / Admin" : "Instructor / TA") : (getLang() === "id" ? "Siswa CS302" : "Student CS302");
+    const className = state.currentUser.className || meta.class_name || "";
+    const roleText = isTeacher 
+      ? (getLang() === "id" ? "Guru / Instruktur" : "Instructor / TA") 
+      : (className ? `${getLang() === "id" ? "Siswa" : "Student"} • ${className}` : (getLang() === "id" ? "Siswa CS302" : "Student CS302"));
 
     container.innerHTML = `
       <div class="flex items-center gap-2.5 min-w-0 cursor-pointer hover:opacity-85 transition-opacity" id="sidebar-user-click" title="${getLang() === "id" ? "Buka Profil Pengguna" : "View Profile"}">
@@ -675,10 +685,21 @@ function renderAuth(container, mode = "login") {
                 <input 
                   type="text" 
                   id="auth-name" 
-                  placeholder="${isId ? "Nama Lengkap Anda" : "Your Full Name"}"
+                  placeholder="${isId ? "Nama Lengkap Siswa" : "Your Full Name"}"
                   class="w-full px-3.5 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg text-xs text-on-surface focus:outline-none focus:ring-1 focus:ring-primary focus:bg-white font-mono" 
                   required 
                 />
+              </div>
+              <div id="student-class-field">
+                <label class="block text-xs font-semibold text-on-surface mb-1 font-mono">${isId ? "Kelas / Jurusan Siswa *" : "Student Class *"}</label>
+                <input 
+                  type="text" 
+                  id="auth-class" 
+                  placeholder="${isId ? "Contoh: X TKJ 1 / XI RPL 2" : "e.g. 10th Grade TKJ 1"}"
+                  class="w-full px-3.5 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg text-xs text-on-surface focus:outline-none focus:ring-1 focus:ring-primary focus:bg-white font-mono" 
+                  required 
+                />
+                <span class="text-[10px] text-outline font-mono mt-0.5 block">${isId ? "Wajib diisi untuk rekapitulasi nilai guru" : "Required for teacher gradebook"}</span>
               </div>
               <div id="student-id-field">
                 <label class="block text-xs font-semibold text-on-surface mb-1 font-mono">${t("studentIdLabel")}</label>
@@ -814,10 +835,13 @@ function renderAuth(container, mode = "login") {
       selectedRole = btn.dataset.role;
 
       if (teacherCodeField) {
+        const studentClassField = document.getElementById("student-class-field");
         if (selectedRole === "teacher") {
           teacherCodeField.classList.remove("hidden");
+          if (studentClassField) studentClassField.classList.add("hidden");
         } else {
           teacherCodeField.classList.add("hidden");
+          if (studentClassField) studentClassField.classList.remove("hidden");
         }
       }
     });
@@ -831,45 +855,19 @@ function renderAuth(container, mode = "login") {
     try {
       const res = await signInWithGoogle({ role: selectedRole });
       if (res && res.isRedirecting) {
-        // Redirection to Google Accounts OAuth URL in progress
         return;
       }
-      if (res && (res.user || res.name)) {
-        state.currentUser = res;
-        showAppLayout();
-        await loadUserStats();
-        updateNavUser();
-        updateRoleAccess();
-        updateHUD();
-        navigateTo(selectedRole === "teacher" ? "admin" : "dashboard");
-
-        if (res.isNewUser) {
-          showToast(
-            isId ? "Akun Baru Berhasil Didaftarkan!" : "New Account Created!",
-            isId 
-              ? `Akun Google (${res.name}) otomatis dibuat sebagai ${res.role === 'teacher' ? 'Guru' : 'Siswa'}.` 
-              : `Google account for ${res.name} auto-registered as ${res.role}.`,
-            "how_to_reg"
-          );
-        } else if (res.isSimulated) {
-          showToast(
-            isId ? "Masuk via Google (Mode Cepat)" : "Google Sign-In (Quick Access)",
-            isId 
-              ? `Selamat datang, ${res.name}.` 
-              : `Welcome, ${res.name}.`,
-            "account_circle"
-          );
-        } else {
-          showToast(
-            isId ? "Berhasil Masuk via Google!" : "Logged In via Google!", 
-            `${isId ? "Selamat datang" : "Welcome"}, ${res.name || "User"}`, 
-            "check_circle"
-          );
-        }
-      }
     } catch (err) {
-      console.error("Google SSO error:", err);
-      showToast(isId ? "Gagal Masuk Google" : "Google Sign-In Failed", err.message || (isId ? "Tidak dapat menghubungkan Google OAuth." : "Could not complete Google OAuth."), "error");
+      console.error("Google sign-in error:", err);
+      if (err.message === "PROVIDER_NOT_ENABLED") {
+        showGoogleNotEnabledModal();
+      } else {
+        showToast(
+          isId ? "Google Login Belum Aktif" : "Google Login Unavailable",
+          isId ? "Silakan mendaftar atau masuk menggunakan formulir email & kata sandi di bawah." : "Please register or sign in using email & password below.",
+          "info"
+        );
+      }
     }
   });
 
@@ -904,12 +902,19 @@ function renderAuth(container, mode = "login") {
     const password = document.getElementById("auth-password").value.trim();
     const nameEl = document.getElementById("auth-name");
     const fullName = nameEl ? nameEl.value.trim() : email.split("@")[0];
+    const classEl = document.getElementById("auth-class");
+    const className = classEl ? classEl.value.trim() : "";
     const codeEl = document.getElementById("auth-teacher-code");
     const teacherCode = codeEl ? codeEl.value.trim() : "";
     const submitBtn = e.target.querySelector('button[type="submit"]');
 
     if (!email || !password) {
       showToast(isId ? "Formulir Tidak Lengkap" : "Incomplete Form", isId ? "Silakan masukkan email dan kata sandi." : "Please enter email and password.", "warning");
+      return;
+    }
+
+    if (!isLogin && selectedRole === "student" && !className) {
+      showToast(isId ? "Kelas Wajib Diisi" : "Class is Required", isId ? "Silakan masukkan kelas Anda (contoh: X TKJ 1)." : "Please enter your class.", "warning");
       return;
     }
 
@@ -928,6 +933,7 @@ function renderAuth(container, mode = "login") {
           password,
           name: fullName,
           role: selectedRole,
+          className,
           teacherCode
         });
       }
@@ -938,6 +944,11 @@ function renderAuth(container, mode = "login") {
       updateNavUser();
       updateRoleAccess();
       updateHUD();
+
+      if (loggedUser.needsProfileCompletion || (loggedUser.role === "student" && (!loggedUser.className || loggedUser.className.trim() === ""))) {
+        showStudentProfileModal(loggedUser);
+      }
+
       const targetView = (state.currentUser.role === "teacher" || state.currentUser.user?.user_metadata?.role === "teacher") ? "admin" : "dashboard";
       navigateTo(targetView);
       showToast(isLogin ? (isId ? "Selamat Datang Kembali!" : "Welcome Back!") : (isId ? "Akun Berhasil Didaftarkan!" : "Account Registered!"), `${isId ? "Masuk sebagai" : "Logged in as"} ${loggedUser.name || fullName}`, "check_circle");
@@ -2507,6 +2518,7 @@ async function renderAdmin(container) {
             <thead class="bg-surface-container text-outline text-[11px] uppercase border-b border-outline-variant">
               <tr>
                 <th class="p-3.5">${t("studentName")}</th>
+                <th class="p-3.5">${isId ? "Kelas" : "Class"}</th>
                 <th class="p-3.5">${t("studentEmail")}</th>
                 <th class="p-3.5">${t("pretestScore")}</th>
                 <th class="p-3.5">${t("posttestScore")}</th>
@@ -2518,7 +2530,8 @@ async function renderAdmin(container) {
               ${studentResults.map(s => `
                 <tr class="hover:bg-surface-container-low/60 transition-colors">
                   <td class="p-3.5 font-bold text-on-surface">${s.name || s.student_name}</td>
-                  <td class="p-3.5 text-on-surface-variant">${s.email || s.student_email}</td>
+                  <td class="p-3.5 font-bold font-mono text-secondary">${s.className || s.class_name || "X TKJ 1"}</td>
+                  <td class="p-3.5 text-on-surface-variant">${s.email || s.student_email || "-"}</td>
                   <td class="p-3.5 text-outline">${s.preScore || s.pre_score || 16} / 25</td>
                   <td class="p-3.5 font-bold text-primary">${s.postScore || s.post_score || 22} / 25</td>
                   <td class="p-3.5 font-bold text-secondary">+${Math.round((s.gain || 0.6) * 100)}% (g=${s.gain || 0.6})</td>
@@ -2931,3 +2944,143 @@ function openSupabaseModal() {
     showToast("Supabase Berhasil Disimpan", `Project ID: ${CONFIG.PROJECT_REF || "Live"}`, "cloud_done");
   });
 }
+
+// ============================================================================
+// Modal: Notifikasi Google Provider Supabase Belum Aktif
+// ============================================================================
+function showGoogleNotEnabledModal() {
+  const isId = getLang() === "id";
+  const modalsRoot = document.getElementById("modals-root") || document.body;
+  const overlay = document.createElement("div");
+  overlay.className = "fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in";
+  overlay.innerHTML = `
+    <div class="bg-surface-container-lowest border border-outline-variant rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
+          <span class="material-symbols-outlined text-[24px]">vpn_key_alert</span>
+        </div>
+        <div>
+          <h3 class="font-bold text-sm text-on-surface">${isId ? "Google Login Belum Aktif di Supabase" : "Google Provider Not Active in Supabase"}</h3>
+          <p class="text-[11px] text-outline font-mono">Error: provider is not enabled (HTTP 400)</p>
+        </div>
+      </div>
+
+      <p class="text-xs text-on-surface-variant leading-relaxed">
+        ${isId 
+          ? "Login Google memerlukan aktivasi Client ID & Client Secret di <strong>Supabase Dashboard (Authentication ➔ Providers ➔ Google)</strong>." 
+          : "Google SSO requires Client ID & Secret activation in your <strong>Supabase Dashboard (Authentication ➔ Providers ➔ Google)</strong>."}
+      </p>
+
+      <div class="p-3 bg-surface-container-low rounded-xl border border-outline-variant space-y-1">
+        <span class="text-xs font-bold text-on-surface block">${isId ? "💡 Solusi untuk Siswa / Pengguna:" : "💡 Solution for Students / Users:"}</span>
+        <span class="text-xs text-on-surface-variant block leading-relaxed">${isId ? "Silakan buat akun baru dengan memasukkan <strong>Nama Lengkap, Kelas, Email, dan Password</strong> pada formulir pendaftaran." : "Please create an account by filling in your <strong>Name, Class, Email, and Password</strong> on the registration form."}</span>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 pt-2">
+        <button type="button" class="h-9 px-4 rounded-lg bg-surface-container-high text-on-surface text-xs font-mono cursor-pointer" id="btn-close-google-notice">
+          ${isId ? "Tutup" : "Close"}
+        </button>
+        <button type="button" class="h-9 px-4 rounded-lg bg-primary text-on-primary font-bold text-xs font-mono cursor-pointer transition-colors hover:bg-primary-container" id="btn-switch-to-register">
+          ${isId ? "Buka Formulir Daftar Siswa" : "Open Student Register Form"}
+        </button>
+      </div>
+    </div>
+  `;
+
+  modalsRoot.appendChild(overlay);
+
+  overlay.querySelector("#btn-close-google-notice")?.addEventListener("click", () => overlay.remove());
+  overlay.querySelector("#btn-switch-to-register")?.addEventListener("click", () => {
+    overlay.remove();
+    const container = document.getElementById("auth-view") || document.getElementById("app-content");
+    if (container) renderAuth(container, "register");
+  });
+}
+
+// ============================================================================
+// Modal: Formulir Identitas Murid Baru (Nama & Kelas)
+// ============================================================================
+function showStudentProfileModal(currentUser) {
+  const isId = getLang() === "id";
+  const modalsRoot = document.getElementById("modals-root") || document.body;
+  const overlay = document.createElement("div");
+  overlay.id = "modal-complete-profile-overlay";
+  overlay.className = "fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 animate-fade-in";
+  overlay.innerHTML = `
+    <div class="bg-surface-container-lowest border border-outline-variant rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-secondary/15 flex items-center justify-center text-secondary shrink-0">
+          <span class="material-symbols-outlined text-[24px]">assignment_ind</span>
+        </div>
+        <div>
+          <h3 class="font-bold text-base text-on-surface">${isId ? "Lengkapi Identitas Siswa Baru" : "Complete Student Identity"}</h3>
+          <p class="text-xs text-on-surface-variant">${isId ? "Wajib diisi untuk rekap nilai Pretest/Posttest dan absensi kelas." : "Required for grade recording and class analytics."}</p>
+        </div>
+      </div>
+
+      <form id="form-complete-student-profile" class="space-y-3.5 pt-1">
+        <div>
+          <label class="block text-xs font-semibold text-on-surface mb-1 font-mono">${isId ? "Nama Lengkap Siswa *" : "Full Student Name *"}</label>
+          <input 
+            type="text" 
+            id="student-complete-name" 
+            value="${currentUser?.name || currentUser?.user?.user_metadata?.full_name || ""}" 
+            placeholder="${isId ? "Contoh: Budi Pratama" : "e.g. John Doe"}"
+            class="w-full px-3.5 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg text-xs font-mono text-on-surface focus:outline-none focus:ring-1 focus:ring-primary" 
+            required 
+          />
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-on-surface mb-1 font-mono">${isId ? "Kelas / Jurusan Siswa *" : "Class / Major *"}</label>
+          <input 
+            type="text" 
+            id="student-complete-class" 
+            value="${currentUser?.className || ""}" 
+            placeholder="${isId ? "Contoh: X TKJ 1 / XI RPL 2" : "e.g. 10th Grade TKJ 1"}"
+            class="w-full px-3.5 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg text-xs font-mono text-on-surface focus:outline-none focus:ring-1 focus:ring-primary" 
+            required 
+          />
+          <span class="text-[10px] text-outline font-mono mt-0.5 block">${isId ? "Pastikan format kelas sesuai dengan absensi sekolah" : "Ensure class format matches school attendance roster"}</span>
+        </div>
+
+        <button 
+          type="submit" 
+          class="w-full h-10 bg-primary hover:bg-primary-container text-on-primary font-bold rounded-lg text-xs font-mono transition-colors flex items-center justify-center gap-2 cursor-pointer mt-3 shadow-xs"
+        >
+          <span>${isId ? "Simpan Identitas & Mulai Belajar" : "Save & Begin Learning"}</span>
+          <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+        </button>
+      </form>
+    </div>
+  `;
+
+  modalsRoot.appendChild(overlay);
+
+  overlay.querySelector("#form-complete-student-profile")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const nameVal = overlay.querySelector("#student-complete-name").value.trim();
+    const classVal = overlay.querySelector("#student-complete-class").value.trim();
+
+    if (!nameVal || !classVal) {
+      showToast(isId ? "Data Belum Lengkap" : "Incomplete", isId ? "Silakan isi nama dan kelas Anda." : "Please enter your name and class.", "warning");
+      return;
+    }
+
+    const updated = await updateUserProfile({ name: nameVal, className: classVal });
+    if (updated) {
+      state.currentUser = updated;
+    } else {
+      currentUser.name = nameVal;
+      currentUser.className = classVal;
+      currentUser.needsProfileCompletion = false;
+      state.currentUser = currentUser;
+    }
+
+    updateNavUser();
+    updateHUD();
+    overlay.remove();
+    showToast(isId ? "Identitas Berhasil Disimpan!" : "Profile Saved!", `${nameVal} (${classVal})`, "verified");
+  });
+}
+
