@@ -1,6 +1,6 @@
 // NetLearn - Main Application Controller (Stitch Architecture)
 // CS302 Computer Networks Educational Platform & Virtual Lab
-// Project ID: erickoncpqwfnvpshfai
+// Environment config loaded dynamically via .env
 
 import { HOTS_QUESTIONS } from "./data/questions.js";
 import { MATERIALS, getYouTubeEmbedUrl } from "./data/materials.js";
@@ -11,6 +11,7 @@ import { exportToWord, exportToCsv } from "./services/export.js";
 import { renderTopicSimulation } from "./services/simulations.js";
 import {
   CONFIG,
+  loadEnvConfig,
   SQL_SCHEMA_SCRIPT,
   initSupabase,
   isUsingLiveSupabase,
@@ -100,7 +101,7 @@ export async function handleLogout() {
 // App Lifecycle & Initialization
 // ============================================================================
 document.addEventListener("DOMContentLoaded", async () => {
-  initSupabase();
+  await loadEnvConfig();
   if (isUsingLiveSupabase()) {
     try {
       const liveUser = await checkLiveSession();
@@ -338,7 +339,7 @@ function updateDbStatusPill() {
   if (isUsingLiveSupabase()) {
     if (dot) dot.className = "w-2 h-2 rounded-full bg-secondary";
     if (text) text.textContent = "Supabase Cloud";
-    pill.title = "Terhubung ke Supabase Cloud (erickoncpqwfnvpshfai) - Klik untuk konfigurasi";
+    pill.title = `Terhubung ke Supabase Cloud (${CONFIG.PROJECT_REF || "Live"}) - Klik untuk konfigurasi`;
   } else {
     if (dot) dot.className = "w-2 h-2 rounded-full bg-tertiary";
     if (text) text.textContent = "Mode Demo (Lokal)";
@@ -725,7 +726,7 @@ function renderAuth(container, mode = "login") {
               <input 
                 type="text" 
                 id="auth-teacher-code" 
-                placeholder="GURU2026"
+                placeholder="${CONFIG.TEACHER_CODE || 'GURU2026'}"
                 class="w-full px-3.5 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg text-xs text-on-surface font-mono" 
               />
               <span class="text-[10px] text-outline font-mono mt-0.5 block">${t("teacherCodeHint")}</span>
@@ -2663,12 +2664,12 @@ function renderProfile(container) {
         <div class="flex items-center justify-between border-b border-outline-variant pb-2">
           <h3 class="text-sm font-bold text-on-surface font-mono">${isId ? "Sinkronisasi Basis Data Supabase Cloud" : "Cloud Database Synchronization"}</h3>
           <span class="text-xs font-mono text-secondary font-bold">
-            Project: erickoncpqwfnvpshfai
+            Project: ${CONFIG.PROJECT_REF || "Cloud"}
           </span>
         </div>
 
         <p class="text-xs text-on-surface-variant leading-relaxed">
-          ${isId ? "Basis data Supabase terhubung ke project <code>erickoncpqwfnvpshfai</code> untuk sinkronisasi nilai pretest/posttest, akun pengguna, dan materi." : "Connected to Supabase project <code>erickoncpqwfnvpshfai</code> to synchronize student gradebooks, live auth, and educational materials."}
+          ${isId ? `Basis data Supabase terhubung ke project <code>${CONFIG.PROJECT_REF || "Cloud"}</code> untuk sinkronisasi nilai pretest/posttest, akun pengguna, dan materi.` : `Connected to Supabase project <code>${CONFIG.PROJECT_REF || "Cloud"}</code> to synchronize student gradebooks, live auth, and educational materials.`}
         </p>
 
         <div class="flex flex-wrap items-center gap-3 pt-1">
@@ -2872,7 +2873,7 @@ function openSupabaseModal() {
           <input 
             type="text" 
             id="cfg-sb-url" 
-            value="${CONFIG.SB_URL || "https://erickoncpqwfnvpshfai.supabase.co"}"
+            value="${CONFIG.SB_URL || ""}"
             class="w-full px-3 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-xs font-mono"
             required
           />
@@ -2891,7 +2892,7 @@ function openSupabaseModal() {
 
         <div class="p-3 bg-surface-container-low rounded-lg border border-outline-variant flex items-center justify-between">
           <span>Project Ref:</span>
-          <span class="font-bold text-primary font-mono">erickoncpqwfnvpshfai</span>
+          <span class="font-bold text-primary font-mono">${CONFIG.PROJECT_REF || "supabase"}</span>
         </div>
 
         <div class="p-3 bg-surface-container-low rounded-lg border border-outline-variant flex items-center justify-between">
@@ -2927,6 +2928,6 @@ function openSupabaseModal() {
     }
     updateDbStatusPill();
     overlay.remove();
-    showToast("Supabase Berhasil Disimpan", `Project ID: erickoncpqwfnvpshfai`, "cloud_done");
+    showToast("Supabase Berhasil Disimpan", `Project ID: ${CONFIG.PROJECT_REF || "Live"}`, "cloud_done");
   });
 }

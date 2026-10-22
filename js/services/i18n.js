@@ -140,12 +140,12 @@ export const translations = {
 
     // Supabase Settings Modal
     settingsTitle: "Konfigurasi Basis Data Supabase Cloud",
-    settingsDesc: "Project ID Anda: erickoncpqwfnvpshfai. Masukkan Supabase Anon Key untuk sinkronisasi nilai.",
+    settingsDesc: "Masukkan Supabase URL dan Anon Public Key untuk sinkronisasi nilai dan data.",
     sbUrlLabel: "Supabase Project URL (SB_URL)",
     sbKeyLabel: "Supabase Anon Public Key (SB_KEY)",
     teacherCodeCfgLabel: "Kode Rahasia Guru (TEACHER_CODE)",
     btnSaveSettings: "Simpan & Hubungkan",
-    connectedStatus: "Terhubung ke Supabase Cloud (erickoncpqwfnvpshfai)",
+    connectedStatus: "Terhubung ke Supabase Cloud",
     demoStatus: "Mode Demo Mandiri (LocalStorage)",
 
     // Toasts & Messages
@@ -296,12 +296,12 @@ export const translations = {
 
     // Supabase Settings Modal
     settingsTitle: "Supabase Cloud Database Settings",
-    settingsDesc: "Your project ID: erickoncpqwfnvpshfai. Enter your Supabase Anon Public Key to sync.",
+    settingsDesc: "Enter your Supabase Project URL and Anon Public Key to synchronize data.",
     sbUrlLabel: "Supabase Project URL (SB_URL)",
     sbKeyLabel: "Supabase Anon Public Key (SB_KEY)",
     teacherCodeCfgLabel: "Instructor Passcode (TEACHER_CODE)",
     btnSaveSettings: "Save & Reconnect",
-    connectedStatus: "Connected to Supabase Cloud (erickoncpqwfnvpshfai)",
+    connectedStatus: "Connected to Supabase Cloud",
     demoStatus: "Standalone Demo Mode (LocalStorage)",
 
     // Toasts & Messages

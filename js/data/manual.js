@@ -19,7 +19,7 @@ export const MANUAL_BOOK = {
         title: "2. Petunjuk Alur Penggunaan (Langkah 10-16)",
         content: `
 <ol start="10">
-  <li><strong>Pendaftaran Akun</strong>: Buka aplikasi, pilih tab <em>Daftar</em>, isi nama lengkap, alamat email, dan kata sandi. Jika mendaftar sebagai Guru, wajib memasukkan <em>Kode Guru</em> resmi (Default: <code>GURU2026</code>).</li>
+  <li><strong>Pendaftaran Akun</strong>: Buka aplikasi, pilih tab <em>Daftar</em>, isi nama lengkap, alamat email, dan kata sandi. Jika mendaftar sebagai Guru, wajib memasukkan <em>Kode Guru</em> resmi (sesuai <code>TEACHER_CODE</code> di file <code>.env</code>).</li>
   <li><strong>Masuk ke Aplikasi</strong>: Masuk dengan email dan kata sandi terdaftar; sistem akan mengarahkan Anda langsung ke <em>Beranda (Dashboard)</em>.</li>
   <li><strong>Mengerjakan Pretest</strong>: Buka menu <em>Pretest</em>, jawab 25 soal cerita HOTS secara seksama, perhatikan umpan balik langsung pada setiap pertanyaan, lalu tekan <em>Lanjut</em> hingga selesai untuk menyimpan skor awal.</li>
   <li><strong>Mempelajari Materi</strong>: Buka menu <em>Materi</em>, baca 6 topik pembelajaran yang tersedia secara runtut, dan tekan tombol <em>Unduh Modul (.doc)</em> untuk menyimpan salinan dokumen yang kompatibel dengan Microsoft Word.</li>
@@ -61,7 +61,7 @@ export const MANUAL_BOOK = {
         title: "2. Operational Workflow (Steps 10-16)",
         content: `
 <ol start="10">
-  <li><strong>Registration</strong>: Open the app, select <em>Register</em>, fill in full name, email, and password. If registering as a Teacher, the designated <em>Teacher Passcode</em> is mandatory (Default demo: <code>GURU2026</code>).</li>
+  <li><strong>Registration</strong>: Open the app, select <em>Register</em>, fill in full name, email, and password. If registering as a Teacher, the designated <em>Teacher Passcode</em> is mandatory (configured via <code>TEACHER_CODE</code> in <code>.env</code>).</li>
   <li><strong>Sign In</strong>: Log in with your registered email and password to access the gamified <em>Dashboard</em>.</li>
   <li><strong>Pretest Quest</strong>: Navigate to <em>Pretest</em>, solve 25 scenario-based HOTS questions, observe instant analytical feedback, and click <em>Next</em> through completion to benchmark baseline knowledge.</li>
   <li><strong>Explore Modules</strong>: Open the <em>Materials</em> tab, study the 6 curated topics, and click <em>Download Module (.doc)</em> to obtain Word-compatible offline study materials.</li>

@@ -1,0 +1,19 @@
+# Environment Variables (Private Kredensial - JANGAN DI-COMMIT)
+.env
+.env.local
+.env.*.local
+
+# Dependency directories
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Editor & OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log
+
+# Temporary test / capture files
+dom.html

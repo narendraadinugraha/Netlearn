@@ -1,22 +1,82 @@
 // NetQuest - Supabase Database & Auth Service
 // Supports live Supabase Client via @supabase/supabase-js with robust live cloud integration
 
-const savedUrl = localStorage.getItem("sb_url");
-const savedKey = localStorage.getItem("sb_key");
-const DEFAULT_KEY = "sb_publishable_KthTrEJg5NIUqb4CD5ZLVg_9C9Sy5nH";
 export const CONFIG = {
-  SB_URL: (savedUrl && savedUrl.trim() !== "") ? savedUrl.trim() : "https://erickoncpqwfnvpshfai.supabase.co",
-  SB_KEY: (savedKey && savedKey.trim() !== "") ? savedKey.trim() : DEFAULT_KEY,
-  TEACHER_CODE: localStorage.getItem("teacher_code") || "GURU2026",
-  PROJECT_REF: "erickoncpqwfnvpshfai"
+  SB_URL: localStorage.getItem("sb_url") || "",
+  SB_KEY: localStorage.getItem("sb_key") || "",
+  TEACHER_CODE: localStorage.getItem("teacher_code") || "",
+  PROJECT_REF: ""
 };
 
-export const SQL_SCHEMA_SCRIPT = `-- ==============================================================================
+/**
+ * Memuat konfigurasi kredensial secara dinamis dari file .env atau /api/config
+ * Mencegah kebocoran kredensial hardcoded di repositori Git
+ */
+export async function loadEnvConfig() {
+  let envVars = {};
+
+  // 1. Coba baca dari endpoint server jika tersedia
+  try {
+    const res = await fetch("/api/config");
+    if (res.ok) {
+      envVars = await res.json();
+    }
+  } catch (_) {}
+
+  // 2. Jika belum terisi, coba baca file .env secara langsung (npx serve / static server)
+  if (!envVars.SUPABASE_URL && !envVars.SUPABASE_ANON_KEY) {
+    try {
+      const res = await fetch("/.env");
+      if (res.ok) {
+        const text = await res.text();
+        text.split(/\r?\n/).forEach(line => {
+          const trimmed = line.trim();
+          if (trimmed && !trimmed.startsWith("#")) {
+            const idx = trimmed.indexOf("=");
+            if (idx > -1) {
+              const key = trimmed.slice(0, idx).trim();
+              const val = trimmed.slice(idx + 1).trim().replace(/^["']|["']$/g, '');
+              envVars[key] = val;
+            }
+          }
+        });
+      }
+    } catch (_) {}
+  }
+
+  // 3. Terapkan konfigurasi: localStorage pengguna diutamakan jika ada, disusul .env
+  const savedUrl = localStorage.getItem("sb_url");
+  const savedKey = localStorage.getItem("sb_key");
+  const savedCode = localStorage.getItem("teacher_code");
+
+  CONFIG.SB_URL = (savedUrl && savedUrl.trim() !== "") ? savedUrl.trim() : (envVars.SUPABASE_URL || "");
+  CONFIG.SB_KEY = (savedKey && savedKey.trim() !== "") ? savedKey.trim() : (envVars.SUPABASE_ANON_KEY || "");
+  CONFIG.TEACHER_CODE = (savedCode && savedCode.trim() !== "") ? savedCode.trim() : (envVars.TEACHER_CODE || "GURU2026");
+
+  if (envVars.SUPABASE_PROJECT_REF) {
+    CONFIG.PROJECT_REF = envVars.SUPABASE_PROJECT_REF.trim();
+  } else if (CONFIG.SB_URL) {
+    try {
+      const parsedHost = new URL(CONFIG.SB_URL).hostname;
+      CONFIG.PROJECT_REF = parsedHost.split(".")[0];
+    } catch (_) {
+      CONFIG.PROJECT_REF = "supabase";
+    }
+  }
+
+  initSupabase();
+  return CONFIG;
+}
+
+export function getSqlSchemaScript() {
+  const ref = CONFIG.PROJECT_REF || "project-id";
+  const url = CONFIG.SB_URL || "https://your-project.supabase.co";
+  return `-- ==============================================================================
 -- NETQUEST: Skrip Skema Database Supabase & Row Level Security (RLS)
--- Project: erickoncpqwfnvpshfai
--- URL: https://erickoncpqwfnvpshfai.supabase.co
+-- Project: \${ref}
+-- URL: \${url}
 -- Jalankan skrip ini di SQL Editor Supabase Anda:
--- https://supabase.com/dashboard/project/erickoncpqwfnvpshfai/sql
+-- https://supabase.com/dashboard/project/\${ref}/sql
 -- ==============================================================================
 
 -- 1. TABEL PROFILES (Tersinkronisasi otomatis dengan auth.users)
@@ -146,6 +206,7 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
 `;
+}
 
 let supabaseClient = null;
 
@@ -177,14 +238,27 @@ export function getSupabaseClient() {
   return supabaseClient;
 }
 
-export function updateConfig(newUrl, newKey, newCode) {
-  CONFIG.SB_URL = newUrl && newUrl.trim() !== "" ? newUrl.trim() : "https://erickoncpqwfnvpshfai.supabase.co";
-  CONFIG.SB_KEY = newKey && newKey.trim() !== "" ? newKey.trim() : DEFAULT_KEY;
-  CONFIG.TEACHER_CODE = newCode ? newCode.trim() : "GURU2026";
+export const SQL_SCHEMA_SCRIPT = getSqlSchemaScript();
 
-  localStorage.setItem("sb_url", CONFIG.SB_URL);
-  localStorage.setItem("sb_key", CONFIG.SB_KEY);
-  localStorage.setItem("teacher_code", CONFIG.TEACHER_CODE);
+export function updateConfig(newUrl, newKey, newCode) {
+  if (newUrl !== undefined && newUrl !== null && newUrl.trim() !== "") {
+    CONFIG.SB_URL = newUrl.trim();
+    localStorage.setItem("sb_url", CONFIG.SB_URL);
+  }
+  if (newKey !== undefined && newKey !== null && newKey.trim() !== "") {
+    CONFIG.SB_KEY = newKey.trim();
+    localStorage.setItem("sb_key", CONFIG.SB_KEY);
+  }
+  if (newCode !== undefined && newCode !== null && newCode.trim() !== "") {
+    CONFIG.TEACHER_CODE = newCode.trim();
+    localStorage.setItem("teacher_code", CONFIG.TEACHER_CODE);
+  }
+
+  if (CONFIG.SB_URL) {
+    try {
+      CONFIG.PROJECT_REF = new URL(CONFIG.SB_URL).hostname.split(".")[0];
+    } catch (_) {}
+  }
 
   return initSupabase();
 }
