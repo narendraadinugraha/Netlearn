@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <!-- SEO Best Practices -->
+  <title>NetLearn - Platform Pembelajaran Jaringan Komputer Akademik (CS302)</title>
+  <meta name="description" content="NetLearn adalah platform media belajar interaktif berstandar akademik untuk materi Jaringan Komputer CS302, dilengkapi simulator subnetting VLSM, 25 soal HOTS teruji, dan telemetri kemajuan belajar.">
+  <meta name="keywords" content="NetLearn, NetQuest, Jaringan Komputer, Media Belajar Interaktif, HOTS, VLSM, Subnet Calculator, Supabase, CS302, Cisco Packet Tracer">
+  <meta name="author" content="NetLearn Engineering">
+
+  <!-- Google Fonts & Material Symbols Outlined -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+
+  <!-- Supabase JS Client v2 CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- Three.js 3D Library CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+  <!-- Tailwind CSS CDN + NetLearn Custom Design System Tokens -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "primary": "var(--color-primary)",
+            "primary-container": "var(--color-primary-container)",
+            "on-primary": "var(--color-on-primary)",
+            "on-primary-container": "var(--color-on-primary-container)",
+            "primary-fixed": "var(--color-primary-fixed)",
+            "primary-fixed-dim": "var(--color-primary)",
+            "on-primary-fixed": "var(--color-on-primary-fixed)",
+            "on-primary-fixed-variant": "var(--color-primary-container)",
+            
+            "secondary": "var(--color-secondary)",
+            "secondary-container": "var(--color-secondary-container)",
+            "on-secondary": "var(--color-on-secondary)",
+            "on-secondary-container": "var(--color-on-secondary-container)",
+            "secondary-fixed": "var(--color-secondary-fixed)",
+            "on-secondary-fixed": "var(--color-on-secondary-fixed)",
+
+            "tertiary": "var(--color-tertiary)",
+            "tertiary-container": "var(--color-tertiary-container)",
+            "tertiary-fixed": "var(--color-tertiary-fixed)",
+            "on-tertiary-fixed": "var(--color-on-tertiary-fixed)",
+
+            "surface": "var(--color-surface)",
+            "surface-dim": "var(--color-surface-dim)",
+            "surface-bright": "var(--color-surface)",
+            "surface-container-lowest": "var(--color-surface-container-lowest)",
+            "surface-container-low": "var(--color-surface-container-low)",
+            "surface-container": "var(--color-surface-container)",
+            "surface-container-high": "var(--color-surface-container-high)",
+            "surface-container-highest": "var(--color-surface-container-highest)",
+            "surface-variant": "var(--color-surface-container-low)",
+            "on-surface": "var(--color-on-surface)",
+            "on-surface-variant": "var(--color-on-surface-variant)",
+            "outline": "var(--color-outline)",
+            "outline-variant": "var(--color-outline-variant)",
+            "surface-tint": "var(--color-primary)",
+
+            "background": "var(--color-surface)",
+            "on-background": "var(--color-on-surface)",
+            "inverse-surface": "var(--color-on-surface)",
+            "inverse-on-surface": "var(--color-surface)",
+            "inverse-primary": "var(--color-primary)",
+
+            "error": "var(--color-error)",
+            "error-container": "var(--color-error-container)",
+            "on-error": "#ffffff",
+            "on-error-container": "var(--color-error)"
+          },
+          fontFamily: {
+            sans: ["Inter", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "sans-serif"],
+            mono: ["JetBrains Mono", "SFMono-Regular", "Consolas", "monospace"],
+            headline: ["Inter", "sans-serif"],
+            body: ["Inter", "sans-serif"]
+          },
+          borderRadius: {
+            "DEFAULT": "8px",
+            "lg": "12px",
+            "xl": "16px",
+            "2xl": "1rem",
+            "full": "9999px"
+          },
+          spacing: {
+            "gutter": "1.5rem",
+            "gutter-desktop": "2rem",
+            "space-xs": "0.5rem",
+            "space-sm": "0.75rem",
+            "space-md": "1rem",
+            "space-lg": "1.5rem",
+            "space-xl": "2.5rem"
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2300375e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect width='18' height='18' x='3' y='3' rx='2'/><path d='M9 9h6v6H9z'/><path d='M9 1v2M15 1v2M9 21v2M15 21v2M1 9h2M1 15h2M21 9h2M21 15h2'/></svg>">
+
+  <!-- NetLearn Application Stylesheet -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="bg-surface font-sans text-on-surface antialiased min-h-screen flex flex-col">
+
+  <!-- Mobile Overlay Backdrop -->
+  <div id="sidebar-backdrop" class="sidebar-backdrop" aria-hidden="true"></div>
+
+  <!-- Standalone Dedicated Authentication Screen (Completely Separated from App Framework) -->
+  <div id="auth-screen" class="min-h-screen w-full flex items-center justify-center bg-surface p-4 sm:p-6 lg:p-8" style="display: none;">
+    <!-- Rendered dynamically by renderAuth() -->
+  </div>
+
+  <!-- App Main Layout Frame -->
+  <div id="app-root" class="min-h-screen flex w-full">
+
+    <!-- NetLearn Left Navigation Dock (Stitch Architecture) -->
+    <aside id="app-sidebar" class="fixed left-0 top-0 h-full w-64 bg-surface-container-lowest z-50 flex flex-col justify-between border-r border-outline-variant transition-transform duration-200">
+      
+      <!-- Top Scrollable Nav Area -->
+      <div class="flex flex-col flex-1 overflow-y-auto">
+        
+        <!-- Monogram Brand Bar -->
+        <div class="h-14 px-4 flex items-center justify-between border-b border-outline-variant">
+          <div class="flex items-center gap-2.5 cursor-pointer" id="nav-brand" role="button" tabindex="0">
+            <div class="w-8 h-8 bg-gradient-to-tr from-primary-container to-primary rounded-lg flex items-center justify-center text-white shadow-sm shadow-blue-500/20">
+              <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2L13.09 8.26L20 9L13.09 9.74L12 16L10.91 9.74L4 9L10.91 8.26L12 2Z"/>
+              </svg>
+            </div>
+            <div class="flex flex-col">
+              <div class="flex items-center gap-1.5">
+                <span class="font-extrabold text-sm text-on-surface tracking-tight leading-none">NetLearn</span>
+                <span class="text-[9px] font-bold px-1.5 py-0.5 bg-blue-50 text-primary border border-blue-200/80 rounded font-sans">SkillUp</span>
+              </div>
+              <span class="text-[10px] text-on-surface-variant font-mono leading-tight mt-0.5">Networks Academy CS302</span>
+            </div>
+          </div>
+          <button id="sidebar-close-btn" class="md:hidden p-1 rounded text-outline hover:text-on-surface" title="Tutup Menu">
+            <span class="material-symbols-outlined text-[20px]">close</span>
+          </button>
+        </div>
+
+
+
+        <!-- Navigation Links Group -->
+        <div class="p-3">
+          <nav class="flex flex-col gap-0.5" id="nav-links-list">
+            
+            <!-- SECTION: LEARN -->
+            <div class="px-2 pt-2 pb-1 text-[11px] uppercase tracking-wider text-outline font-semibold font-mono">
+              Learn
+            </div>
+            
+            <button class="nav-item-btn flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-medium transition-colors text-on-surface hover:bg-surface-container-low" data-view="dashboard" id="nav-btn-home">
+              <span class="material-symbols-outlined text-[18px]">dashboard</span>
+              <span class="i18n-text" data-i18n="navHome">Dashboard</span>
+            </button>
+
+            <button class="nav-item-btn flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-medium transition-colors text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface" data-view="materials" id="nav-btn-materials">
+              <span class="material-symbols-outlined text-[18px]">menu_book</span>
+              <span class="i18n-text" data-i18n="navMaterials">Materials & Modules</span>
+              <span class="ml-auto text-[10px] font-mono px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant">6</span>
+            </button>
+
+            <button class="nav-item-btn flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-medium transition-colors text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface" data-view="simulation" id="nav-btn-simulation">
+              <span class="material-symbols-outlined text-[18px]">terminal</span>
+              <span class="i18n-text" data-i18n="navSimulation">Simulation Lab & VLSM</span>
+              <span class="ml-auto text-[9px] font-mono px-1.5 py-0.5 rounded bg-secondary-container text-on-secondary-container font-semibold">LAB</span>
+            </button>
+
+            <!-- SECTION: EVALUATION -->
+            <div class="px-2 pt-3 pb-1 text-[11px] uppercase tracking-wider text-outline font-semibold font-mono">
+              Evaluation
+            </div>
+
+            <button class="nav-item-btn flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-medium transition-colors text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface" data-view="pretest" id="nav-btn-pretest">
+              <span class="material-symbols-outlined text-[18px]">assignment</span>
+              <span class="i18n-text" data-i18n="navPretest">Diagnostic Pretest</span>
+              <span class="ml-auto text-[10px] font-mono px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant">25</span>
+            </button>
+
+            <button class="nav-item-btn flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-medium transition-colors text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface" data-view="posttest" id="nav-btn-posttest">
+              <span class="material-symbols-outlined text-[18px]">verified</span>
+              <span class="i18n-text" data-i18n="navPosttest">HOTS Posttest</span>
+              <span class="ml-auto text-[10px] font-mono px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant">25</span>
+            </button>
+
+            <button class="nav-item-btn flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-medium transition-colors text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface" data-view="quizzes" id="nav-btn-quizzes">
+              <span class="material-symbols-outlined text-[18px]">help_outline</span>
+              <span class="i18n-text" data-i18n="navQuizzes">Quizzes & Bank</span>
+            </button>
+
+            <!-- SECTION: SYSTEM -->
+            <div class="px-2 pt-3 pb-1 text-[11px] uppercase tracking-wider text-outline font-semibold font-mono">
+              System
+            </div>
+
+            <button class="nav-item-btn flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-medium transition-colors text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface" data-view="admin" id="nav-btn-admin">
+              <span class="material-symbols-outlined text-[18px]">shield_person</span>
+              <span class="i18n-text" data-i18n="navAdmin">Teacher & Reviews</span>
+              <span class="ml-auto text-[9px] font-mono px-1.5 py-0.5 rounded bg-primary text-on-primary font-bold">PRO</span>
+            </button>
+
+            <button class="nav-item-btn flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-medium transition-colors text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface" data-view="manual" id="nav-btn-manual">
+              <span class="material-symbols-outlined text-[18px]">article</span>
+              <span class="i18n-text" data-i18n="navManual">RFC Docs & Specs</span>
+            </button>
+
+            <button class="nav-item-btn flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-medium transition-colors text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface" data-view="profile" id="nav-btn-profile">
+              <span class="material-symbols-outlined text-[18px]">tune</span>
+              <span class="i18n-text" data-i18n="navSettings">Settings & Profile</span>
+            </button>
+          </nav>
+        </div>
+
+        <!-- Sidebar Learning Progress Indicator -->
+        <div class="px-3 pb-3 mt-auto">
+          <div class="p-3 bg-surface-container-low border border-outline-variant rounded-xl flex flex-col gap-2">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold text-on-surface flex items-center gap-1.5">
+                <span class="material-symbols-outlined text-primary text-[16px]">trending_up</span>
+                <span id="hud-progress-title">Progres Belajar</span>
+              </span>
+              <span class="text-xs font-mono font-bold text-primary" id="hud-progress-percent">0%</span>
+            </div>
+            <div class="w-full bg-surface-container-high h-1.5 rounded-full overflow-hidden">
+              <div class="bg-primary h-full rounded-full transition-all duration-300" id="hud-progress-fill" style="width: 0%;"></div>
+            </div>
+            <div class="flex items-center justify-between text-[10px] font-mono text-on-surface-variant">
+              <span id="hud-modules-done">0/6 Modul</span>
+              <span id="hud-status-label">Aktif</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- User Profile Box -->
+      <div class="p-3 border-t border-outline-variant bg-surface-container-lowest">
+        <div id="nav-user-area" class="flex items-center justify-between">
+          <!-- Populated dynamically by JS -->
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Workspace Container -->
+    <div class="flex-1 md:pl-64 flex flex-col min-w-0">
+
+      <!-- Top Command Header Bar (Stitch Reference) -->
+      <header class="sticky top-0 h-14 bg-surface-container-lowest/90 backdrop-blur-md border-b border-outline-variant z-40 flex items-center justify-between px-4 sm:px-6">
+        
+        <!-- Left: Mobile Toggle & Breadcrumbs -->
+        <div class="flex items-center gap-3 min-w-0">
+          <button id="mobile-menu-btn" class="md:hidden p-1.5 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container" title="Buka Menu">
+            <span class="material-symbols-outlined text-[20px]">menu</span>
+          </button>
+          
+          <div class="flex items-center gap-1.5 text-xs text-on-surface-variant font-mono truncate">
+            <span class="text-primary font-semibold hover:underline cursor-pointer" id="header-breadcrumb-root">CS302 Networks</span>
+            <span class="text-outline-variant">/</span>
+            <span class="text-on-surface font-medium truncate" id="header-breadcrumb-title">Dashboard</span>
+          </div>
+        </div>
+
+        <!-- Center: Command Search (RFCs & Modules) -->
+        <div class="hidden lg:flex items-center relative max-w-sm w-full mx-4">
+          <span class="material-symbols-outlined absolute left-2.5 text-[16px] text-outline pointer-events-none">search</span>
+          <input 
+            type="text" 
+            id="global-search-input"
+            class="w-full h-8 pl-8 pr-12 bg-surface-container-low border border-outline-variant rounded-lg text-xs text-on-surface placeholder:text-outline focus:outline-none focus:ring-1 focus:ring-primary focus:bg-white transition-all font-mono" 
+            placeholder="Search curriculum, RFCs, tools..."
+          />
+          <span class="absolute right-2 px-1.5 py-0.5 bg-surface-container-lowest border border-outline-variant rounded text-[10px] text-outline font-mono pointer-events-none">⌘K</span>
+        </div>
+
+        <!-- Right: Audio, Theme & Language Controls -->
+        <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <!-- Audio Sound Effects Switch -->
+          <button class="p-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors" id="sound-toggle-btn" title="Toggle Audio FX" aria-label="Toggle Audio FX">
+            <span class="material-symbols-outlined text-[18px]" id="sound-icon">volume_up</span>
+          </button>
+
+          <!-- Theme Mode Switch -->
+          <button class="p-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors" id="theme-toggle-btn" title="Toggle Tema" aria-label="Toggle Tema">
+            <span class="material-symbols-outlined text-[18px]" id="theme-icon">light_mode</span>
+          </button>
+
+          <!-- Language Switcher -->
+          <button class="px-2.5 py-1 rounded-lg border border-outline-variant text-[11px] font-mono font-bold text-on-surface hover:bg-surface-container transition-colors" id="lang-toggle-btn" title="Switch Language">
+            <span id="current-lang-label">ID</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Main Dynamic View Canvas -->
+      <main class="flex-1 w-full bg-surface p-4 sm:p-6 lg:p-8" id="app-view">
+        <!-- Rendered dynamically by js/app.js -->
+      </main>
+    </div>
+  </div>
+
+  <!-- Global Toast Notification Container -->
+  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none" aria-live="polite"></div>
+
+  <!-- Global Modal Root -->
+  <div id="modals-root" class="relative z-50"></div>
+
+  <!-- Main JavaScript App Entrypoint (ES Module) -->
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
