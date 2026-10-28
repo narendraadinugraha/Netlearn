@@ -130,9 +130,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       showStudentProfileModal(state.currentUser);
     }
     const isTeacher = state.currentUser.role === "teacher" || state.currentUser.user?.user_metadata?.role === "teacher";
-    navigateTo(isTeacher ? "admin" : "dashboard");
+    const targetHash = window.location.hash.replace("#", "").trim();
+    const validViews = ["dashboard", "materials", "simulation", "quizzes", "pretest", "posttest", "manual", "profile", "admin"];
+    const initialView = validViews.includes(targetHash) ? targetHash : (isTeacher ? "admin" : "dashboard");
+    navigateTo(initialView);
   } else {
-    showAuthLayout("login");
+    const initialMode = window.location.hash.toLowerCase().includes("register") ? "register" : "login";
+    showAuthLayout(initialMode);
   }
 });
 
@@ -320,15 +324,18 @@ function updateNavUser() {
     const name = state.currentUser.name || meta.full_name || meta.name || (state.currentUser.user?.email ? state.currentUser.user.email.split("@")[0] : "Pengguna");
     const isTeacher = state.currentUser.role === "teacher" || meta.role === "teacher";
     const className = state.currentUser.className || meta.class_name || "";
+    const avatar = state.currentUser.avatar || meta.avatar_url;
     const roleText = isTeacher 
       ? (getLang() === "id" ? "Guru / Instruktur" : "Instructor / TA") 
-      : (className ? `${getLang() === "id" ? "Siswa" : "Student"} • ${className}` : (getLang() === "id" ? "Siswa CS302" : "Student CS302"));
+      : (className ? `${getLang() === "id" ? "Siswa" : "Student"} • ${className}` : (getLang() === "id" ? "Siswa NetLearn" : "NetLearn Student"));
+
+    const avatarHtml = avatar 
+      ? `<img src="${avatar}" alt="${name}" class="w-8 h-8 rounded-full object-cover shrink-0 shadow-xs border border-outline-variant" />` 
+      : `<div class="w-8 h-8 rounded-full ${isTeacher ? "bg-secondary text-on-secondary" : "bg-primary text-on-primary"} flex items-center justify-center font-bold text-xs shrink-0 shadow-xs font-mono">${name.charAt(0).toUpperCase()}</div>`;
 
     container.innerHTML = `
       <div class="flex items-center gap-2.5 min-w-0 cursor-pointer hover:opacity-85 transition-opacity" id="sidebar-user-click" title="${getLang() === "id" ? "Buka Profil Pengguna" : "View Profile"}">
-        <div class="w-8 h-8 rounded-full ${isTeacher ? "bg-secondary text-on-secondary" : "bg-primary text-on-primary"} flex items-center justify-center font-bold text-xs shrink-0 shadow-xs font-mono">
-          ${name.charAt(0).toUpperCase()}
-        </div>
+        ${avatarHtml}
         <div class="flex flex-col min-w-0">
           <span class="text-xs font-bold text-on-surface truncate leading-tight">${name}</span>
           <span class="text-[10px] text-on-surface-variant font-mono truncate leading-tight mt-0.5">${roleText}</span>
@@ -363,12 +370,12 @@ function updateDbStatusPill() {
 
   if (isUsingLiveSupabase()) {
     if (dot) dot.className = "w-2 h-2 rounded-full bg-secondary";
-    if (text) text.textContent = "Supabase Cloud";
-    pill.title = `Terhubung ke Supabase Cloud (${CONFIG.PROJECT_REF || "Live"}) - Klik untuk konfigurasi`;
+    if (text) text.textContent = "Online";
+    pill.title = "Sistem Basis Data Aktif";
   } else {
     if (dot) dot.className = "w-2 h-2 rounded-full bg-tertiary";
-    if (text) text.textContent = "Mode Demo (Lokal)";
-    pill.title = "Mode Demo Mandiri - Klik untuk menghubungkan Supabase";
+    if (text) text.textContent = "Mode Mandiri (Lokal)";
+    pill.title = "Mode Demo Mandiri Aktif";
   }
 }
 
@@ -413,21 +420,21 @@ export function navigateTo(viewName, params = {}) {
   // Breadcrumbs title update
   const isId = getLang() === "id";
   const breadcrumbMap = {
-    dashboard: isId ? "Ringkasan CS302" : "CS302 Overview",
+    dashboard: isId ? "Ringkasan Pembelajaran" : "Learning Overview",
     auth: isId ? "Autentikasi" : "Authentication",
     pretest: isId ? "Pretest Diagnostik" : "Diagnostic Pretest",
     posttest: isId ? "Posttest HOTS" : "HOTS Posttest",
     materials: isId ? "Modul & Materi" : "Materials & Modules",
     simulation: isId ? "Lab Simulasi & VLSM" : "Simulation Lab & VLSM",
     quizzes: isId ? "Kuis & Bank Soal" : "Quizzes & Bank",
-    manual: isId ? "Buku Panduan & RFC" : "RFC Docs & Specs",
+    manual: isId ? "Buku Panduan Aplikasi" : "User Guide & Manual",
     admin: isId ? "Panel Guru" : "Teacher Console",
     profile: isId ? "Profil Pengguna" : "Student Profile",
     "posttest-results": isId ? "Hasil Evaluasi & Diagnostik" : "Assessment Results & Diagnostics"
   };
 
   const titleEl = document.getElementById("header-breadcrumb-title");
-  if (titleEl) titleEl.textContent = breadcrumbMap[viewName] || "NetLearn CS302";
+  if (titleEl) titleEl.textContent = breadcrumbMap[viewName] || "NetLearn TKJ";
 
   // Close mobile drawer
   document.getElementById("app-sidebar")?.classList.remove("mobile-open");
@@ -627,7 +634,6 @@ function renderAuth(container, mode = "login") {
             <div>
               <div class="flex items-center gap-2">
                 <h1 class="text-xl font-bold text-on-surface tracking-tight leading-none">NetLearn</h1>
-                <span class="text-[10px] font-semibold px-2 py-0.5 bg-primary/10 text-primary border border-primary/20 rounded font-mono">CS302</span>
               </div>
               <p class="text-xs text-on-surface-variant mt-1">
                 ${isLogin 
@@ -638,7 +644,7 @@ function renderAuth(container, mode = "login") {
           </div>
 
           <!-- Primary Mode Selector: Masuk vs Daftar Baru -->
-          <div class="flex items-center p-1 bg-surface-container-low rounded-xl mb-4 border border-outline-variant">
+          <div class="flex items-center p-1 bg-surface-container-low rounded-xl mb-5 border border-outline-variant">
             <button 
               type="button" 
               class="flex-1 py-2 px-3 rounded-lg text-xs font-bold text-center transition-all auth-mode-tab cursor-pointer ${isLogin ? 'bg-surface-container-lowest text-primary shadow-xs' : 'text-outline hover:text-on-surface'}" 
@@ -654,29 +660,6 @@ function renderAuth(container, mode = "login") {
               ${isId ? "Daftar Akun Baru" : "Register"}
             </button>
           </div>
-
-          <!-- Role Switcher: Hanya ditampilkan saat Masuk (Guru login manual) -->
-          ${isLogin ? `
-            <div class="flex items-center justify-between mb-4">
-              <span class="text-[11px] font-mono text-outline font-semibold uppercase tracking-wider">${t("roleLabel")}:</span>
-              <div class="p-0.5 bg-surface-container-low rounded-lg flex items-center text-xs font-semibold border border-outline-variant">
-                <button type="button" class="py-1 px-3 rounded-md bg-surface-container-lowest text-primary shadow-xs font-bold text-center transition-all auth-role-btn active" data-role="student">
-                  ${t("roleStudentTab")}
-                </button>
-                <button type="button" class="py-1 px-3 rounded-md text-outline hover:text-on-surface text-center transition-all auth-role-btn" data-role="teacher">
-                  ${t("roleTeacherTab")}
-                </button>
-              </div>
-            </div>
-          ` : `
-            <div class="flex items-center justify-between mb-4 p-2.5 bg-primary/5 rounded-xl border border-primary/20">
-              <div class="flex items-center gap-2">
-                <span class="material-symbols-outlined text-[18px] text-primary">school</span>
-                <span class="text-xs font-bold text-primary">${isId ? "Pendaftaran Khusus Siswa" : "Student Registration Only"}</span>
-              </div>
-              <span class="text-[10px] text-outline font-mono">${isId ? "Akun Guru dikelola Admin" : "Teacher accounts set by Admin"}</span>
-            </div>
-          `}
 
           <!-- Form Element (Username/Email & Password) -->
           <form id="auth-form" class="space-y-3.5">
@@ -706,15 +689,6 @@ function renderAuth(container, mode = "login") {
                   <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-[18px] text-outline pointer-events-none">expand_more</span>
                 </div>
                 <span class="text-[10px] text-outline font-mono mt-1 block">${isId ? "Pilih langsung kelas tanpa mengetik manual" : "Select directly without typing"}</span>
-              </div>
-              <div id="student-id-field">
-                <label class="block text-xs font-semibold text-on-surface mb-1 font-mono">${t("studentIdLabel")}</label>
-                <input 
-                  type="text" 
-                  id="auth-student-id" 
-                  placeholder="${isId ? "Contoh: CS2025-08119 (Opsional)" : "e.g. CS2025-08119 (Optional)"}"
-                  class="w-full px-3.5 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg text-xs text-on-surface focus:outline-none focus:ring-1 focus:ring-primary focus:bg-white font-mono" 
-                />
               </div>
             ` : ""}
 
@@ -798,8 +772,6 @@ function renderAuth(container, mode = "login") {
               ${isId ? "⚡ Akun otomatis terdaftar jika belum pernah dibuat" : "⚡ Automatically registers your account if not yet created"}
             </p>
           </div>
-            </button>
-          </form>
         </div>
 
         <!-- Footer switch mode link -->
@@ -835,7 +807,7 @@ function renderAuth(container, mode = "login") {
         <div class="relative z-10 bg-slate-900/75 backdrop-blur-md border border-white/15 p-5 rounded-2xl shadow-xl space-y-2">
           <div class="flex items-center gap-2">
             <span class="w-2 h-2 rounded-full bg-secondary"></span>
-            <span class="text-[11px] font-mono font-semibold tracking-wider text-sky-300 uppercase">Akademi Jaringan Komputer CS302</span>
+            <span class="text-[11px] font-mono font-semibold tracking-wider text-sky-300 uppercase">Akademi Jaringan Komputer</span>
           </div>
           <h2 class="text-base font-bold text-white tracking-tight">
             ${isId ? "Laboratorium Virtual & Kurikulum Terpadu" : "Virtual Networking Lab & Curriculum"}
@@ -1064,14 +1036,14 @@ function renderDashboard(container) {
       <div class="bg-surface-container-lowest border border-outline-variant rounded-2xl p-5 sm:p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div class="space-y-1.5 max-w-2xl">
           <div class="flex items-center gap-2">
-            <span class="text-xs font-mono font-semibold px-2 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">CS302 Networks</span>
-            <span class="text-xs text-on-surface-variant font-mono">• ${state.currentUser?.className ? `${state.currentUser.className} • ` : ""}${isId ? "Semester Genap 2025" : "Spring Term 2025"}</span>
+            <span class="text-xs font-mono font-semibold px-2 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">NetLearn TKJ</span>
+            <span class="text-xs text-on-surface-variant font-mono">• ${state.currentUser?.className ? `${state.currentUser.className} • ` : ""}${isId ? "Tahun Ajaran 2025/2026" : "Academic Year 2025/2026"}</span>
           </div>
           <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-on-surface">
             ${isId ? `Selamat Datang, ${state.currentUser?.name || studentName}` : `Welcome, ${state.currentUser?.name || studentName}`}
           </h1>
           <p class="text-xs text-on-surface-variant leading-relaxed">
-            ${isId ? "Akses silabus kurikulum, simulator lab CLI & VLSM, serta pantau evaluasi kognitif Anda secara mandiri." : "Access curriculum modules, CLI & VLSM lab simulators, and track your evaluation progress."}
+            ${isId ? "Akses modul kurikulum, simulator lab CLI & VLSM, serta pantau evaluasi kognitif Anda secara mandiri." : "Access curriculum modules, CLI & VLSM lab simulators, and track your evaluation progress."}
           </p>
         </div>
         <div class="flex items-center gap-2.5 shrink-0 flex-wrap">
@@ -1082,10 +1054,6 @@ function renderDashboard(container) {
           <button class="h-9 px-3.5 bg-surface-container-low hover:bg-surface-container text-on-surface border border-outline-variant font-medium text-xs rounded-xl flex items-center gap-2 transition-colors cursor-pointer" id="btn-hero-lab">
             <span class="material-symbols-outlined text-[18px] text-primary">terminal</span>
             <span>${isId ? "Buka Lab" : "Simulation Lab"}</span>
-          </button>
-          <button class="h-9 px-3 bg-surface-container-low hover:bg-surface-container text-on-surface font-mono text-xs rounded-xl border border-outline-variant flex items-center gap-1.5 transition-colors cursor-pointer" id="btn-dash-syllabus" title="Unduh Silabus">
-            <span class="material-symbols-outlined text-[16px] text-outline">file_download</span>
-            <span>Silabus</span>
           </button>
         </div>
       </div>
@@ -1427,24 +1395,6 @@ function renderDashboard(container) {
   document.getElementById("btn-tool-subnet")?.addEventListener("click", () => navigateTo("simulation"));
   document.getElementById("btn-tool-topology")?.addEventListener("click", () => navigateTo("simulation"));
   document.getElementById("btn-tool-pretest")?.addEventListener("click", () => navigateTo("pretest"));
-
-  document.getElementById("btn-dash-syllabus")?.addEventListener("click", () => {
-    exportToWord("Silabus_Jaringan_Komputer_CS302", "Silabus Jaringan Komputer CS302", `
-      <h1>Silabus Jaringan Komputer (CS302)</h1>
-      <p>Dosen Pengampu: Dr. Sarah Jenkins</p>
-      <h2>Rincian Modul Kurikulum</h2>
-      <ul>
-        <li>MOD-01: Pengantar Jaringan, Klasifikasi & Topologi</li>
-        <li>MOD-02: Perangkat Keras Jaringan, Switch, Router & ARP</li>
-        <li>MOD-03: Pengalamatan IP, Subnetting & Arsitektur VLSM</li>
-        <li>MOD-04: Protokol Routing: Distance Vector vs Link-State</li>
-        <li>MOD-05: Media Transmisi, Kabel & Standar Crimping UTP</li>
-        <li>MOD-06: Model Referensi OSI 7 Layer & Protokol TCP/IP</li>
-      </ul>
-      <p>Instrumen Evaluasi: 25 Butir Soal Cerita HOTS Teruji.</p>
-    `);
-    showToast(isId ? "Silabus Diekspor" : "Syllabus Exported", isId ? "Dokumen Word silabus berhasil diunduh." : "Word document generated.", "download");
-  });
 
   container.querySelectorAll(".mod-review-btn, .mod-resume-btn").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -2536,7 +2486,7 @@ async function renderAdmin(container) {
       <div class="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-xs overflow-hidden">
         <div class="p-4 bg-surface-container-low border-b border-outline-variant flex items-center justify-between">
           <h3 class="text-xs font-mono font-bold text-on-surface uppercase tracking-wider">${t("tabStudents")}</h3>
-          <span class="text-xs font-mono text-secondary font-bold">Sinkronisasi Cloud Aktif</span>
+          <span class="text-xs font-mono text-secondary font-bold">Status: Online</span>
         </div>
 
         <div class="overflow-x-auto">
@@ -2586,35 +2536,68 @@ async function renderAdmin(container) {
 // ============================================================================
 function renderManual(container) {
   const isId = getLang() === "id";
+  const book = isId ? MANUAL_BOOK.id : MANUAL_BOOK.en;
+  const sections = book?.sections || [];
 
   container.innerHTML = `
-    <div class="max-w-6xl mx-auto space-y-6 w-full">
+    <div class="max-w-5xl mx-auto space-y-6 w-full">
       <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-2 border-b border-outline-variant">
         <div>
           <div class="flex items-center gap-1.5 font-mono text-xs text-outline uppercase tracking-wider">
-            <span>${isId ? "Portal Akademik" : "Academic Portal"}</span>
+            <span>${isId ? "Portal Pembelajaran" : "Learning Portal"}</span>
             <span>/</span>
-            <span>${isId ? "Dokumentasi & Bantuan" : "Help & Documentation"}</span>
+            <span>${isId ? "Buku Panduan & Petunjuk" : "User Guide & Handbook"}</span>
           </div>
-          <h1 class="text-2xl sm:text-3xl font-extrabold text-on-surface tracking-tight">${t("manualTitle")}</h1>
-          <p class="text-xs sm:text-sm text-on-surface-variant">${t("manualSubtitle")}</p>
+          <h1 class="text-2xl sm:text-3xl font-extrabold text-on-surface tracking-tight">${book?.title || (isId ? "Buku Panduan Tata Cara Penggunaan Aplikasi" : "NetLearn Application User Guide")}</h1>
+          <p class="text-xs sm:text-sm text-on-surface-variant mt-1">${book?.subtitle || (isId ? "Petunjuk lengkap langkah demi langkah pengoperasian fitur pembelajaran mandiri NetLearn." : "Complete step-by-step user manual.")}</p>
         </div>
-        <button class="h-9 px-3.5 bg-primary hover:bg-primary-container text-on-primary font-mono text-xs font-bold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer" id="btn-export-handbook">
+        <button class="h-9 px-3.5 bg-primary hover:bg-primary-container text-on-primary font-mono text-xs font-bold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 shadow-xs" id="btn-export-handbook">
           <span class="material-symbols-outlined text-[16px]">file_download</span>
-          <span>${t("btnDownloadManual")}</span>
+          <span>${isId ? "Unduh Panduan (.doc)" : "Download Guide (.doc)"}</span>
         </button>
       </div>
 
-      <!-- Documentation Chapters Accordion -->
+      <!-- Quick Summary Cards (Pilar Utama Penggunaan) -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant shadow-xs flex items-center gap-3">
+          <div class="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+            <span class="material-symbols-outlined text-[22px]">menu_book</span>
+          </div>
+          <div>
+            <div class="font-bold text-xs text-on-surface">${isId ? "1. Modul & Video" : "1. Modules & Video"}</div>
+            <div class="text-[11px] text-on-surface-variant">${isId ? "6 topik kurikulum & dokumen Word" : "6 curriculum topics & Word docs"}</div>
+          </div>
+        </div>
+        <div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant shadow-xs flex items-center gap-3">
+          <div class="w-10 h-10 rounded-lg bg-secondary/10 text-secondary flex items-center justify-center shrink-0">
+            <span class="material-symbols-outlined text-[22px]">terminal</span>
+          </div>
+          <div>
+            <div class="font-bold text-xs text-on-surface">${isId ? "2. Simulator & VLSM" : "2. Simulator & VLSM"}</div>
+            <div class="text-[11px] text-on-surface-variant">${isId ? "Kalkulator subnetting interaktif" : "Interactive subnet calculator"}</div>
+          </div>
+        </div>
+        <div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant shadow-xs flex items-center gap-3">
+          <div class="w-10 h-10 rounded-lg bg-tertiary/10 text-tertiary flex items-center justify-center shrink-0">
+            <span class="material-symbols-outlined text-[22px]">fact_check</span>
+          </div>
+          <div>
+            <div class="font-bold text-xs text-on-surface">${isId ? "3. Evaluasi HOTS" : "3. HOTS Assessment"}</div>
+            <div class="text-[11px] text-on-surface-variant">${isId ? "Pretest, posttest & gain score" : "Pretest, posttest & gain score"}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Documentation Chapters -->
       <div class="space-y-4">
-        ${MANUAL_BOOK.sections.map((sec, idx) => `
-          <div class="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant shadow-xs">
-            <h3 class="text-base font-bold text-on-surface mb-2 flex items-center gap-2">
-              <span class="w-6 h-6 rounded-full bg-primary-fixed text-primary font-mono text-xs flex items-center justify-center font-bold">${idx + 1}</span>
-              <span>${isId ? sec.title_id : sec.title_en}</span>
+        ${sections.map((sec, idx) => `
+          <div class="bg-surface-container-lowest p-5 sm:p-6 rounded-xl border border-outline-variant shadow-xs">
+            <h3 class="text-base font-bold text-on-surface mb-3 flex items-center gap-3 border-b border-outline-variant/60 pb-2">
+              <span class="w-7 h-7 rounded-lg bg-primary/10 text-primary font-mono text-xs flex items-center justify-center font-bold border border-primary/20 shrink-0">${idx + 1}</span>
+              <span>${sec.title}</span>
             </h3>
-            <div class="text-xs sm:text-sm text-on-surface-variant leading-relaxed pl-8 space-y-2">
-              ${isId ? sec.content_id : sec.content_en}
+            <div class="text-xs sm:text-sm text-on-surface-variant leading-relaxed sm:pl-10 space-y-2">
+              ${sec.content}
             </div>
           </div>
         `).join("")}
@@ -2623,9 +2606,9 @@ function renderManual(container) {
   `;
 
   document.getElementById("btn-export-handbook")?.addEventListener("click", () => {
-    let docHtml = `<h1>Buku Panduan Platform NetLearn & Spesifikasi RFC CS302</h1>`;
-    MANUAL_BOOK.sections.forEach(s => {
-      docHtml += `<h2>${s.title_id}</h2><div>${s.content_id}</div><hr/>`;
+    let docHtml = `<h1>${book?.title || "Buku Panduan NetLearn"}</h1><p><em>${book?.subtitle || ""}</em></p><hr/>`;
+    sections.forEach(s => {
+      docHtml += `<h2>${s.title}</h2><div>${s.content}</div><hr/>`;
     });
     exportToWord("Buku_Panduan_NetLearn", "Buku Panduan NetLearn", docHtml);
     showToast(isId ? "Panduan Diunduh" : "Handbook Downloaded", isId ? "File panduan format Word berhasil diunduh." : "Exported successfully to Word format.", "file_download");
@@ -2637,9 +2620,10 @@ function renderManual(container) {
 // ============================================================================
 function renderProfile(container) {
   const meta = state.currentUser?.user?.user_metadata || {};
-  const studentName = meta.full_name || "Aditya Sharma";
-  const studentEmail = state.currentUser?.user?.email || "aditya@netlearn.edu";
-  const studentId = meta.student_id || "CS2025-08119";
+  const studentName = state.currentUser?.name || meta.full_name || meta.name || (getLang() === "id" ? "Siswa NetLearn" : "Student");
+  const studentEmail = state.currentUser?.email || state.currentUser?.user?.email || "siswa@netlearn.edu";
+  const studentClass = state.currentUser?.className || meta.class_name || "";
+  const studentAvatar = state.currentUser?.avatar || meta.avatar_url || "";
   const isTeacher = state.currentUser?.role === "teacher" || meta.role === "teacher";
   const isId = getLang() === "id";
 
@@ -2653,28 +2637,150 @@ function renderProfile(container) {
           <span>/</span>
           <span class="text-on-surface font-semibold">${isId ? "Profil & Pengaturan" : "Profile & Settings"}</span>
         </div>
-        <h1 class="text-2xl sm:text-3xl font-extrabold text-on-surface tracking-tight">${isId ? "Profil Pengguna & Pengaturan Keamanan" : "Student Profile & Security Settings"}</h1>
+        <h1 class="text-2xl sm:text-3xl font-extrabold text-on-surface tracking-tight">${isId ? "Profil Pengguna & Pengaturan Akun" : "User Profile & Account Settings"}</h1>
       </div>
 
       <!-- Hero Identity Card -->
       <div class="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant shadow-xs flex flex-col sm:flex-row items-center gap-6">
-        <div class="w-20 h-20 rounded-full ${isTeacher ? "bg-secondary text-on-secondary" : "bg-primary text-on-primary"} flex items-center justify-center text-3xl font-bold font-mono shadow-md">
-          ${studentName.charAt(0).toUpperCase()}
+        <div class="w-20 h-20 rounded-full ${isTeacher ? "bg-secondary text-on-secondary" : "bg-primary text-on-primary"} flex items-center justify-center text-3xl font-bold font-mono shadow-md overflow-hidden shrink-0 border-2 border-outline-variant">
+          ${studentAvatar 
+            ? `<img src="${studentAvatar}" alt="${studentName}" class="w-full h-full object-cover" id="hero-avatar-img" />`
+            : `<span id="hero-avatar-initial">${studentName.charAt(0).toUpperCase()}</span>`
+          }
         </div>
         <div class="flex flex-col gap-1 text-center sm:text-left min-w-0">
           <div class="flex flex-wrap items-center justify-center sm:justify-start gap-2">
-            <h2 class="text-xl font-bold text-on-surface">${studentName}</h2>
-            <span class="px-2 py-0.5 rounded font-mono text-xs bg-primary-fixed text-primary font-bold">ID: ${studentId}</span>
+            <h2 class="text-xl font-bold text-on-surface" id="hero-name-display">${studentName}</h2>
+            ${studentClass ? `<span class="px-2 py-0.5 rounded font-mono text-xs bg-primary-fixed text-primary font-bold" id="hero-class-badge">${studentClass}</span>` : ""}
             <span class="px-2 py-0.5 rounded font-mono text-xs ${isTeacher ? "bg-secondary-fixed text-on-secondary-fixed" : "bg-surface-container text-on-surface"} font-bold">
-              ${isTeacher ? (isId ? "Guru / Admin" : "Teacher") : (isId ? "Siswa CS302" : "Student")}
+              ${isTeacher ? (isId ? "Guru / Admin" : "Teacher") : (isId ? "Siswa" : "Student")}
             </span>
           </div>
-          <p class="text-xs text-on-surface-variant font-mono">${studentEmail} • CS302 Networks Engineering Spec.</p>
+          <p class="text-xs text-on-surface-variant font-mono">${studentEmail} • ${studentClass ? `Kelas ${studentClass} • ` : ""}Kurikulum Jaringan Komputer</p>
           <div class="flex items-center gap-2 mt-1">
             <span class="px-2.5 py-0.5 rounded-full bg-secondary-fixed text-on-secondary-fixed font-mono text-[10px] font-bold">Node Verified</span>
             <span class="px-2.5 py-0.5 rounded-full bg-surface-container text-outline font-mono text-[10px]">Academic Active</span>
           </div>
         </div>
+      </div>
+
+      <!-- Edit Profil: Ubah Nama & Foto Profil -->
+      <div class="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant shadow-xs space-y-5">
+        <div class="flex items-center justify-between border-b border-outline-variant pb-3">
+          <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+              <span class="material-symbols-outlined text-[20px]">manage_accounts</span>
+            </div>
+            <div>
+              <h3 class="text-sm font-bold text-on-surface font-mono">${isId ? "Perbarui Profil & Identitas Siswa" : "Edit Profile & Credentials"}</h3>
+              <p class="text-[11px] text-on-surface-variant">${isId ? "Ubah nama lengkap, kelas TKJ, dan foto profil akun Anda" : "Update your display name, class, and profile picture"}</p>
+            </div>
+          </div>
+        </div>
+
+        <form id="form-edit-profile" class="space-y-4">
+          <!-- Photo Upload & Presets -->
+          <div>
+            <label class="block text-xs font-semibold text-on-surface mb-2 font-mono">${isId ? "Foto Profil Pengguna (Avatar)" : "Profile Picture (Avatar)"}</label>
+            <div class="flex flex-wrap items-center gap-4">
+              <!-- Live Preview -->
+              <div class="relative w-16 h-16 rounded-full overflow-hidden bg-surface-container border-2 border-outline-variant shrink-0 flex items-center justify-center text-xl font-bold font-mono shadow-xs">
+                <img id="edit-avatar-preview" src="${studentAvatar || ''}" class="w-full h-full object-cover ${studentAvatar ? '' : 'hidden'}" alt="Avatar Preview" />
+                <span id="edit-avatar-fallback" class="${studentAvatar ? 'hidden' : ''} text-primary font-bold">${studentName.charAt(0).toUpperCase()}</span>
+              </div>
+
+              <!-- Action buttons -->
+              <div class="flex flex-wrap items-center gap-2">
+                <input type="file" id="input-profile-avatar" accept="image/*" class="hidden" />
+                <button type="button" id="btn-trigger-avatar-upload" class="h-9 px-3.5 bg-surface-container-low hover:bg-surface-container text-on-surface border border-outline-variant rounded-lg font-mono text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer">
+                  <span class="material-symbols-outlined text-[16px] text-primary">add_a_photo</span>
+                  <span>${isId ? "Pilih Foto Baru" : "Upload Photo"}</span>
+                </button>
+                <button type="button" id="btn-remove-avatar" class="h-9 px-3 text-error hover:bg-error/10 border border-transparent rounded-lg font-mono text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer ${studentAvatar ? '' : 'hidden'}">
+                  <span class="material-symbols-outlined text-[16px]">delete</span>
+                  <span>${isId ? "Hapus Foto" : "Remove"}</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Avatar Presets -->
+            <div class="mt-3">
+              <span class="text-[11px] text-outline font-mono block mb-1.5">${isId ? "Atau pilih avatar karakter siap pakai:" : "Or choose a preset avatar:"}</span>
+              <div class="flex items-center gap-2.5">
+                ${[
+                  "https://api.dicebear.com/7.x/bottts/svg?seed=Technician1",
+                  "https://api.dicebear.com/7.x/bottts/svg?seed=NetworkAdmin",
+                  "https://api.dicebear.com/7.x/bottts/svg?seed=CiscoPro",
+                  "https://api.dicebear.com/7.x/bottts/svg?seed=FiberOptic"
+                ].map((presetUrl, idx) => `
+                  <button type="button" class="w-10 h-10 rounded-full border border-outline-variant hover:border-primary p-0.5 bg-surface-container transition-all cursor-pointer avatar-preset-btn hover:scale-105" data-url="${presetUrl}" title="Avatar ${idx + 1}">
+                    <img src="${presetUrl}" alt="Avatar ${idx + 1}" class="w-full h-full rounded-full object-cover pointer-events-none" />
+                  </button>
+                `).join("")}
+              </div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+            <!-- Full Name Input -->
+            <div>
+              <label class="block text-xs font-semibold text-on-surface mb-1 font-mono">${isId ? "Nama Lengkap Siswa *" : "Full Name *"}</label>
+              <input 
+                type="text" 
+                id="edit-profile-name" 
+                value="${studentName}"
+                class="w-full px-3.5 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg text-xs text-on-surface focus:outline-none focus:ring-1 focus:ring-primary focus:bg-white font-mono"
+                required
+              />
+            </div>
+
+            <!-- Class Dropdown (if student) or Teacher label -->
+            <div>
+              <label class="block text-xs font-semibold text-on-surface mb-1 font-mono">${isId ? "Kelas Siswa (TKJ) *" : "Class (TKJ) *"}</label>
+              ${isTeacher ? `
+                <input 
+                  type="text" 
+                  value="${isId ? "Guru / Instruktur" : "Instructor"}" 
+                  disabled 
+                  class="w-full px-3.5 py-2.5 bg-surface-container-high border border-outline-variant rounded-lg text-xs text-outline font-mono cursor-not-allowed"
+                />
+              ` : `
+                <select 
+                  id="edit-profile-class" 
+                  class="w-full px-3.5 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg text-xs text-on-surface focus:outline-none focus:ring-1 focus:ring-primary focus:bg-white font-mono cursor-pointer"
+                >
+                  ${TKJ_CLASSES.map(cls => `<option value="${cls}" ${studentClass === cls ? "selected" : ""}>${cls}</option>`).join("")}
+                </select>
+              `}
+            </div>
+          </div>
+
+          <!-- Email (Read-only) -->
+          <div>
+            <label class="block text-xs font-semibold text-on-surface mb-1 font-mono">${isId ? "Alamat Email Terdaftar (Terkunci)" : "Registered Email"}</label>
+            <div class="relative flex items-center">
+              <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-outline">lock</span>
+              <input 
+                type="email" 
+                value="${studentEmail}" 
+                disabled 
+                class="w-full pl-10 pr-3.5 py-2.5 bg-surface-container-high border border-outline-variant rounded-lg text-xs text-outline font-mono cursor-not-allowed"
+              />
+            </div>
+          </div>
+
+          <!-- Submit Button -->
+          <div class="pt-2">
+            <button 
+              type="submit" 
+              id="btn-save-profile" 
+              class="h-10 px-5 bg-primary hover:bg-primary-container text-on-primary font-semibold text-xs rounded-xl shadow-xs flex items-center gap-2 transition-all cursor-pointer"
+            >
+              <span class="material-symbols-outlined text-[18px]">save</span>
+              <span>${isId ? "Simpan Perubahan Profil" : "Save Profile Changes"}</span>
+            </button>
+          </div>
+        </form>
       </div>
 
       <!-- Badges Showcase -->
@@ -2698,23 +2804,22 @@ function renderProfile(container) {
         </div>
       </div>
 
-      <!-- Supabase Cloud Connection Settings -->
+      <!-- Sesi Akun & Keluar -->
       <div class="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant shadow-xs space-y-4">
         <div class="flex items-center justify-between border-b border-outline-variant pb-2">
-          <h3 class="text-sm font-bold text-on-surface font-mono">${isId ? "Sinkronisasi Basis Data Supabase Cloud" : "Cloud Database Synchronization"}</h3>
+          <h3 class="text-sm font-bold text-on-surface font-mono">${isId ? "Sesi Akun Pengguna" : "User Account Session"}</h3>
           <span class="text-xs font-mono text-secondary font-bold">
-            Project: ${CONFIG.PROJECT_REF || "Cloud"}
+            ${isTeacher ? (isId ? "Role: Guru" : "Role: Teacher") : (isId ? "Role: Siswa" : "Role: Student")}
           </span>
         </div>
 
         <p class="text-xs text-on-surface-variant leading-relaxed">
-          ${isId ? `Basis data Supabase terhubung ke project <code>${CONFIG.PROJECT_REF || "Cloud"}</code> untuk sinkronisasi nilai pretest/posttest, akun pengguna, dan materi.` : `Connected to Supabase project <code>${CONFIG.PROJECT_REF || "Cloud"}</code> to synchronize student gradebooks, live auth, and educational materials.`}
+          ${isId 
+            ? "Keluar dari sesi akun untuk mengamankan data dan riwayat belajar Anda pada perangkat ini." 
+            : "Sign out of your active session to secure your learning progress and test history on this device."}
         </p>
 
         <div class="flex flex-wrap items-center gap-3 pt-1">
-          <button class="h-9 px-4 bg-primary hover:bg-primary-container text-on-primary font-mono text-xs font-bold rounded-lg transition-colors cursor-pointer" id="btn-open-supabase-cfg">
-            ${isId ? "Buka Pengaturan Supabase Cloud" : "Open Supabase Cloud Configuration Modal"}
-          </button>
           <button class="h-9 px-4 bg-error hover:bg-error/90 text-on-error font-mono text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer" id="btn-profile-logout">
             <span class="material-symbols-outlined text-[16px]">logout</span>
             <span>${isId ? "Keluar dari Akun" : "Log Out"}</span>
@@ -2724,9 +2829,124 @@ function renderProfile(container) {
     </div>
   `;
 
-  document.getElementById("btn-open-supabase-cfg")?.addEventListener("click", () => {
-    openSupabaseModal();
+  // Profile Edit Interactions
+  let activeAvatar = studentAvatar;
+
+  const fileInput = document.getElementById("input-profile-avatar");
+  const avatarPreview = document.getElementById("edit-avatar-preview");
+  const avatarFallback = document.getElementById("edit-avatar-fallback");
+  const removeAvatarBtn = document.getElementById("btn-remove-avatar");
+
+  document.getElementById("btn-trigger-avatar-upload")?.addEventListener("click", () => {
+    fileInput?.click();
   });
+
+  fileInput?.addEventListener("change", (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      showToast(isId ? "File Tidak Valid" : "Invalid File", isId ? "Silakan pilih file gambar (JPG/PNG)." : "Please choose an image file.", "warning");
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      showToast(isId ? "Ukuran Terlalu Besar" : "File Too Large", isId ? "Ukuran gambar maksimal adalah 2MB." : "Image size must be under 2MB.", "warning");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      activeAvatar = event.target.result;
+      if (avatarPreview) {
+        avatarPreview.src = activeAvatar;
+        avatarPreview.classList.remove("hidden");
+      }
+      if (avatarFallback) avatarFallback.classList.add("hidden");
+      if (removeAvatarBtn) removeAvatarBtn.classList.remove("hidden");
+    };
+    reader.readAsDataURL(file);
+  });
+
+  // Preset buttons
+  container.querySelectorAll(".avatar-preset-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      activeAvatar = btn.dataset.url;
+      if (avatarPreview) {
+        avatarPreview.src = activeAvatar;
+        avatarPreview.classList.remove("hidden");
+      }
+      if (avatarFallback) avatarFallback.classList.add("hidden");
+      if (removeAvatarBtn) removeAvatarBtn.classList.remove("hidden");
+    });
+  });
+
+  // Remove photo
+  removeAvatarBtn?.addEventListener("click", () => {
+    activeAvatar = "";
+    if (avatarPreview) {
+      avatarPreview.src = "";
+      avatarPreview.classList.add("hidden");
+    }
+    if (avatarFallback) avatarFallback.classList.remove("hidden");
+    if (removeAvatarBtn) removeAvatarBtn.classList.add("hidden");
+    if (fileInput) fileInput.value = "";
+  });
+
+  // Form submit
+  document.getElementById("form-edit-profile")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const nameInput = document.getElementById("edit-profile-name");
+    const classInput = document.getElementById("edit-profile-class");
+    const saveBtn = document.getElementById("btn-save-profile");
+
+    const newName = nameInput ? nameInput.value.trim() : "";
+    const newClass = classInput ? classInput.value.trim() : studentClass;
+
+    if (!newName) {
+      showToast(isId ? "Nama Wajib Diisi" : "Name Required", isId ? "Silakan masukkan nama lengkap Anda." : "Please enter your full name.", "warning");
+      return;
+    }
+
+    if (saveBtn) {
+      saveBtn.disabled = true;
+      saveBtn.classList.add("opacity-60");
+    }
+
+    try {
+      const updated = await updateUserProfile({
+        name: newName,
+        className: newClass,
+        avatar: activeAvatar
+      });
+
+      if (updated) {
+        state.currentUser = updated;
+      } else {
+        if (!state.currentUser) state.currentUser = {};
+        state.currentUser.name = newName;
+        state.currentUser.className = newClass;
+        state.currentUser.avatar = activeAvatar;
+      }
+
+      updateNavUser();
+      showToast(
+        isId ? "Profil Berhasil Diperbarui!" : "Profile Updated!", 
+        isId ? `Nama: ${newName} ${newClass ? `(${newClass})` : ""}` : `Credentials saved successfully.`, 
+        "check_circle"
+      );
+      renderProfile(container);
+    } catch (err) {
+      console.error("Save profile error:", err);
+      showToast(isId ? "Gagal Menyimpan" : "Failed to Save", err.message || (isId ? "Terjadi kesalahan saat menyimpan profil." : "Error saving profile."), "error");
+    } finally {
+      if (saveBtn) {
+        saveBtn.disabled = false;
+        saveBtn.classList.remove("opacity-60");
+      }
+    }
+  });
+
   document.getElementById("btn-profile-logout")?.addEventListener("click", () => {
     handleLogout();
   });

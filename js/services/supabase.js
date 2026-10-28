@@ -418,10 +418,12 @@ export async function checkLiveSession() {
     let name = session.user.user_metadata?.name || session.user.user_metadata?.full_name || session.user.email.split("@")[0];
     let className = session.user.user_metadata?.class_name || "";
 
+    let avatar = session.user.user_metadata?.avatar_url || localCached?.avatar || "";
+
     try {
       const { data: profile } = await supabaseClient
         .from("profiles")
-        .select("name, role, class_name")
+        .select("name, role, class_name, avatar_url")
         .eq("id", session.user.id)
         .maybeSingle();
 
@@ -429,12 +431,14 @@ export async function checkLiveSession() {
         if (profile.role) role = profile.role;
         if (profile.name) name = profile.name;
         if (profile.class_name) className = profile.class_name;
+        if (profile.avatar_url) avatar = profile.avatar_url;
       } else {
         await supabaseClient.from("profiles").upsert({
           id: session.user.id,
           name,
           role,
-          class_name: className
+          class_name: className,
+          avatar_url: avatar
         });
       }
     } catch (e) {
@@ -446,6 +450,7 @@ export async function checkLiveSession() {
       role, 
       name, 
       className,
+      avatar,
       needsProfileCompletion: role === "student" && (!className || className.trim() === "")
     };
     localStorage.setItem("netquest_current_user", JSON.stringify(appUser));
@@ -599,19 +604,24 @@ export async function signIn({ email, password }) {
   return session;
 }
 
-export async function updateUserProfile({ name, className }) {
+export async function updateUserProfile({ name, className, avatar }) {
   const current = getCurrentUser();
   if (!current || !current.user) return null;
 
-  if (name) current.name = name.trim();
-  if (className) current.className = className.trim();
+  if (name !== undefined && name !== null) current.name = name.trim();
+  if (className !== undefined && className !== null) current.className = className.trim();
+  if (avatar !== undefined && avatar !== null) current.avatar = avatar;
   current.needsProfileCompletion = false;
   const userEmail = current.user.email || "";
 
   if (isUsingLiveSupabase()) {
     try {
       await supabaseClient.auth.updateUser({
-        data: { name: current.name, class_name: current.className }
+        data: { 
+          name: current.name, 
+          class_name: current.className,
+          avatar_url: current.avatar 
+        }
       });
     } catch (e) {
       console.warn("auth.updateUser error:", e);
@@ -623,7 +633,8 @@ export async function updateUserProfile({ name, className }) {
         name: current.name,
         role: current.role || "student",
         class_name: current.className,
-        email: userEmail
+        email: userEmail,
+        avatar_url: current.avatar
       });
     } catch (e) {
       console.warn("profiles.upsert error:", e);
@@ -634,6 +645,7 @@ export async function updateUserProfile({ name, className }) {
     if (u) {
       u.name = current.name;
       u.className = current.className;
+      u.avatar = current.avatar;
       saveMockData(db);
     }
   }
