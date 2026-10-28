@@ -88,8 +88,9 @@ create table if not exists public.profiles (
   created_at timestamptz default now()
 );
 
--- Pastikan kolom class_name tersedia jika tabel profiles sudah ada sebelumnya
+-- Pastikan kolom class_name dan email tersedia jika tabel profiles sudah ada sebelumnya
 alter table public.profiles add column if not exists class_name text;
+alter table public.profiles add column if not exists email text;
 
 -- 2. TABEL RESULTS (Menyimpan Hasil Evaluasi Pretest & Posttest Siswa)
 create table if not exists public.results (
@@ -401,10 +402,14 @@ function saveMockData(data) {
 // ----------------------------------------------------
 export async function checkLiveSession() {
   if (!isUsingLiveSupabase()) return getCurrentUser();
+  const localCached = getCurrentUser();
   try {
     const { data: { session }, error } = await supabaseClient.auth.getSession();
     if (error || !session || !session.user) {
-      // Jika di cloud tidak ada session aktif, bersihkan cache lokal agar browser/device baru tidak auto-login
+      // Jika pengguna adalah mock/offline atau Google Quick Sign-In lokal, pertahankan sesi
+      if (localCached && (localCached.user?.id?.startsWith("usr-") || localCached.provider === "google")) {
+        return localCached;
+      }
       localStorage.removeItem("netquest_current_user");
       return null;
     }
@@ -454,10 +459,8 @@ export async function checkLiveSession() {
 
 
 export async function signUp({ email, password, name, role, className = "", teacherCode }) {
-  if (role === "teacher" && teacherCode !== CONFIG.TEACHER_CODE) {
-    throw new Error(
-      `Kode guru tidak valid! Hubungi administrator atau periksa TEACHER_CODE (default: ${CONFIG.TEACHER_CODE}).`
-    );
+  if (role === "teacher") {
+    throw new Error("Pendaftaran akun Guru dinonaktifkan. Akun Guru diatur langsung secara manual oleh Administrator.");
   }
 
   if (role === "student" && (!className || className.trim() === "")) {
@@ -465,43 +468,51 @@ export async function signUp({ email, password, name, role, className = "", teac
   }
 
   if (isUsingLiveSupabase()) {
-    const { data: authData, error: authErr } = await supabaseClient.auth.signUp({
-      email,
-      password,
-      options: { 
-        data: { 
-          name, 
-          role,
-          class_name: className 
-        } 
-      }
-    });
-    if (authErr) throw authErr;
+    try {
+      const { data: authData, error: authErr } = await supabaseClient.auth.signUp({
+        email,
+        password,
+        options: { 
+          data: { 
+            name, 
+            role,
+            class_name: className 
+          } 
+        }
+      });
+      if (authErr) throw authErr;
 
-    if (authData.user) {
-      try {
-        await supabaseClient.from("profiles").upsert({
-          id: authData.user.id,
-          name,
-          role,
-          class_name: className
-        });
-      } catch (profileErr) {
-        console.warn("Profile sync warning:", profileErr);
+      if (authData.user) {
+        try {
+          await supabaseClient.from("profiles").upsert({
+            id: authData.user.id,
+            name,
+            role,
+            class_name: className
+          });
+        } catch (profileErr) {
+          console.warn("Profile sync warning:", profileErr);
+        }
       }
-    }
 
-    const session = { 
-      user: authData.user, 
-      role, 
-      name, 
-      className,
-      needsProfileCompletion: false
-    };
-    if (authData.session) {
-      localStorage.setItem("netquest_current_user", JSON.stringify(session));
+      const session = { 
+        user: authData.user, 
+        role, 
+        name, 
+        className,
+        needsProfileCompletion: false
+      };
+      if (authData.session) {
+        localStorage.setItem("netquest_current_user", JSON.stringify(session));
+      }
+      return session;
+    } catch (liveErr) {
+      console.warn("Live Supabase signUp error, fallback to local storage:", liveErr);
+      if (liveErr.message && (liveErr.message.includes("already registered") || liveErr.message.includes("Email already in use"))) {
+        throw new Error("Email sudah terdaftar! Silakan langsung masuk.");
+      }
+      // If it's rate limit or connectivity, continue to mock/local user below
     }
-    return session;
   }
 
   // Mock implementation
@@ -595,6 +606,7 @@ export async function updateUserProfile({ name, className }) {
   if (name) current.name = name.trim();
   if (className) current.className = className.trim();
   current.needsProfileCompletion = false;
+  const userEmail = current.user.email || "";
 
   if (isUsingLiveSupabase()) {
     try {
@@ -610,14 +622,15 @@ export async function updateUserProfile({ name, className }) {
         id: current.user.id,
         name: current.name,
         role: current.role || "student",
-        class_name: current.className
+        class_name: current.className,
+        email: userEmail
       });
     } catch (e) {
       console.warn("profiles.upsert error:", e);
     }
   } else {
     const db = getMockData();
-    const u = db.users.find(user => user.id === current.user.id);
+    const u = db.users.find(user => (user.id && user.id === current.user.id) || (user.email && user.email === userEmail));
     if (u) {
       u.name = current.name;
       u.className = current.className;
@@ -627,6 +640,102 @@ export async function updateUserProfile({ name, className }) {
 
   localStorage.setItem("netquest_current_user", JSON.stringify(current));
   return current;
+}
+
+export async function signInWithGoogleEmail({ email, role = "student" }) {
+  if (!email || !email.includes("@")) {
+    throw new Error("Format email Google tidak valid.");
+  }
+  const cleanEmail = email.trim().toLowerCase();
+  let userRecord = null;
+  let isNew = false;
+  let className = "";
+  let name = cleanEmail.split("@")[0];
+
+  if (isUsingLiveSupabase()) {
+    try {
+      const { data: existingProfile } = await supabaseClient
+        .from("profiles")
+        .select("id, name, role, class_name, email")
+        .eq("email", cleanEmail)
+        .maybeSingle();
+
+      if (existingProfile) {
+        userRecord = {
+          id: existingProfile.id,
+          email: cleanEmail,
+          user_metadata: {
+            full_name: existingProfile.name,
+            role: existingProfile.role,
+            class_name: existingProfile.class_name
+          }
+        };
+        name = existingProfile.name || name;
+        role = existingProfile.role || role;
+        className = existingProfile.class_name || "";
+      } else {
+        isNew = true;
+        const newUuid = "00000000-0000-4000-8000-" + Math.random().toString(16).substring(2, 14).padEnd(12, "0");
+        userRecord = {
+          id: newUuid,
+          email: cleanEmail,
+          user_metadata: {
+            full_name: name,
+            role: "student",
+            class_name: ""
+          }
+        };
+
+        try {
+          await supabaseClient.from("profiles").upsert({
+            id: newUuid,
+            name,
+            role: "student",
+            class_name: "",
+            email: cleanEmail
+          });
+        } catch (upErr) {
+          console.warn("Could not upsert new Google profile:", upErr);
+        }
+      }
+    } catch (e) {
+      console.warn("Error querying profile in Supabase:", e);
+    }
+  }
+
+  // Sync to mock database
+  const db = getMockData();
+  let mockUser = db.users.find(u => u.email.toLowerCase() === cleanEmail);
+  if (!mockUser) {
+    isNew = true;
+    mockUser = {
+      id: userRecord?.id || ("usr-g-" + Date.now().toString(36)),
+      email: cleanEmail,
+      name: name,
+      role: role,
+      className: className || "",
+      provider: "google",
+      createdAt: new Date().toISOString()
+    };
+    db.users.push(mockUser);
+    saveMockData(db);
+  } else {
+    name = mockUser.name || name;
+    className = mockUser.className || className;
+    role = mockUser.role || role;
+  }
+
+  const session = {
+    user: userRecord || mockUser,
+    role: role,
+    name: name,
+    className: className,
+    provider: "google",
+    needsProfileCompletion: !className || className.trim() === ""
+  };
+
+  localStorage.setItem("netquest_current_user", JSON.stringify(session));
+  return session;
 }
 
 export async function signInWithGoogle({ role = "student" } = {}) {

@@ -20,6 +20,7 @@ import {
   signUp,
   signIn,
   signInWithGoogle,
+  signInWithGoogleEmail,
   updateUserProfile,
   signOut,
   getCurrentUser,
@@ -169,27 +170,41 @@ function applyTheme(theme) {
 // ============================================================================
 // Gamification & Stats Storage
 // ============================================================================
+export const TKJ_CLASSES = [
+  "X TKJ 1",
+  "X TKJ 2",
+  "XI TKJ 1",
+  "XI TKJ 2",
+  "XII TKJ 1",
+  "XII TKJ 2"
+];
+
 function getStorageKey(suffix) {
-  const uid = state.currentUser ? state.currentUser.user.id : "guest";
+  const uid = state.currentUser ? (state.currentUser.user?.id || state.currentUser.id || "guest") : "guest";
   return `netlearn_${uid}_${suffix}`;
 }
 
 async function loadUserStats() {
   if (!state.currentUser) return;
+  const uid = state.currentUser.user?.id || state.currentUser.id || "guest";
 
+  // Reset to clean 0 initial state for the user (guarantees newly created accounts start strictly at 0)
   const savedXp = localStorage.getItem(getStorageKey("xp"));
   const savedMaterials = localStorage.getItem(getStorageKey("materials"));
   const savedVideos = localStorage.getItem(getStorageKey("videos"));
   const savedBadges = localStorage.getItem(getStorageKey("badges"));
 
-  if (savedXp) state.userStats.xp = parseInt(savedXp, 10);
-  if (savedMaterials) state.userStats.readMaterials = JSON.parse(savedMaterials);
-  if (savedVideos) state.userStats.watchedVideos = JSON.parse(savedVideos);
-  if (savedBadges) state.userStats.unlockedBadges = JSON.parse(savedBadges);
+  state.userStats = {
+    xp: savedXp ? parseInt(savedXp, 10) : 0,
+    readMaterials: savedMaterials ? JSON.parse(savedMaterials) : [],
+    watchedVideos: savedVideos ? JSON.parse(savedVideos) : [],
+    unlockedBadges: savedBadges ? JSON.parse(savedBadges) : [],
+    results: []
+  };
 
   // Auto-sync progress from Supabase in background
   try {
-    const remoteProgress = await getUserProgress(state.currentUser.user.id);
+    const remoteProgress = await getUserProgress(uid);
     if (remoteProgress) {
       if (typeof remoteProgress.xp === "number" && remoteProgress.xp > state.userStats.xp) {
         state.userStats.xp = remoteProgress.xp;
@@ -209,7 +224,7 @@ async function loadUserStats() {
   }
 
   try {
-    const liveResults = await getUserResults(state.currentUser.user.id);
+    const liveResults = await getUserResults(uid);
     if (liveResults && liveResults.length > 0) {
       state.userStats.results = liveResults;
     }
@@ -606,11 +621,9 @@ function renderAuth(container, mode = "login") {
       <!-- Left Column: Form -->
       <div class="lg:col-span-6 p-6 sm:p-10 flex flex-col justify-between">
         <div>
-          <!-- Clean Brand Header -->
-          <div class="flex items-center gap-3 mb-5">
-            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-primary-container to-primary text-white flex items-center justify-center shadow-md shadow-blue-500/20 shrink-0 font-bold text-base">
-              NL
-            </div>
+          <!-- Clean Brand Header with Official Logo -->
+          <div class="flex items-center gap-3.5 mb-5">
+            <img src="assets/images/logo_icon.png" alt="NetLearn Logo" class="w-11 h-11 object-contain rounded-xl shadow-xs shrink-0" />
             <div>
               <div class="flex items-center gap-2">
                 <h1 class="text-xl font-bold text-on-surface tracking-tight leading-none">NetLearn</h1>
@@ -618,7 +631,7 @@ function renderAuth(container, mode = "login") {
               </div>
               <p class="text-xs text-on-surface-variant mt-1">
                 ${isLogin 
-                  ? (isId ? "Masuk ke platform pembelajaran jaringan komputer." : "Sign in to computer networks learning platform.")
+                  ? (isId ? "Web Pembelajaran Jaringan Komputer interaktif & mandiri." : "Sign in to computer networks learning platform.")
                   : (isId ? "Buat akun baru untuk memulai pembelajaran & praktikum." : "Create a new account to access courseware & virtual lab.")}
               </p>
             </div>
@@ -642,42 +655,30 @@ function renderAuth(container, mode = "login") {
             </button>
           </div>
 
-          <!-- Role Switcher Toggle Pill -->
-          <div class="flex items-center justify-between mb-4">
-            <span class="text-[11px] font-mono text-outline font-semibold uppercase tracking-wider">${t("roleLabel")}:</span>
-            <div class="p-0.5 bg-surface-container-low rounded-lg flex items-center text-xs font-semibold border border-outline-variant">
-              <button type="button" class="py-1 px-3 rounded-md bg-surface-container-lowest text-primary shadow-xs font-bold text-center transition-all auth-role-btn active" data-role="student">
-                ${t("roleStudentTab")}
-              </button>
-              <button type="button" class="py-1 px-3 rounded-md text-outline hover:text-on-surface text-center transition-all auth-role-btn" data-role="teacher">
-                ${t("roleTeacherTab")}
-              </button>
+          <!-- Role Switcher: Hanya ditampilkan saat Masuk (Guru login manual) -->
+          ${isLogin ? `
+            <div class="flex items-center justify-between mb-4">
+              <span class="text-[11px] font-mono text-outline font-semibold uppercase tracking-wider">${t("roleLabel")}:</span>
+              <div class="p-0.5 bg-surface-container-low rounded-lg flex items-center text-xs font-semibold border border-outline-variant">
+                <button type="button" class="py-1 px-3 rounded-md bg-surface-container-lowest text-primary shadow-xs font-bold text-center transition-all auth-role-btn active" data-role="student">
+                  ${t("roleStudentTab")}
+                </button>
+                <button type="button" class="py-1 px-3 rounded-md text-outline hover:text-on-surface text-center transition-all auth-role-btn" data-role="teacher">
+                  ${t("roleTeacherTab")}
+                </button>
+              </div>
             </div>
-          </div>
+          ` : `
+            <div class="flex items-center justify-between mb-4 p-2.5 bg-primary/5 rounded-xl border border-primary/20">
+              <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-[18px] text-primary">school</span>
+                <span class="text-xs font-bold text-primary">${isId ? "Pendaftaran Khusus Siswa" : "Student Registration Only"}</span>
+              </div>
+              <span class="text-[10px] text-outline font-mono">${isId ? "Akun Guru dikelola Admin" : "Teacher accounts set by Admin"}</span>
+            </div>
+          `}
 
-          <!-- Google SSO Button with Auto-Registration Hint -->
-          <div class="mb-4">
-            <button type="button" id="btn-google-login" class="w-full py-2.5 px-4 bg-white hover:bg-slate-50 text-slate-800 font-semibold text-xs rounded-xl border border-outline-variant shadow-xs flex items-center justify-center gap-3 transition-all cursor-pointer">
-              <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
-                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
-              </svg>
-              <span>${isLogin ? t("googleSignIn") : (isId ? "Daftar Cepat dengan Akun Google" : "Quick Register with Google")}</span>
-            </button>
-            <p class="text-[10px] text-outline text-center mt-1.5 font-mono">
-              ${isId ? "⚡ Akun otomatis terdaftar jika belum pernah dibuat" : "⚡ Automatically registers your account if not yet created"}
-            </p>
-          </div>
-
-          <!-- Divider -->
-          <div class="relative my-3 text-center">
-            <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-outline-variant"></div></div>
-            <span class="relative bg-surface-container-lowest px-2.5 text-[10px] font-mono text-outline uppercase tracking-wider">${t("orDivider")}</span>
-          </div>
-
-          <!-- Form Element -->
+          <!-- Form Element (Username/Email & Password) -->
           <form id="auth-form" class="space-y-3.5">
             ${!isLogin ? `
               <div>
@@ -691,15 +692,20 @@ function renderAuth(container, mode = "login") {
                 />
               </div>
               <div id="student-class-field">
-                <label class="block text-xs font-semibold text-on-surface mb-1 font-mono">${isId ? "Kelas / Jurusan Siswa *" : "Student Class *"}</label>
-                <input 
-                  type="text" 
-                  id="auth-class" 
-                  placeholder="${isId ? "Contoh: X TKJ 1 / XI RPL 2" : "e.g. 10th Grade TKJ 1"}"
-                  class="w-full px-3.5 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg text-xs text-on-surface focus:outline-none focus:ring-1 focus:ring-primary focus:bg-white font-mono" 
-                  required 
-                />
-                <span class="text-[10px] text-outline font-mono mt-0.5 block">${isId ? "Wajib diisi untuk rekapitulasi nilai guru" : "Required for teacher gradebook"}</span>
+                <label class="block text-xs font-semibold text-on-surface mb-1 font-mono">${isId ? "Kelas Siswa (TKJ) *" : "Student Class (TKJ) *"}</label>
+                <div class="relative flex items-center">
+                  <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-outline pointer-events-none">school</span>
+                  <select 
+                    id="auth-class" 
+                    class="w-full pl-10 pr-9 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg text-xs text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:bg-white font-mono appearance-none cursor-pointer" 
+                    required 
+                  >
+                    <option value="" disabled selected>${isId ? "-- Pilih Kelas TKJ --" : "-- Select TKJ Class --"}</option>
+                    ${TKJ_CLASSES.map(cls => `<option value="${cls}">${cls}</option>`).join("")}
+                  </select>
+                  <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-[18px] text-outline pointer-events-none">expand_more</span>
+                </div>
+                <span class="text-[10px] text-outline font-mono mt-1 block">${isId ? "Pilih langsung kelas tanpa mengetik manual" : "Select directly without typing"}</span>
               </div>
               <div id="student-id-field">
                 <label class="block text-xs font-semibold text-on-surface mb-1 font-mono">${t("studentIdLabel")}</label>
@@ -768,6 +774,30 @@ function renderAuth(container, mode = "login") {
             >
               <span>${isLogin ? t("btnSignIn") : t("btnRegister")}</span>
               <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+            </button>
+          </form>
+
+          <!-- Divider: Atau Masuk / Daftar dengan Google -->
+          <div class="relative my-4 text-center">
+            <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-outline-variant"></div></div>
+            <span class="relative bg-surface-container-lowest px-2.5 text-[10px] font-mono text-outline uppercase tracking-wider">${isId ? "Atau Lanjut Dengan" : "Or Continue With"}</span>
+          </div>
+
+          <!-- Google SSO Button Placed Below Form Credentials -->
+          <div>
+            <button type="button" id="btn-google-login" class="w-full py-2.5 px-4 bg-white hover:bg-slate-50 text-slate-800 font-semibold text-xs rounded-xl border border-outline-variant shadow-xs flex items-center justify-center gap-3 transition-all cursor-pointer">
+              <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+              </svg>
+              <span>${isLogin ? t("googleSignIn") : (isId ? "Daftar Cepat dengan Akun Google" : "Quick Register with Google")}</span>
+            </button>
+            <p class="text-[10px] text-outline text-center mt-1.5 font-mono">
+              ${isId ? "⚡ Akun otomatis terdaftar jika belum pernah dibuat" : "⚡ Automatically registers your account if not yet created"}
+            </p>
+          </div>
             </button>
           </form>
         </div>
@@ -847,28 +877,23 @@ function renderAuth(container, mode = "login") {
     });
   });
 
-  // Google Sign-In Handler
+  // Google Sign-In / Register Handler
   document.getElementById("btn-google-login")?.addEventListener("click", async () => {
     sound.click();
-    showToast(isId ? "Menghubungkan Akun Google..." : "Connecting Google Account...", "Supabase Auth Cloud", "sync");
     
-    try {
-      const res = await signInWithGoogle({ role: selectedRole });
-      if (res && res.isRedirecting) {
-        return;
-      }
-    } catch (err) {
-      console.error("Google sign-in error:", err);
-      if (err.message === "PROVIDER_NOT_ENABLED") {
-        showGoogleNotEnabledModal();
-      } else {
-        showToast(
-          isId ? "Google Login Belum Aktif" : "Google Login Unavailable",
-          isId ? "Silakan mendaftar atau masuk menggunakan formulir email & kata sandi di bawah." : "Please register or sign in using email & password below.",
-          "info"
-        );
+    // Jika live Supabase OAuth aktif dan bisa redirect, coba terlebih dahulu
+    if (isUsingLiveSupabase()) {
+      try {
+        const res = await signInWithGoogle({ role: selectedRole });
+        if (res && res.isRedirecting) return;
+      } catch (err) {
+        // Jika provider belum aktif di dashboard, lanjutkan ke modal Google Quick Sign-in mandiri
+        console.log("Supabase OAuth redirect tidak aktif, membuka Google Quick Sign-In:", err);
       }
     }
+
+    // Tampilkan formulir Google Quick Sign-In interaktif
+    showGoogleAccountPromptModal(selectedRole);
   });
 
   // Mode switch tabs (Masuk vs Daftar Baru)
@@ -914,7 +939,7 @@ function renderAuth(container, mode = "login") {
     }
 
     if (!isLogin && selectedRole === "student" && !className) {
-      showToast(isId ? "Kelas Wajib Diisi" : "Class is Required", isId ? "Silakan masukkan kelas Anda (contoh: X TKJ 1)." : "Please enter your class.", "warning");
+      showToast(isId ? "Kelas Wajib Dipilih" : "Class is Required", isId ? "Silakan pilih kelas TKJ Anda." : "Please select your TKJ class.", "warning");
       return;
     }
 
@@ -938,6 +963,13 @@ function renderAuth(container, mode = "login") {
         });
       }
 
+      state.userStats = {
+        xp: 0,
+        readMaterials: [],
+        watchedVideos: [],
+        unlockedBadges: [],
+        results: []
+      };
       state.currentUser = loggedUser;
       showAppLayout();
       await loadUserStats();
@@ -965,12 +997,65 @@ function renderAuth(container, mode = "login") {
 }
 
 // ============================================================================
-// VIEW 2: STUDENT DASHBOARD (Stitch student_dashboard_computer_networks_redesigned)
+// VIEW 2: STUDENT DASHBOARD (Dynamic Progress & Stitch Architecture)
 // ============================================================================
 function renderDashboard(container) {
   const meta = state.currentUser?.user?.user_metadata || {};
-  const studentName = meta.full_name || "Aditya Sharma";
   const isId = getLang() === "id";
+  const studentName = state.currentUser?.name || meta.full_name || (isId ? "Siswa CS302" : "CS302 Student");
+
+  // Metrics dynamically derived from active state.userStats (strictly 0 for newly created accounts)
+  const totalModules = MATERIALS.length || 6;
+  const readCount = Math.min(totalModules, (state.userStats?.readMaterials || []).length);
+  const percentModules = Math.round((readCount / totalModules) * 100);
+
+  const preResult = (state.userStats?.results || []).find(r => r.type === "pre");
+  const postResult = (state.userStats?.results || []).find(r => r.type === "post");
+
+  const preScoreVal = preResult ? preResult.score : 0;
+  const preTotalVal = preResult ? preResult.total : 25;
+  const prePercent = preResult ? Math.round((preScoreVal / preTotalVal) * 100) : 0;
+
+  const postScoreVal = postResult ? postResult.score : 0;
+  const postTotalVal = postResult ? postResult.total : 25;
+  const postPercent = postResult ? Math.round((postScoreVal / postTotalVal) * 100) : 0;
+
+  // Hake Normalized Gain calculation: g = (post% - pre%) / (100 - pre%)
+  let hakeGainLabel = "-";
+  let gainDeltaLabel = "-";
+  if (preResult && postResult) {
+    if (prePercent >= 100) {
+      hakeGainLabel = "1.00";
+      gainDeltaLabel = "+0%";
+    } else {
+      const g = (postPercent - prePercent) / (100 - prePercent);
+      hakeGainLabel = g.toFixed(2);
+      const delta = postPercent - prePercent;
+      gainDeltaLabel = (delta >= 0 ? "+" : "") + Math.round(delta) + "%";
+    }
+  }
+
+  // Lab completed count: count of watched videos/completed labs
+  const labCount = Math.min(totalModules, (state.userStats?.watchedVideos || []).length);
+  const labPercent = Math.round((labCount / totalModules) * 100);
+
+  // Helper functions for module title & summary
+  const getModTitle = (m) => (isId ? (m?.title_id || m?.title) : (m?.title_en || m?.title || m?.title_id)) || "Modul Kurikulum";
+  const getModSummary = (m) => (isId ? (m?.summary_id || m?.summary) : (m?.summary_en || m?.summary || m?.summary_id)) || "";
+
+  // Active module workbench: find first unread module, or module 0
+  const nextUnreadIdx = MATERIALS.findIndex(m => !state.userStats?.readMaterials?.includes(m.id));
+  const activeModIdx = nextUnreadIdx >= 0 ? nextUnreadIdx : 0;
+  const activeMod = MATERIALS[activeModIdx] || MATERIALS[0];
+  const activeTitle = getModTitle(activeMod);
+  const activeSummary = getModSummary(activeMod);
+  const isActiveModDone = state.userStats?.readMaterials?.includes(activeMod.id);
+  const activeModPercent = isActiveModDone ? 100 : (state.userStats?.watchedVideos?.includes(activeMod.id) ? 50 : 0);
+
+  // Cognitive skills calculation (if tests taken, show real estimates, otherwise 0%)
+  const c4Score = postResult ? Math.min(100, Math.round(postPercent * 1.05)) : (preResult ? Math.round(prePercent * 0.9) : 0);
+  const c5Score = postResult ? Math.min(100, Math.round(postPercent * 0.95)) : (preResult ? Math.round(prePercent * 0.85) : 0);
+  const c6Score = postResult ? Math.min(100, Math.round(postPercent * 1.0)) : (preResult ? Math.round(prePercent * 0.8) : 0);
 
   container.innerHTML = `
     <div class="flex flex-col space-y-6 max-w-7xl mx-auto w-full">
@@ -980,19 +1065,19 @@ function renderDashboard(container) {
         <div class="space-y-1.5 max-w-2xl">
           <div class="flex items-center gap-2">
             <span class="text-xs font-mono font-semibold px-2 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">CS302 Networks</span>
-            <span class="text-xs text-on-surface-variant font-mono">• ${isId ? "Semester Genap 2025" : "Spring Term 2025"}</span>
+            <span class="text-xs text-on-surface-variant font-mono">• ${state.currentUser?.className ? `${state.currentUser.className} • ` : ""}${isId ? "Semester Genap 2025" : "Spring Term 2025"}</span>
           </div>
           <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-on-surface">
             ${isId ? `Selamat Datang, ${state.currentUser?.name || studentName}` : `Welcome, ${state.currentUser?.name || studentName}`}
           </h1>
           <p class="text-xs text-on-surface-variant leading-relaxed">
-            ${isId ? "Akses silabus kurikulum, simulator lab CLI & VLSM, serta pantau evaluasi kognitif Anda." : "Access curriculum modules, CLI & VLSM lab simulators, and track your evaluation progress."}
+            ${isId ? "Akses silabus kurikulum, simulator lab CLI & VLSM, serta pantau evaluasi kognitif Anda secara mandiri." : "Access curriculum modules, CLI & VLSM lab simulators, and track your evaluation progress."}
           </p>
         </div>
         <div class="flex items-center gap-2.5 shrink-0 flex-wrap">
           <button class="h-9 px-4 bg-primary hover:bg-primary-container text-on-primary font-semibold text-xs rounded-xl flex items-center gap-2 transition-colors cursor-pointer shadow-xs" id="btn-hero-continue">
             <span class="material-symbols-outlined text-[18px]">play_circle</span>
-            <span>${isId ? "Lanjutkan Modul" : "Continue Learning"}</span>
+            <span>${isActiveModDone ? (isId ? "Semua Modul Tuntas" : "Review Modules") : (isId ? "Lanjutkan Modul" : "Continue Learning")}</span>
           </button>
           <button class="h-9 px-3.5 bg-surface-container-low hover:bg-surface-container text-on-surface border border-outline-variant font-medium text-xs rounded-xl flex items-center gap-2 transition-colors cursor-pointer" id="btn-hero-lab">
             <span class="material-symbols-outlined text-[18px] text-primary">terminal</span>
@@ -1005,7 +1090,7 @@ function renderDashboard(container) {
         </div>
       </div>
 
-      <!-- Top 4 Metrics Row (Clean Minimalist Cards) -->
+      <!-- Top 4 Metrics Row (Clean Dynamic Minimalist Cards) -->
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         
         <!-- Metric 1: Module Completion -->
@@ -1016,12 +1101,12 @@ function renderDashboard(container) {
           </div>
           <div class="my-2.5">
             <div class="text-2xl font-bold text-on-surface tracking-tight">
-              4 <span class="text-outline font-normal text-sm">/ 6 ${isId ? "Modul" : "Modules"}</span>
+              ${readCount} <span class="text-outline font-normal text-sm">/ ${totalModules} ${isId ? "Modul" : "Modules"}</span>
             </div>
-            <div class="text-xs font-mono text-outline mt-0.5">${isId ? "66% Materi Selesai" : "66% Completed"}</div>
+            <div class="text-xs font-mono text-outline mt-0.5">${percentModules}% ${isId ? "Materi Selesai" : "Completed"}</div>
           </div>
           <div class="w-full bg-surface-container-high h-1.5 rounded-full overflow-hidden">
-            <div class="bg-primary h-full rounded-full" style="width: 66.6%;"></div>
+            <div class="bg-primary h-full rounded-full transition-all duration-300" style="width: ${percentModules}%;"></div>
           </div>
         </div>
 
@@ -1033,13 +1118,15 @@ function renderDashboard(container) {
           </div>
           <div class="my-2.5">
             <div class="text-2xl font-bold text-on-surface tracking-tight">
-              88 <span class="text-outline font-normal text-sm">/ 100</span>
-              <span class="text-xs font-mono text-secondary ml-1.5 font-bold">+20%</span>
+              ${postResult ? postPercent : "0"} <span class="text-outline font-normal text-sm">/ 100</span>
+              ${postResult && preResult ? `<span class="text-xs font-mono text-secondary ml-1.5 font-bold">${gainDeltaLabel}</span>` : ""}
             </div>
-            <div class="text-xs font-mono text-outline mt-0.5">${isId ? "Hasil HOTS Posttest" : "HOTS Posttest Score"}</div>
+            <div class="text-xs font-mono text-outline mt-0.5">
+              ${postResult ? (isId ? "Hasil HOTS Posttest" : "HOTS Posttest Score") : (isId ? "Belum Ujian Posttest" : "No Posttest Yet")}
+            </div>
           </div>
           <div class="w-full bg-surface-container-high h-1.5 rounded-full overflow-hidden">
-            <div class="bg-secondary h-full rounded-full" style="width: 88%;"></div>
+            <div class="bg-secondary h-full rounded-full transition-all duration-300" style="width: ${postPercent}%;"></div>
           </div>
         </div>
 
@@ -1051,12 +1138,12 @@ function renderDashboard(container) {
           </div>
           <div class="my-2.5">
             <div class="text-2xl font-bold text-on-surface tracking-tight">
-              14 <span class="text-outline font-normal text-sm">${isId ? "Lulus" : "Completed"}</span>
+              ${labCount} <span class="text-outline font-normal text-sm">/ ${totalModules} ${isId ? "Selesai" : "Done"}</span>
             </div>
-            <div class="text-xs font-mono text-outline mt-0.5">${isId ? "OSPF, RIP & VLSM" : "OSPF, RIP & VLSM"}</div>
+            <div class="text-xs font-mono text-outline mt-0.5">${labCount > 0 ? (isId ? "Praktikum Selesai" : "Labs Completed") : (isId ? "Belum Ada Lab Diselesaikan" : "No Labs Completed")}</div>
           </div>
           <div class="w-full bg-surface-container-high h-1.5 rounded-full overflow-hidden">
-            <div class="bg-primary h-full rounded-full" style="width: 70%;"></div>
+            <div class="bg-primary h-full rounded-full transition-all duration-300" style="width: ${labPercent}%;"></div>
           </div>
         </div>
 
@@ -1068,16 +1155,16 @@ function renderDashboard(container) {
           </div>
           <div class="my-2.5">
             <div class="text-2xl font-bold text-on-surface tracking-tight">
-              5 <span class="text-outline font-normal text-sm">${isId ? "Hari Beruntun" : "Days Active"}</span>
+              ${readCount > 0 || preResult || postResult ? "1" : "0"} <span class="text-outline font-normal text-sm">${isId ? "Hari Aktif" : "Days Active"}</span>
             </div>
-            <div class="text-xs font-mono text-outline mt-0.5">${isId ? "Sesi Aktif Pekan Ini" : "Active this week"}</div>
+            <div class="text-xs font-mono text-outline mt-0.5">${isId ? "Sesi Belajar Anda" : "Active session"}</div>
           </div>
           <div class="flex items-center gap-1">
-            <div class="w-2.5 h-2.5 rounded-xs bg-primary"></div>
-            <div class="w-2.5 h-2.5 rounded-xs bg-primary"></div>
-            <div class="w-2.5 h-2.5 rounded-xs bg-primary"></div>
-            <div class="w-2.5 h-2.5 rounded-xs bg-primary"></div>
-            <div class="w-2.5 h-2.5 rounded-xs bg-primary"></div>
+            <div class="w-2.5 h-2.5 rounded-xs ${readCount > 0 || preResult ? 'bg-primary' : 'bg-surface-container-high'}"></div>
+            <div class="w-2.5 h-2.5 rounded-xs bg-surface-container-high"></div>
+            <div class="w-2.5 h-2.5 rounded-xs bg-surface-container-high"></div>
+            <div class="w-2.5 h-2.5 rounded-xs bg-surface-container-high"></div>
+            <div class="w-2.5 h-2.5 rounded-xs bg-surface-container-high"></div>
             <div class="w-2.5 h-2.5 rounded-xs bg-surface-container-high"></div>
             <div class="w-2.5 h-2.5 rounded-xs bg-surface-container-high"></div>
           </div>
@@ -1090,24 +1177,26 @@ function renderDashboard(container) {
         <!-- Left 70% Column (approx 8 cols) -->
         <div class="lg:col-span-8 space-y-6">
           
-          <!-- In-Progress Module Workbench Card (Module 03 VLSM & Terminal) -->
+          <!-- In-Progress Module Workbench Card (Focus on current active module) -->
           <div class="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-xs overflow-hidden">
             <div class="p-4 bg-surface-container-low border-b border-outline-variant flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div class="flex items-center gap-2">
-                <span class="px-2 py-0.5 bg-primary text-on-primary font-mono text-xs rounded font-bold">MODUL 03</span>
-                <span class="font-mono text-xs text-on-surface-variant">RFC 4632 • Classless Inter-Domain Routing</span>
+                <span class="px-2 py-0.5 bg-primary text-on-primary font-mono text-xs rounded font-bold">MODUL 0${activeMod.id}</span>
+                <span class="font-mono text-xs text-on-surface-variant truncate">${activeTitle}</span>
               </div>
-              <span class="font-mono text-xs text-secondary font-semibold">ID Sesi: #CLI-8820</span>
+              <span class="font-mono text-xs text-secondary font-semibold">CS302 #${activeMod.slug || 'lab'}</span>
             </div>
 
             <div class="p-5 space-y-4">
               <div>
                 <div class="flex items-center justify-between">
-                  <h2 class="text-lg font-bold text-on-surface">${isId ? "Pengalamatan IP & Arsitektur Variable Length Subnet Mask (VLSM)" : "IP Addressing & Variable Length Subnet Masking (VLSM)"}</h2>
-                  <span class="text-xs font-mono font-bold text-primary bg-primary-fixed px-2 py-0.5 rounded">65% ${isId ? "SELESAI" : "COMPLETED"}</span>
+                  <h2 class="text-lg font-bold text-on-surface">${activeTitle}</h2>
+                  <span class="text-xs font-mono font-bold ${isActiveModDone ? 'text-secondary bg-secondary-container/50' : 'text-primary bg-primary-fixed'} px-2 py-0.5 rounded">
+                    ${activeModPercent}% ${isActiveModDone ? (isId ? "SELESAI" : "COMPLETED") : (isId ? "SIAP DIPELAJARI" : "IN PROGRESS")}
+                  </span>
                 </div>
                 <p class="text-xs text-on-surface-variant mt-1.5 leading-relaxed">
-                  ${isId ? "Fokus Aktif: <strong class=\"text-on-surface font-semibold\">Materi 3.3 — Ringkasan Rute Rekursif & Alokasi Subnet.</strong> Konfigurasi router egress interface pada batas CIDR /27 dan /28." : "Active Focus: <strong class=\"text-on-surface font-semibold\">Lesson 3.3 — Recursive Route Summarization & Allocation.</strong> Configuring router egress interfaces under overlapping /27 and /28 CIDR boundaries."}
+                  ${isId ? `Fokus Aktif: <strong class="text-on-surface font-semibold">${activeTitle}</strong>. ${activeSummary || "Pelajari materi jaringan, tonton rekaman video teori, dan ikuti simulasi interaktif."}` : `Active Focus: <strong class="text-on-surface font-semibold">${activeTitle}</strong>. ${activeSummary || "Master foundational networking concepts, video lectures, and hands-on simulation labs."}`}
                 </p>
               </div>
 
@@ -1138,151 +1227,69 @@ function renderDashboard(container) {
               <!-- Action Buttons -->
               <div class="flex flex-wrap items-center gap-2 pt-1">
                 <button class="h-9 px-4 bg-primary hover:bg-primary-container text-on-primary text-xs font-medium rounded-lg flex items-center gap-2 transition-colors cursor-pointer" id="btn-resume-lab">
-                  <span class="material-symbols-outlined text-[16px]">terminal</span>
-                  <span>${isId ? "Lanjutkan Lab CLI" : "Resume Lab CLI"}</span>
+                  <span class="material-symbols-outlined text-[16px]">${isActiveModDone ? "refresh" : "play_circle"}</span>
+                  <span>${isActiveModDone ? (isId ? "Buka Modul Ini" : "Open Module") : (readCount === 0 ? (isId ? "Mulai Belajar Modul 1" : "Start Module 1") : (isId ? "Lanjutkan Modul" : "Resume Module"))}</span>
                   <span class="px-1 py-0.2 bg-white/20 rounded font-mono text-[10px]">↵ Enter</span>
                 </button>
                 <button class="h-9 px-3 bg-surface-container-low hover:bg-surface-container text-on-surface text-xs font-mono rounded-lg border border-outline-variant flex items-center gap-1.5 transition-colors cursor-pointer" id="btn-read-rfc">
                   <span class="material-symbols-outlined text-[16px] text-outline">description</span>
-                  <span>${isId ? "Baca RFC 1878" : "Read RFC 1878 Spec"}</span>
+                  <span>${isId ? "Buku Manual Lab" : "Manual Book"}</span>
                 </button>
                 <button class="h-9 px-3 text-on-surface-variant hover:text-on-surface text-xs font-mono rounded-lg flex items-center gap-1 transition-colors ml-auto cursor-pointer" id="btn-view-all-modules">
-                  <span>${isId ? "Lihat Silabus Lengkap" : "View Full Syllabus"}</span>
+                  <span>${isId ? "Lihat Semua Modul" : "View All Modules"}</span>
                   <span class="material-symbols-outlined text-[16px]">chevron_right</span>
                 </button>
               </div>
             </div>
           </div>
 
-          <!-- Curriculum Modules Matrix (6 Modules - Exact Stitch Component) -->
+          <!-- Curriculum Modules Matrix (Dynamically Rendered from MATERIALS) -->
           <div class="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-xs overflow-hidden">
             <div class="p-4 flex items-center justify-between bg-surface-container-low border-b border-outline-variant">
               <div>
                 <h3 class="text-sm font-bold text-on-surface font-mono">${isId ? "Matriks Modul Kurikulum" : "Curriculum Modules Matrix"}</h3>
-                <p class="text-[11px] font-mono text-outline">${isId ? "SEMESTER GENAP 2025 • STANDAR AKADEMIK" : "SPRING 2025 TERM • ACCREDITED TRACK"}</p>
+                <p class="text-[11px] font-mono text-outline">${isId ? "SEMESTER GENAP 2025 • STANDAR AKADEMIK TKJ" : "SPRING 2025 TERM • ACCREDITED TRACK"}</p>
               </div>
-              <span class="text-xs font-mono text-on-surface-variant font-medium">${isId ? "Registri Status" : "Status Registry"}</span>
+              <span class="text-xs font-mono text-on-surface-variant font-medium">${readCount}/${totalModules} ${isId ? "Tuntas" : "Completed"}</span>
             </div>
 
             <div class="divide-y divide-outline-variant text-xs">
-              
-              <!-- MOD 01 -->
-              <div class="p-4 flex items-center justify-between hover:bg-surface-container-low/50 transition-colors">
-                <div class="flex items-center gap-3 min-w-0">
-                  <div class="w-8 h-8 rounded-lg bg-secondary-container text-on-secondary-container flex items-center justify-center shrink-0">
-                    <span class="material-symbols-outlined text-[18px]">check_circle</span>
-                  </div>
-                  <div class="min-w-0">
-                    <div class="flex items-center gap-2">
-                      <span class="font-mono text-[11px] text-outline">MOD-01</span>
-                      <span class="font-semibold text-on-surface truncate">${isId ? "Pengantar Jaringan, Klasifikasi & Topologi" : "Physical Layer, Fiber Topologies & Encoding"}</span>
-                    </div>
-                    <div class="font-mono text-[11px] text-outline">${isId ? "8 Praktikum • Selesai 12 Feb • Skor: 96%" : "8 Labs • Completed Feb 12 • Score: 96%"}</div>
-                  </div>
-                </div>
-                <div class="flex items-center gap-3 shrink-0">
-                  <span class="hidden sm:inline font-mono text-[11px] text-outline">14j belajar</span>
-                  <button class="h-7 px-2.5 bg-surface-container-low text-on-surface font-mono text-xs rounded border border-outline-variant hover:bg-surface-container transition-colors cursor-pointer mod-review-btn" data-mod="1">${isId ? "Tinjau" : "Review"}</button>
-                </div>
-              </div>
+              ${MATERIALS.map(m => {
+                const isModDone = state.userStats?.readMaterials?.includes(m.id);
+                const isModActive = m.id === activeMod.id && !isModDone;
+                const isVideoDone = state.userStats?.watchedVideos?.includes(m.id);
+                const mTitle = getModTitle(m);
 
-              <!-- MOD 02 -->
-              <div class="p-4 flex items-center justify-between hover:bg-surface-container-low/50 transition-colors">
-                <div class="flex items-center gap-3 min-w-0">
-                  <div class="w-8 h-8 rounded-lg bg-secondary-container text-on-secondary-container flex items-center justify-center shrink-0">
-                    <span class="material-symbols-outlined text-[18px]">check_circle</span>
-                  </div>
-                  <div class="min-w-0">
-                    <div class="flex items-center gap-2">
-                      <span class="font-mono text-[11px] text-outline">MOD-02</span>
-                      <span class="font-semibold text-on-surface truncate">${isId ? "Perangkat Keras Jaringan, Switch, Router & ARP" : "Data Link Layer, Ethernet Framing & ARP"}</span>
+                return `
+                  <div class="p-4 flex items-center justify-between ${isModActive ? 'bg-surface-container-low/60' : 'hover:bg-surface-container-low/50'} transition-colors">
+                    <div class="flex items-center gap-3 min-w-0">
+                      <div class="w-8 h-8 rounded-lg ${isModDone ? 'bg-secondary-container text-on-secondary-container' : (isModActive ? 'bg-primary text-on-primary' : 'bg-surface-container-high text-outline')} flex items-center justify-center shrink-0 font-mono text-xs font-bold">
+                        ${isModDone ? '<span class="material-symbols-outlined text-[18px]">check_circle</span>' : `0${m.id}`}
+                      </div>
+                      <div class="min-w-0">
+                        <div class="flex items-center gap-2">
+                          <span class="font-mono text-[11px] ${isModActive ? 'text-secondary font-bold' : 'text-outline'}">MOD-0${m.id}</span>
+                          <span class="${isModActive ? 'font-bold' : 'font-semibold'} text-on-surface truncate">${mTitle}</span>
+                          ${isModActive ? `<span class="px-1.5 py-0.2 bg-primary/10 text-primary font-mono text-[9px] rounded font-bold uppercase">${isId ? "Fokus" : "Active"}</span>` : ""}
+                        </div>
+                        <div class="font-mono text-[11px] text-outline">
+                          ${isModDone 
+                            ? (isId ? "✓ Modul Tuntas Dipelajari" : "✓ Module Completed") 
+                            : (isVideoDone ? (isId ? "Video ditonton • Belum membaca materi" : "Video watched • Reading pending") : (isId ? "Modul Pembelajaran Mandiri" : "Self-paced Learning Module"))}
+                        </div>
+                      </div>
                     </div>
-                    <div class="font-mono text-[11px] text-outline">${isId ? "10 Praktikum • Selesai 26 Feb • Skor: 91%" : "10 Labs • Completed Feb 26 • Score: 91%"}</div>
-                  </div>
-                </div>
-                <div class="flex items-center gap-3 shrink-0">
-                  <span class="hidden sm:inline font-mono text-[11px] text-outline">18j belajar</span>
-                  <button class="h-7 px-2.5 bg-surface-container-low text-on-surface font-mono text-xs rounded border border-outline-variant hover:bg-surface-container transition-colors cursor-pointer mod-review-btn" data-mod="2">${isId ? "Tinjau" : "Review"}</button>
-                </div>
-              </div>
-
-              <!-- MOD 03 (Active) -->
-              <div class="p-4 flex items-center justify-between bg-surface-container-low/60">
-                <div class="flex items-center gap-3 min-w-0">
-                  <div class="w-8 h-8 rounded-lg bg-primary text-on-primary flex items-center justify-center shrink-0 font-mono font-bold text-xs">
-                    03
-                  </div>
-                  <div class="min-w-0">
-                    <div class="flex items-center gap-2">
-                      <span class="font-mono text-[11px] text-secondary font-bold">${isId ? "AKTIF" : "ACTIVE"}</span>
-                      <span class="font-bold text-on-surface truncate">${isId ? "Pengalamatan IP, Subnetting & Arsitektur VLSM" : "IP Addressing, Subnetting & VLSM Architecture"}</span>
+                    <div class="flex items-center gap-3 shrink-0">
+                      <span class="hidden sm:inline font-mono text-[11px] ${isModDone ? 'text-secondary font-bold' : 'text-outline'}">
+                        ${isModDone ? (isId ? "Selesai" : "Completed") : (isModActive ? (isId ? "Sedang Berjalan" : "In Progress") : (isId ? "Tersedia" : "Available"))}
+                      </span>
+                      <button class="h-7 px-2.5 ${isModActive ? 'bg-primary text-on-primary' : 'bg-surface-container-low text-on-surface'} font-mono text-xs rounded border border-outline-variant hover:bg-surface-container transition-colors cursor-pointer mod-review-btn" data-mod="${m.id}">
+                        ${isModDone ? (isId ? "Tinjau" : "Review") : (isModActive ? (isId ? "Lanjutkan" : "Resume") : (isId ? "Buka" : "Open"))}
+                      </button>
                     </div>
-                    <div class="font-mono text-[11px] text-outline">${isId ? "6 dari 10 Lab Selesai • Sedang Berjalan" : "6 of 10 Labs Complete • In Progress"}</div>
                   </div>
-                </div>
-                <div class="flex items-center gap-3 shrink-0">
-                  <span class="hidden sm:inline font-mono text-[11px] text-secondary font-bold">65% Progress</span>
-                  <button class="h-7 px-3 bg-primary text-on-primary font-mono text-xs rounded hover:bg-primary-container transition-colors cursor-pointer mod-resume-btn" data-mod="3">${isId ? "Lanjutkan" : "Resume"}</button>
-                </div>
-              </div>
-
-              <!-- MOD 04 -->
-              <div class="p-4 flex items-center justify-between hover:bg-surface-container-low/50 transition-colors">
-                <div class="flex items-center gap-3 min-w-0">
-                  <div class="w-8 h-8 rounded-lg bg-surface-container-high text-outline flex items-center justify-center shrink-0 font-mono text-xs">
-                    04
-                  </div>
-                  <div class="min-w-0">
-                    <div class="flex items-center gap-2">
-                      <span class="font-mono text-[11px] text-outline">MOD-04</span>
-                      <span class="font-semibold text-on-surface truncate">${isId ? "Protokol Routing: Distance Vector vs Link-State" : "Routing Protocols: Distance Vector vs Link-State"}</span>
-                    </div>
-                    <div class="font-mono text-[11px] text-outline">${isId ? "Tersedia pratinjau • Prasyarat MOD-03" : "Open for preview • Prerequisite MOD-03"}</div>
-                  </div>
-                </div>
-                <div class="flex items-center gap-3 shrink-0">
-                  <span class="px-2 py-0.5 bg-surface-container text-on-surface font-mono text-[10px] rounded">${isId ? "TERSEDIA" : "AVAILABLE"}</span>
-                  <button class="h-7 px-2.5 bg-surface-container-low text-on-surface font-mono text-xs rounded border border-outline-variant hover:bg-surface-container transition-colors cursor-pointer mod-review-btn" data-mod="4">${isId ? "Buka" : "Open"}</button>
-                </div>
-              </div>
-
-              <!-- MOD 05 -->
-              <div class="p-4 flex items-center justify-between hover:bg-surface-container-low/50 transition-colors">
-                <div class="flex items-center gap-3 min-w-0">
-                  <div class="w-8 h-8 rounded-lg bg-surface-container-high text-outline flex items-center justify-center shrink-0 font-mono text-xs">
-                    05
-                  </div>
-                  <div class="min-w-0">
-                    <div class="flex items-center gap-2">
-                      <span class="font-mono text-[11px] text-outline">MOD-05</span>
-                      <span class="font-semibold text-on-surface truncate">${isId ? "Media Transmisi, Kabel & Standar Crimping UTP" : "Transmission Media, Cables & Crimping Standards"}</span>
-                    </div>
-                    <div class="font-mono text-[11px] text-outline">T568A vs T568B • Redaman Kabel UTP</div>
-                  </div>
-                </div>
-                <div class="flex items-center gap-3 shrink-0">
-                  <button class="h-7 px-2.5 bg-surface-container-low text-on-surface font-mono text-xs rounded border border-outline-variant hover:bg-surface-container transition-colors cursor-pointer mod-review-btn" data-mod="5">${isId ? "Buka" : "Open"}</button>
-                </div>
-              </div>
-
-              <!-- MOD 06 -->
-              <div class="p-4 flex items-center justify-between hover:bg-surface-container-low/50 transition-colors">
-                <div class="flex items-center gap-3 min-w-0">
-                  <div class="w-8 h-8 rounded-lg bg-surface-container-high text-outline flex items-center justify-center shrink-0 font-mono text-xs">
-                    06
-                  </div>
-                  <div class="min-w-0">
-                    <div class="flex items-center gap-2">
-                      <span class="font-mono text-[11px] text-outline">MOD-06</span>
-                      <span class="font-semibold text-on-surface truncate">${isId ? "Model Referensi OSI 7 Layer & Protokol TCP/IP" : "OSI 7 Layers & TCP/IP Protocol Analysis"}</span>
-                    </div>
-                    <div class="font-mono text-[11px] text-outline">${isId ? "Enkapsulasi & Dekapsulasi Paket Data" : "Packet Header Decapsulation Diagnostics"}</div>
-                  </div>
-                </div>
-                <div class="flex items-center gap-3 shrink-0">
-                  <button class="h-7 px-2.5 bg-surface-container-low text-on-surface font-mono text-xs rounded border border-outline-variant hover:bg-surface-container transition-colors cursor-pointer mod-review-btn" data-mod="6">${isId ? "Buka" : "Open"}</button>
-                </div>
-              </div>
+                `;
+              }).join("")}
             </div>
           </div>
         </div>
@@ -1290,27 +1297,29 @@ function renderDashboard(container) {
         <!-- Right 30% Column (approx 4 cols) -->
         <div class="lg:col-span-4 space-y-6">
           
-          <!-- Benchmark & Normalized Gain Diagnostics Card -->
+          <!-- Benchmark & Normalized Gain Diagnostics Card (Derived Dynamically) -->
           <div class="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant shadow-xs space-y-4">
             <div class="flex items-center justify-between">
               <h3 class="text-xs font-mono uppercase tracking-wider text-outline font-bold">${isId ? "Diagnostik Psikometrik" : "Psychometric Diagnostics"}</h3>
-              <span class="px-2 py-0.5 rounded font-mono text-[10px] bg-secondary-fixed text-on-secondary-fixed font-bold">Hake g = 0.58</span>
+              <span class="px-2 py-0.5 rounded font-mono text-[10px] ${hakeGainLabel !== '-' ? 'bg-secondary-fixed text-on-secondary-fixed font-bold' : 'bg-surface-container-high text-outline'}">
+                Hake g = ${hakeGainLabel}
+              </span>
             </div>
 
             <div class="p-3 bg-surface-container-low rounded-lg border border-outline-variant space-y-2">
               <div class="flex items-center justify-between text-xs font-mono">
                 <span class="text-on-surface-variant font-medium">${isId ? "Garis Dasar Pretest" : "Diagnostic Baseline"}</span>
-                <span class="text-primary font-bold">68%</span>
+                <span class="${preResult ? 'text-primary font-bold' : 'text-outline'}">${preResult ? `${prePercent}%` : (isId ? "Belum Ujian (0%)" : "Not Taken (0%)")}</span>
               </div>
               <div class="w-full bg-surface-container-high h-2 rounded-full overflow-hidden">
-                <div class="bg-primary h-full rounded-full" style="width: 68%;"></div>
+                <div class="bg-primary h-full rounded-full transition-all duration-300" style="width: ${prePercent}%;"></div>
               </div>
               <div class="flex items-center justify-between text-xs font-mono pt-1">
                 <span class="text-on-surface-variant font-medium">${isId ? "Nilai Akhir Posttest" : "HOTS Posttest Score"}</span>
-                <span class="text-secondary font-bold">88%</span>
+                <span class="${postResult ? 'text-secondary font-bold' : 'text-outline'}">${postResult ? `${postPercent}%` : (isId ? "Belum Ujian (0%)" : "Not Taken (0%)")}</span>
               </div>
               <div class="w-full bg-surface-container-high h-2 rounded-full overflow-hidden">
-                <div class="bg-secondary h-full rounded-full" style="width: 88%;"></div>
+                <div class="bg-secondary h-full rounded-full transition-all duration-300" style="width: ${postPercent}%;"></div>
               </div>
             </div>
 
@@ -1320,31 +1329,31 @@ function renderDashboard(container) {
               
               <div class="flex items-center justify-between text-xs font-mono">
                 <span class="text-on-surface">C4 Analisis (Subnetting)</span>
-                <span class="font-bold text-secondary">92%</span>
+                <span class="${c4Score > 0 ? 'font-bold text-secondary' : 'text-outline font-mono'}">${c4Score}%</span>
               </div>
               <div class="w-full bg-surface-container-high h-1.5 rounded-full overflow-hidden">
-                <div class="bg-secondary h-full rounded-full" style="width: 92%;"></div>
+                <div class="bg-secondary h-full rounded-full transition-all duration-300" style="width: ${c4Score}%;"></div>
               </div>
 
               <div class="flex items-center justify-between text-xs font-mono pt-1">
                 <span class="text-on-surface">C5 Sintesis (Routing OSPF)</span>
-                <span class="font-bold text-primary">78%</span>
+                <span class="${c5Score > 0 ? 'font-bold text-primary' : 'text-outline font-mono'}">${c5Score}%</span>
               </div>
               <div class="w-full bg-surface-container-high h-1.5 rounded-full overflow-hidden">
-                <div class="bg-primary h-full rounded-full" style="width: 78%;"></div>
+                <div class="bg-primary h-full rounded-full transition-all duration-300" style="width: ${c5Score}%;"></div>
               </div>
 
               <div class="flex items-center justify-between text-xs font-mono pt-1">
                 <span class="text-on-surface">C6 Evaluasi (Troubleshooting)</span>
-                <span class="font-bold text-tertiary">85%</span>
+                <span class="${c6Score > 0 ? 'font-bold text-tertiary' : 'text-outline font-mono'}">${c6Score}%</span>
               </div>
               <div class="w-full bg-surface-container-high h-1.5 rounded-full overflow-hidden">
-                <div class="bg-tertiary h-full rounded-full" style="width: 85%;"></div>
+                <div class="bg-tertiary h-full rounded-full transition-all duration-300" style="width: ${c6Score}%;"></div>
               </div>
             </div>
 
             <button class="w-full py-2 bg-surface-container-low hover:bg-surface-container text-primary font-mono text-xs font-bold rounded-lg border border-outline-variant transition-colors flex items-center justify-center gap-1.5 cursor-pointer" id="btn-view-diagnostic-report">
-              <span>${isId ? "Lihat Laporan Diagnostik Lengkap" : "View Full Psychometric Report"}</span>
+              <span>${isId ? "Lihat Evaluasi Soal HOTS" : "View Evaluative HOTS Exam"}</span>
               <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
             </button>
           </div>
@@ -1391,13 +1400,30 @@ function renderDashboard(container) {
   `;
 
   // Attach Dashboard events
-  document.getElementById("btn-hero-continue")?.addEventListener("click", () => navigateTo("materials"));
+  document.getElementById("btn-hero-continue")?.addEventListener("click", () => {
+    if (activeMod) {
+      openMaterialModal(activeMod.id);
+    } else {
+      navigateTo("materials");
+    }
+  });
   document.getElementById("btn-hero-lab")?.addEventListener("click", () => navigateTo("simulation"));
-  document.getElementById("btn-dash-sandbox")?.addEventListener("click", () => navigateTo("simulation"));
-  document.getElementById("btn-resume-lab")?.addEventListener("click", () => navigateTo("simulation"));
+  document.getElementById("btn-resume-lab")?.addEventListener("click", () => {
+    if (activeMod) {
+      openMaterialModal(activeMod.id);
+    } else {
+      navigateTo("materials");
+    }
+  });
   document.getElementById("btn-view-all-modules")?.addEventListener("click", () => navigateTo("materials"));
   document.getElementById("btn-read-rfc")?.addEventListener("click", () => navigateTo("manual"));
-  document.getElementById("btn-view-diagnostic-report")?.addEventListener("click", () => navigateTo("posttest-results"));
+  document.getElementById("btn-view-diagnostic-report")?.addEventListener("click", () => {
+    if (state.userStats?.results && state.userStats.results.length > 0) {
+      navigateTo("posttest-results", { result: state.userStats.results[0] });
+    } else {
+      navigateTo("quizzes");
+    }
+  });
   document.getElementById("btn-tool-subnet")?.addEventListener("click", () => navigateTo("simulation"));
   document.getElementById("btn-tool-topology")?.addEventListener("click", () => navigateTo("simulation"));
   document.getElementById("btn-tool-pretest")?.addEventListener("click", () => navigateTo("pretest"));
@@ -2946,54 +2972,109 @@ function openSupabaseModal() {
 }
 
 // ============================================================================
-// Modal: Notifikasi Google Provider Supabase Belum Aktif
+// Modal: Google Quick Sign-In / Register (Input Email Akun Google Pengguna)
 // ============================================================================
-function showGoogleNotEnabledModal() {
+function showGoogleAccountPromptModal(selectedRole = "student") {
   const isId = getLang() === "id";
   const modalsRoot = document.getElementById("modals-root") || document.body;
   const overlay = document.createElement("div");
+  overlay.id = "modal-google-prompt";
   overlay.className = "fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in";
   overlay.innerHTML = `
-    <div class="bg-surface-container-lowest border border-outline-variant rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
-          <span class="material-symbols-outlined text-[24px]">vpn_key_alert</span>
+    <div class="bg-surface-container-lowest border border-outline-variant rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between pb-2 border-b border-outline-variant">
+        <div class="flex items-center gap-2.5">
+          <svg class="w-5 h-5 shrink-0" viewBox="0 0 24 24">
+            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+          </svg>
+          <span class="font-bold text-sm text-on-surface">${isId ? "Masuk / Daftar Akun Google" : "Continue with Google"}</span>
         </div>
-        <div>
-          <h3 class="font-bold text-sm text-on-surface">${isId ? "Google Login Belum Aktif di Supabase" : "Google Provider Not Active in Supabase"}</h3>
-          <p class="text-[11px] text-outline font-mono">Error: provider is not enabled (HTTP 400)</p>
-        </div>
+        <button type="button" class="text-outline hover:text-on-surface p-1 rounded-lg cursor-pointer" id="btn-close-google-prompt">
+          <span class="material-symbols-outlined text-[18px]">close</span>
+        </button>
       </div>
 
       <p class="text-xs text-on-surface-variant leading-relaxed">
         ${isId 
-          ? "Login Google memerlukan aktivasi Client ID & Client Secret di <strong>Supabase Dashboard (Authentication ➔ Providers ➔ Google)</strong>." 
-          : "Google SSO requires Client ID & Secret activation in your <strong>Supabase Dashboard (Authentication ➔ Providers ➔ Google)</strong>."}
+          ? "Masukkan alamat email Google Anda untuk masuk atau mendaftar otomatis sebagai Siswa." 
+          : "Enter your Google email address to sign in or automatically register as a Student."}
       </p>
 
-      <div class="p-3 bg-surface-container-low rounded-xl border border-outline-variant space-y-1">
-        <span class="text-xs font-bold text-on-surface block">${isId ? "💡 Solusi untuk Siswa / Pengguna:" : "💡 Solution for Students / Users:"}</span>
-        <span class="text-xs text-on-surface-variant block leading-relaxed">${isId ? "Silakan buat akun baru dengan memasukkan <strong>Nama Lengkap, Kelas, Email, dan Password</strong> pada formulir pendaftaran." : "Please create an account by filling in your <strong>Name, Class, Email, and Password</strong> on the registration form."}</span>
-      </div>
+      <form id="form-google-prompt" class="space-y-3.5 pt-1">
+        <div>
+          <label class="block text-xs font-semibold text-on-surface mb-1 font-mono">${isId ? "Alamat Email Google *" : "Google Email Address *"}</label>
+          <div class="relative flex items-center">
+            <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-outline pointer-events-none">mail</span>
+            <input 
+              type="email" 
+              id="prompt-google-email" 
+              placeholder="${isId ? "nama.siswa@gmail.com" : "student@gmail.com"}"
+              class="w-full pl-10 pr-3.5 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg text-xs font-mono text-on-surface focus:outline-none focus:ring-1 focus:ring-primary" 
+              required 
+            />
+          </div>
+          <span class="text-[10px] text-outline font-mono mt-1 block">
+            ${isId ? "⚡ Setelah email terverifikasi, Anda akan mengisi identitas Nama & Kelas." : "⚡ Next step: Complete your Name & Class."}
+          </span>
+        </div>
 
-      <div class="flex items-center justify-end gap-2 pt-2">
-        <button type="button" class="h-9 px-4 rounded-lg bg-surface-container-high text-on-surface text-xs font-mono cursor-pointer" id="btn-close-google-notice">
-          ${isId ? "Tutup" : "Close"}
+        <button 
+          type="submit" 
+          class="w-full h-10 bg-primary hover:bg-primary-container text-on-primary font-bold rounded-lg text-xs font-mono transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+        >
+          <span>${isId ? "Lanjut & Isi Identitas" : "Continue & Set Identity"}</span>
+          <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
         </button>
-        <button type="button" class="h-9 px-4 rounded-lg bg-primary text-on-primary font-bold text-xs font-mono cursor-pointer transition-colors hover:bg-primary-container" id="btn-switch-to-register">
-          ${isId ? "Buka Formulir Daftar Siswa" : "Open Student Register Form"}
-        </button>
-      </div>
+      </form>
     </div>
   `;
 
   modalsRoot.appendChild(overlay);
 
-  overlay.querySelector("#btn-close-google-notice")?.addEventListener("click", () => overlay.remove());
-  overlay.querySelector("#btn-switch-to-register")?.addEventListener("click", () => {
+  overlay.querySelector("#btn-close-google-prompt")?.addEventListener("click", () => overlay.remove());
+
+  overlay.querySelector("#form-google-prompt")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const emailVal = overlay.querySelector("#prompt-google-email").value.trim().toLowerCase();
+    if (!emailVal || !emailVal.includes("@")) {
+      showToast(isId ? "Email Tidak Valid" : "Invalid Email", isId ? "Silakan masukkan email Google yang benar." : "Please enter a valid Google email.", "warning");
+      return;
+    }
+
     overlay.remove();
-    const container = document.getElementById("auth-view") || document.getElementById("app-content");
-    if (container) renderAuth(container, "register");
+    showToast(isId ? "Menghubungkan Akun..." : "Connecting Account...", emailVal, "sync");
+
+    try {
+      const loggedUser = await signInWithGoogleEmail({ email: emailVal, role: selectedRole });
+      state.userStats = {
+        xp: 0,
+        readMaterials: [],
+        watchedVideos: [],
+        unlockedBadges: [],
+        results: []
+      };
+      state.currentUser = loggedUser;
+      showAppLayout();
+      await loadUserStats();
+      updateNavUser();
+      updateRoleAccess();
+      updateHUD();
+
+      // Jika identitas (kelas atau nama) belum lengkap, langsung buka modal identitas
+      if (loggedUser.needsProfileCompletion || (loggedUser.role === "student" && (!loggedUser.className || loggedUser.className.trim() === ""))) {
+        showStudentProfileModal(loggedUser);
+      } else {
+        const targetView = (state.currentUser.role === "teacher" || state.currentUser.user?.user_metadata?.role === "teacher") ? "admin" : "dashboard";
+        navigateTo(targetView);
+        showToast(isId ? "Berhasil Masuk via Google!" : "Logged In via Google!", `${isId ? "Selamat datang" : "Welcome"}, ${loggedUser.name}`, "check_circle");
+      }
+    } catch (err) {
+      console.error("Google login error:", err);
+      showToast(isId ? "Gagal Masuk" : "Login Failed", err.message || (isId ? "Terjadi kesalahan saat masuk Google." : "Google login failed."), "error");
+    }
   });
 }
 
@@ -3014,7 +3095,7 @@ function showStudentProfileModal(currentUser) {
         </div>
         <div>
           <h3 class="font-bold text-base text-on-surface">${isId ? "Lengkapi Identitas Siswa Baru" : "Complete Student Identity"}</h3>
-          <p class="text-xs text-on-surface-variant">${isId ? "Wajib diisi untuk rekap nilai Pretest/Posttest dan absensi kelas." : "Required for grade recording and class analytics."}</p>
+          <p class="text-xs text-on-surface-variant">${isId ? "Wajib diisi untuk rekap nilai Pretest/Posttest dan absensi kelas." : "Required for grade recording and class roster."}</p>
         </div>
       </div>
 
@@ -3024,7 +3105,7 @@ function showStudentProfileModal(currentUser) {
           <input 
             type="text" 
             id="student-complete-name" 
-            value="${currentUser?.name || currentUser?.user?.user_metadata?.full_name || ""}" 
+            value="${currentUser?.name && !currentUser.name.includes("@") ? currentUser.name : ""}" 
             placeholder="${isId ? "Contoh: Budi Pratama" : "e.g. John Doe"}"
             class="w-full px-3.5 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg text-xs font-mono text-on-surface focus:outline-none focus:ring-1 focus:ring-primary" 
             required 
@@ -3032,16 +3113,20 @@ function showStudentProfileModal(currentUser) {
         </div>
 
         <div>
-          <label class="block text-xs font-semibold text-on-surface mb-1 font-mono">${isId ? "Kelas / Jurusan Siswa *" : "Class / Major *"}</label>
-          <input 
-            type="text" 
-            id="student-complete-class" 
-            value="${currentUser?.className || ""}" 
-            placeholder="${isId ? "Contoh: X TKJ 1 / XI RPL 2" : "e.g. 10th Grade TKJ 1"}"
-            class="w-full px-3.5 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg text-xs font-mono text-on-surface focus:outline-none focus:ring-1 focus:ring-primary" 
-            required 
-          />
-          <span class="text-[10px] text-outline font-mono mt-0.5 block">${isId ? "Pastikan format kelas sesuai dengan absensi sekolah" : "Ensure class format matches school attendance roster"}</span>
+          <label class="block text-xs font-semibold text-on-surface mb-1 font-mono">${isId ? "Kelas Siswa (TKJ) *" : "Class (TKJ) *"}</label>
+          <div class="relative flex items-center">
+            <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-outline pointer-events-none">school</span>
+            <select 
+              id="student-complete-class" 
+              class="w-full pl-10 pr-9 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg text-xs font-mono text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary appearance-none cursor-pointer" 
+              required 
+            >
+              <option value="" disabled ${!currentUser?.className ? "selected" : ""}>${isId ? "-- Pilih Kelas TKJ --" : "-- Select TKJ Class --"}</option>
+              ${TKJ_CLASSES.map(cls => `<option value="${cls}" ${currentUser?.className === cls ? "selected" : ""}>${cls}</option>`).join("")}
+            </select>
+            <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-[18px] text-outline pointer-events-none">expand_more</span>
+          </div>
+          <span class="text-[10px] text-outline font-mono mt-1 block">${isId ? "Pilih langsung kelas tanpa mengetik manual" : "Select directly without typing"}</span>
         </div>
 
         <button 
@@ -3063,7 +3148,7 @@ function showStudentProfileModal(currentUser) {
     const classVal = overlay.querySelector("#student-complete-class").value.trim();
 
     if (!nameVal || !classVal) {
-      showToast(isId ? "Data Belum Lengkap" : "Incomplete", isId ? "Silakan isi nama dan kelas Anda." : "Please enter your name and class.", "warning");
+      showToast(isId ? "Data Belum Lengkap" : "Incomplete", isId ? "Silakan isi nama dan pilih kelas Anda." : "Please enter your name and select your class.", "warning");
       return;
     }
 
@@ -3081,6 +3166,7 @@ function showStudentProfileModal(currentUser) {
     updateHUD();
     overlay.remove();
     showToast(isId ? "Identitas Berhasil Disimpan!" : "Profile Saved!", `${nameVal} (${classVal})`, "verified");
+    navigateTo("dashboard");
   });
 }
 

@@ -9,6 +9,10 @@
   <meta name="description" content="NetLearn adalah platform media belajar interaktif berstandar akademik untuk materi Jaringan Komputer CS302, dilengkapi simulator subnetting VLSM, 25 soal HOTS teruji, dan telemetri kemajuan belajar.">
   <meta name="keywords" content="NetLearn, NetQuest, Jaringan Komputer, Media Belajar Interaktif, HOTS, VLSM, Subnet Calculator, Supabase, CS302, Cisco Packet Tracer">
   <meta name="author" content="NetLearn Engineering">
+  <link rel="icon" type="image/png" href="assets/images/logo_icon.png">
+  <link rel="apple-touch-icon" href="assets/images/logo_icon.png">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1E90FF">
 
   <!-- Google Fonts & Material Symbols Outlined -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -129,20 +133,16 @@
       <!-- Top Scrollable Nav Area -->
       <div class="flex flex-col flex-1 overflow-y-auto">
         
-        <!-- Monogram Brand Bar -->
+        <!-- Monogram Brand Bar with Official Logo -->
         <div class="h-14 px-4 flex items-center justify-between border-b border-outline-variant">
           <div class="flex items-center gap-2.5 cursor-pointer" id="nav-brand" role="button" tabindex="0">
-            <div class="w-8 h-8 bg-gradient-to-tr from-primary-container to-primary rounded-lg flex items-center justify-center text-white shadow-sm shadow-blue-500/20">
-              <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2L13.09 8.26L20 9L13.09 9.74L12 16L10.91 9.74L4 9L10.91 8.26L12 2Z"/>
-              </svg>
-            </div>
+            <img src="assets/images/logo_icon.png" alt="NetLearn Logo" class="w-9 h-9 object-contain rounded-lg shadow-xs shrink-0" />
             <div class="flex flex-col">
               <div class="flex items-center gap-1.5">
                 <span class="font-extrabold text-sm text-on-surface tracking-tight leading-none">NetLearn</span>
-                <span class="text-[9px] font-bold px-1.5 py-0.5 bg-blue-50 text-primary border border-blue-200/80 rounded font-sans">SkillUp</span>
+                <span class="text-[9px] font-bold px-1.5 py-0.5 bg-blue-50 text-primary border border-blue-200/80 rounded font-sans">CS302</span>
               </div>
-              <span class="text-[10px] text-on-surface-variant font-mono leading-tight mt-0.5">Networks Academy CS302</span>
+              <span class="text-[10px] text-on-surface-variant font-mono leading-tight mt-0.5">Web Pembelajaran Jaringan</span>
             </div>
           </div>
           <button id="sidebar-close-btn" class="md:hidden p-1 rounded text-outline hover:text-on-surface" title="Tutup Menu">
