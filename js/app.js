@@ -1713,9 +1713,21 @@ function renderDashboard(container) {
   `;
 
   // Attach Dashboard events
-  document.getElementById("btn-dash-minigame")?.addEventListener("click", () => navigateTo("minigame"));
+  const launchGameWithFullscreen = () => {
+    navigateTo("minigame");
+    setTimeout(() => {
+      const stage = document.getElementById("netgame-viewport");
+      if (stage && (stage.requestFullscreen || stage.webkitRequestFullscreen)) {
+        (stage.requestFullscreen || stage.webkitRequestFullscreen).call(stage).then(() => {
+          if (screen.orientation && screen.orientation.lock) screen.orientation.lock("landscape").catch(() => {});
+        }).catch(() => {});
+      }
+    }, 80);
+  };
+
+  document.getElementById("btn-dash-minigame")?.addEventListener("click", launchGameWithFullscreen);
   document.getElementById("btn-dash-cisco")?.addEventListener("click", () => navigateTo("simulation"));
-  document.getElementById("btn-tool-minigame")?.addEventListener("click", () => navigateTo("minigame"));
+  document.getElementById("btn-tool-minigame")?.addEventListener("click", launchGameWithFullscreen);
   document.getElementById("btn-hero-continue")?.addEventListener("click", () => {
     if (activeMod) {
       openMaterialModal(activeMod.id);
@@ -3017,6 +3029,11 @@ function renderMiniGame(container) {
             <span class="material-symbols-outlined text-[15px]">restart_alt</span>
             <span>Reset (R)</span>
           </button>
+
+          <button class="h-8 px-2.5 sm:px-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer transition-colors" id="btn-game-toggle-fullscreen" title="Layar Penuh (Landscape)">
+            <span class="material-symbols-outlined text-[17px]" id="icon-game-fullscreen">fullscreen</span>
+            <span id="text-game-fullscreen" class="hidden sm:inline">Layar Penuh</span>
+          </button>
         </div>
       </div>
 
@@ -3024,6 +3041,19 @@ function renderMiniGame(container) {
       <div class="relative w-full rounded-2xl overflow-hidden border border-slate-300 shadow-md bg-slate-900 select-none h-[420px] sm:h-[500px] md:h-[620px]" id="netgame-viewport">
         <!-- Three.js Canvas Container -->
         <div id="netgame-canvas-mount" class="w-full h-full"></div>
+
+        <!-- Floating Center Top: Fullscreen Toggle & Rotation Helper -->
+        <button class="absolute top-3 left-1/2 -translate-x-1/2 z-20 px-3 py-1.5 bg-slate-900/85 hover:bg-slate-800 active:bg-indigo-600 text-white border border-slate-700 rounded-xl font-mono text-[10px] font-bold flex items-center gap-1.5 backdrop-blur-md shadow-lg cursor-pointer transition-all select-none touch-manipulation" id="btn-viewport-fullscreen" title="Beralih Mode Layar Penuh">
+          <span class="material-symbols-outlined text-[15px]" id="icon-viewport-fullscreen">fullscreen</span>
+          <span id="text-viewport-fullscreen">Layar Penuh</span>
+        </button>
+
+        <!-- Floating Rotate Hint Banner for Mobile Screen -->
+        <div id="netgame-rotate-hint" class="hidden absolute top-14 left-1/2 -translate-x-1/2 z-30 bg-slate-900/95 backdrop-blur-md border border-amber-400 text-white px-3.5 py-2 rounded-xl font-mono text-[10px] sm:text-xs shadow-2xl flex items-center gap-2 pointer-events-auto">
+          <span class="material-symbols-outlined text-amber-400 text-[18px]">screen_rotation</span>
+          <span>Putar HP ke Landscape (Mendatar)</span>
+          <button id="btn-close-rotate-hint" class="ml-1 text-slate-400 hover:text-white text-xs px-1.5 py-0.5 rounded bg-slate-800 cursor-pointer">✕</button>
+        </div>
 
         <!-- Floating Top-Left: Active Data Courier Mission HUD -->
         <div id="netgame-courier-card" class="absolute top-3 left-3 sm:top-4 sm:left-4 bg-slate-900/90 backdrop-blur-md border border-amber-500/50 rounded-xl p-2 sm:p-2.5 shadow-xl max-w-[170px] sm:max-w-xs pointer-events-none flex items-center gap-2 sm:gap-2.5 z-10">
@@ -3135,43 +3165,43 @@ function renderMiniGame(container) {
             <span class="tracking-wide text-rose-200">BATAS KOTA: Area Terlarang! Silakan Putar Balik</span>
           </div>
         </div>
-      </div>
 
-      <!-- In-Game Question Modal Overlay Mount (Managed by game3d.js) -->
-      <div id="netgame-modal-overlay" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-      </div>
+        <!-- In-Game Question Modal Overlay Mount (Inside Viewport for Flawless Fullscreen Mode) -->
+        <div id="netgame-modal-overlay" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+        </div>
 
-      <!-- Victory Celebration Modal (All 6 Stations Completed) -->
-      <div id="netgame-victory-modal" class="hidden fixed inset-0 z-50 bg-slate-900/75 backdrop-blur-md flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl border border-slate-200 max-w-md w-full p-6 sm:p-8 shadow-2xl text-center space-y-5 animate-scale-up">
-          <div class="w-20 h-20 rounded-2xl bg-amber-50 border border-amber-200 text-amber-500 flex items-center justify-center mx-auto shadow-md">
-            <span class="material-symbols-outlined text-[44px]">emoji_events</span>
-          </div>
-
-          <div class="space-y-1.5">
-            <span class="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono text-xs font-bold uppercase tracking-wider">MISI 100% TUNTAS</span>
-            <h2 class="text-2xl font-bold font-display text-slate-900">Grand Champion NetDrive!</h2>
-            <p class="text-xs text-slate-600 leading-relaxed">
-              Selamat! Anda telah berhasil menuntaskan seluruh 6 pos misi studi kasus jaringan di kota 3D dengan hasil memuaskan!
-            </p>
-          </div>
-
-          <div class="p-4 bg-slate-50 rounded-xl border border-slate-200 grid grid-cols-2 gap-3 text-center font-mono text-xs">
-            <div>
-              <span class="text-slate-400 block text-[10px] uppercase font-bold">Total Skor</span>
-              <span class="text-2xl font-black text-indigo-700" id="victory-score-display">600</span>
+        <!-- Victory Celebration Modal (All 6 Stations Completed) -->
+        <div id="netgame-victory-modal" class="hidden fixed inset-0 z-50 bg-slate-900/75 backdrop-blur-md flex items-center justify-center p-4">
+          <div class="bg-white rounded-2xl border border-slate-200 max-w-md w-full p-6 sm:p-8 shadow-2xl text-center space-y-5 animate-scale-up">
+            <div class="w-20 h-20 rounded-2xl bg-amber-50 border border-amber-200 text-amber-500 flex items-center justify-center mx-auto shadow-md">
+              <span class="material-symbols-outlined text-[44px]">emoji_events</span>
             </div>
-            <div>
-              <span class="text-slate-400 block text-[10px] uppercase font-bold">Bonus XP</span>
-              <span class="text-2xl font-black text-emerald-700">+300 XP</span>
-            </div>
-          </div>
 
-          <div class="pt-2">
-            <button class="w-full h-11 bg-indigo-600 hover:bg-indigo-700 text-white font-mono text-xs font-bold rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-sm" id="btn-victory-claim-back">
-              <span class="material-symbols-outlined text-[18px]">verified</span>
-              <span>Klaim Hadiah &amp; Kembali</span>
-            </button>
+            <div class="space-y-1.5">
+              <span class="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono text-xs font-bold uppercase tracking-wider">MISI 100% TUNTAS</span>
+              <h2 class="text-2xl font-bold font-display text-slate-900">Grand Champion NetDrive!</h2>
+              <p class="text-xs text-slate-600 leading-relaxed">
+                Selamat! Anda telah berhasil menuntaskan seluruh 6 pos misi studi kasus jaringan di kota 3D dengan hasil memuaskan!
+              </p>
+            </div>
+
+            <div class="p-4 bg-slate-50 rounded-xl border border-slate-200 grid grid-cols-2 gap-3 text-center font-mono text-xs">
+              <div>
+                <span class="text-slate-400 block text-[10px] uppercase font-bold">Total Skor</span>
+                <span class="text-2xl font-black text-indigo-700" id="victory-score-display">600</span>
+              </div>
+              <div>
+                <span class="text-slate-400 block text-[10px] uppercase font-bold">Bonus XP</span>
+                <span class="text-2xl font-black text-emerald-700">+300 XP</span>
+              </div>
+            </div>
+
+            <div class="pt-2">
+              <button class="w-full h-11 bg-indigo-600 hover:bg-indigo-700 text-white font-mono text-xs font-bold rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-sm" id="btn-victory-claim-back">
+                <span class="material-symbols-outlined text-[18px]">verified</span>
+                <span>Klaim Hadiah &amp; Kembali</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -3183,6 +3213,93 @@ function renderMiniGame(container) {
     cleanupNetQuestCityGame();
     navigateTo("quizzes");
   });
+
+  // Fullscreen and Landscape Support for Mobile and Desktop
+  const stageViewport = document.getElementById("netgame-viewport");
+
+  const enterGameFullscreen = () => {
+    if (!stageViewport) return;
+    const req = stageViewport.requestFullscreen || stageViewport.webkitRequestFullscreen || stageViewport.mozRequestFullScreen || stageViewport.msRequestFullscreen;
+    if (req) {
+      req.call(stageViewport).then(() => {
+        if (screen.orientation && screen.orientation.lock) {
+          screen.orientation.lock("landscape").catch(() => {});
+        }
+      }).catch(() => {});
+    }
+  };
+
+  const exitGameFullscreen = () => {
+    const exit = document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen || document.msExitFullscreen;
+    if (exit) {
+      exit.call(document).then(() => {
+        if (screen.orientation && screen.orientation.unlock) {
+          try { screen.orientation.unlock(); } catch (e) {}
+        }
+      }).catch(() => {});
+    }
+  };
+
+  const toggleGameFullscreen = () => {
+    const isFS = !!(document.fullscreenElement || document.webkitFullscreenElement);
+    if (!isFS) {
+      enterGameFullscreen();
+    } else {
+      exitGameFullscreen();
+    }
+  };
+
+  document.getElementById("btn-game-toggle-fullscreen")?.addEventListener("click", toggleGameFullscreen);
+  document.getElementById("btn-viewport-fullscreen")?.addEventListener("click", toggleGameFullscreen);
+
+  const rotateHintEl = document.getElementById("netgame-rotate-hint");
+  document.getElementById("btn-close-rotate-hint")?.addEventListener("click", () => {
+    rotateHintEl?.classList.add("hidden");
+  });
+
+  const checkOrientationHint = () => {
+    if (!rotateHintEl) return;
+    const isMobile = window.innerWidth <= 768;
+    const isPortrait = window.innerHeight > window.innerWidth;
+    if (isMobile && isPortrait) {
+      rotateHintEl.classList.remove("hidden");
+    } else {
+      rotateHintEl.classList.add("hidden");
+    }
+  };
+
+  const onFSChange = () => {
+    const isFS = !!(document.fullscreenElement || document.webkitFullscreenElement);
+    const icon1 = document.getElementById("icon-game-fullscreen");
+    const text1 = document.getElementById("text-game-fullscreen");
+    const icon2 = document.getElementById("icon-viewport-fullscreen");
+    const text2 = document.getElementById("text-viewport-fullscreen");
+
+    if (isFS) {
+      if (icon1) icon1.textContent = "fullscreen_exit";
+      if (text1) text1.textContent = "Keluar Penuh";
+      if (icon2) icon2.textContent = "fullscreen_exit";
+      if (text2) text2.textContent = "Keluar";
+      stageViewport?.classList.add("game-stage-fullscreen");
+    } else {
+      if (icon1) icon1.textContent = "fullscreen";
+      if (text1) text1.textContent = "Layar Penuh";
+      if (icon2) icon2.textContent = "fullscreen";
+      if (text2) text2.textContent = "Layar Penuh";
+      stageViewport?.classList.remove("game-stage-fullscreen");
+    }
+
+    checkOrientationHint();
+    setTimeout(() => {
+      window.dispatchEvent(new Event("resize"));
+    }, 150);
+  };
+
+  document.addEventListener("fullscreenchange", onFSChange);
+  document.addEventListener("webkitfullscreenchange", onFSChange);
+  window.addEventListener("resize", checkOrientationHint);
+  window.addEventListener("orientationchange", checkOrientationHint);
+  checkOrientationHint();
 
   // Attach Model Selector
   const carSelect = document.getElementById("select-game-car-model");
@@ -3469,6 +3586,14 @@ function renderQuizzes(container) {
   // Attach event handlers
   document.getElementById("btn-launch-minigame-hero")?.addEventListener("click", () => {
     navigateTo("minigame");
+    setTimeout(() => {
+      const stage = document.getElementById("netgame-viewport");
+      if (stage && (stage.requestFullscreen || stage.webkitRequestFullscreen)) {
+        (stage.requestFullscreen || stage.webkitRequestFullscreen).call(stage).then(() => {
+          if (screen.orientation && screen.orientation.lock) screen.orientation.lock("landscape").catch(() => {});
+        }).catch(() => {});
+      }
+    }, 80);
   });
 
   document.getElementById("btn-quiz-pretest")?.addEventListener("click", () => {

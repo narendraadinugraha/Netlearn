@@ -10,6 +10,15 @@ let animationFrameId = null;
 let currentGameInstance = null;
 
 export function cleanupNetQuestCityGame() {
+  if (document.fullscreenElement || document.webkitFullscreenElement) {
+    try {
+      if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
+      else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+    } catch (e) {}
+  }
+  if (screen.orientation && screen.orientation.unlock) {
+    try { screen.orientation.unlock(); } catch (e) {}
+  }
   if (currentGameInstance) {
     currentGameInstance.destroy();
     currentGameInstance = null;
@@ -865,7 +874,7 @@ export function initNetQuestCityGame(containerEl, options = {}) {
     sound.click();
 
     overlay.innerHTML = `
-      <div class="bg-white rounded-2xl border border-slate-200 max-w-lg w-full p-6 sm:p-7 shadow-2xl space-y-4 animate-scale-up text-left">
+      <div class="bg-white rounded-2xl border border-slate-200 max-w-lg w-full max-h-[92vh] overflow-y-auto p-4 sm:p-7 shadow-2xl space-y-4 animate-scale-up text-left">
         <div class="flex items-center justify-between border-b border-slate-100 pb-3">
           <div class="flex items-center gap-3">
             <span class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center shrink-0">
@@ -985,7 +994,23 @@ export function initNetQuestCityGame(containerEl, options = {}) {
     keys.nitro = false;
     carState.speed = 0;
 
-    const topicQuestions = HOTS_QUESTIONS.filter(q => q.topic_id === stationObj.config.topic);
+    // Map stations 1..6 reliably to question topics in HOTS_QUESTIONS
+    const topicMap = {
+      1: ["Pengantar & Jenis Jaringan"],
+      2: ["Topologi Jaringan", "Topologi Jaringan & Perangkat Switch/Hub"],
+      3: ["Model OSI & TCP/IP", "Model OSI & Protokol Komunikasi"],
+      4: ["IP Address & Subnetting", "Pengalamatan IPv4, Subnetting & VLSM"],
+      5: ["Perangkat & Media Transmisi", "Media Transmisi & Pengkabelan"],
+      6: ["Layanan, Keamanan & Troubleshooting"]
+    };
+
+    const targetTopics = topicMap[stationObj.config.id] || topicMap[stationObj.config.topic] || [];
+    let topicQuestions = HOTS_QUESTIONS.filter(q => targetTopics.includes(q.topic_id));
+    if (topicQuestions.length < 5) {
+      // Safe fallback to guarantee 5 questions per station
+      const startIdx = ((stationObj.config.id - 1) % 6) * 5;
+      topicQuestions = HOTS_QUESTIONS.slice(startIdx, startIdx + 5);
+    }
     const selectedQuestions = topicQuestions.slice(0, 5);
 
     open5QuestionsModal(stationObj, selectedQuestions, (score) => {
@@ -1004,6 +1029,7 @@ export function initNetQuestCityGame(containerEl, options = {}) {
 
   // 11. Main 60 FPS Game Loop
   let lastTime = performance.now();
+  let activePromptKey = null;
 
   const gameLoop = (currentTime) => {
     animationFrameId = requestAnimationFrame(gameLoop);
@@ -1197,51 +1223,83 @@ export function initNetQuestCityGame(containerEl, options = {}) {
       });
     }
 
+    let desiredKey = null;
+    let desiredType = null;
+    if (isCourierPrompt && !gameState.isModalOpen) {
+      desiredKey = "courier_" + (curMission ? curMission.id : "active");
+      desiredType = "courier";
+    } else if (promptTarget && promptDist <= 9.0 && !gameState.isModalOpen) {
+      desiredKey = "station_" + promptTarget.config.id;
+      desiredType = "station";
+    }
+
     const promptEl = document.getElementById("netgame-prompt-container");
     if (promptEl) {
-      if (isCourierPrompt && !gameState.isModalOpen) {
+      if (!desiredKey) {
+        if (activePromptKey !== null) {
+          promptEl.classList.add("hidden");
+          promptEl.innerHTML = "";
+          activePromptKey = null;
+        }
+      } else if (desiredKey !== activePromptKey) {
+        activePromptKey = desiredKey;
         promptEl.classList.remove("hidden");
-        promptEl.innerHTML = `
-          <div class="w-[92vw] max-w-sm sm:max-w-md px-3 sm:px-5 py-2.5 sm:py-3 rounded-2xl bg-slate-900/95 text-white border border-amber-400 shadow-2xl flex items-center gap-2.5 sm:gap-3.5 backdrop-blur-md animate-bounce">
-            <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-400/40 flex items-center justify-center shrink-0">
-              <span class="material-symbols-outlined text-[20px] sm:text-[24px]">local_shipping</span>
+        if (desiredType === "courier") {
+          promptEl.innerHTML = `
+            <div class="w-[92vw] max-w-sm sm:max-w-md px-3 sm:px-5 py-2.5 sm:py-3 rounded-2xl bg-slate-900/95 text-white border border-amber-400 shadow-2xl flex items-center gap-2.5 sm:gap-3.5 backdrop-blur-md animate-bounce cursor-pointer touch-manipulation" id="btn-prompt-card-wrapper">
+              <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-400/40 flex items-center justify-center shrink-0">
+                <span class="material-symbols-outlined text-[20px] sm:text-[24px]">local_shipping</span>
+              </div>
+              <div class="text-left font-mono min-w-0 flex-1">
+                <span class="block text-xs font-bold text-amber-300 truncate">${curMission.title}</span>
+                <span class="block text-[10px] sm:text-[11px] text-slate-300 truncate">Tiba di ${curMission.targetName}</span>
+              </div>
+              <button type="button" class="px-3.5 sm:px-4 py-2 bg-amber-600 hover:bg-amber-500 active:scale-95 text-white font-mono font-bold text-xs rounded-xl cursor-pointer shadow-md transition-all shrink-0 flex items-center gap-1 touch-manipulation" id="btn-prompt-enter-action">
+                <span>Kirim</span>
+                <span class="material-symbols-outlined text-[16px]">done_all</span>
+              </button>
             </div>
-            <div class="text-left font-mono min-w-0 flex-1">
-              <span class="block text-xs font-bold text-amber-300 truncate">${curMission.title}</span>
-              <span class="block text-[10px] sm:text-[11px] text-slate-300 truncate">Tiba di ${curMission.targetName}</span>
+          `;
+          const handleEnter = (e) => {
+            if (e) { e.preventDefault(); e.stopPropagation(); }
+            promptEl.classList.add("hidden");
+            activePromptKey = null;
+            openCourierDeliveryModal(curMission);
+          };
+          const enterBtn = document.getElementById("btn-prompt-enter-action");
+          const cardWrap = document.getElementById("btn-prompt-card-wrapper");
+          enterBtn?.addEventListener("click", handleEnter);
+          enterBtn?.addEventListener("touchend", handleEnter);
+          cardWrap?.addEventListener("click", handleEnter);
+        } else {
+          const solvedInfo = gameState.solvedStations.get(promptTarget.config.id);
+          promptEl.innerHTML = `
+            <div class="w-[92vw] max-w-sm sm:max-w-md px-3 sm:px-5 py-2.5 sm:py-3 rounded-2xl bg-slate-900/95 text-white border border-indigo-400/60 shadow-2xl flex items-center gap-2.5 sm:gap-3.5 backdrop-blur-md animate-bounce cursor-pointer touch-manipulation" id="btn-prompt-card-wrapper">
+              <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-400/40 flex items-center justify-center shrink-0">
+                <span class="material-symbols-outlined text-[20px] sm:text-[24px]">${promptTarget.config.icon}</span>
+              </div>
+              <div class="text-left font-mono min-w-0 flex-1">
+                <span class="block text-xs font-bold text-indigo-300 truncate">${promptTarget.config.title}</span>
+                <span class="block text-[10px] sm:text-[11px] text-slate-300 truncate">${solvedInfo ? `Pos Tuntas: ${solvedInfo.score}/5 Benar` : "Tantangan 5 Soal HOTS"}</span>
+              </div>
+              <button type="button" class="px-3.5 sm:px-4 py-2 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-mono font-bold text-xs rounded-xl cursor-pointer shadow-md transition-all shrink-0 flex items-center gap-1 touch-manipulation" id="btn-prompt-enter-action">
+                <span>Masuk</span>
+                <span class="material-symbols-outlined text-[16px]">play_arrow</span>
+              </button>
             </div>
-            <button class="px-3 sm:px-4 py-2 bg-amber-600 hover:bg-amber-500 active:scale-95 text-white font-mono font-bold text-xs rounded-xl cursor-pointer shadow-md transition-all shrink-0 flex items-center gap-1" id="btn-prompt-enter-action">
-              <span>Kirim</span>
-              <span class="material-symbols-outlined text-[16px]">done_all</span>
-            </button>
-          </div>
-        `;
-        document.getElementById("btn-prompt-enter-action")?.addEventListener("click", () => {
-          openCourierDeliveryModal(curMission);
-        });
-      } else if (promptTarget && promptDist <= 9.0 && !gameState.isModalOpen) {
-        const solvedInfo = gameState.solvedStations.get(promptTarget.config.id);
-        promptEl.classList.remove("hidden");
-        promptEl.innerHTML = `
-          <div class="w-[92vw] max-w-sm sm:max-w-md px-3 sm:px-5 py-2.5 sm:py-3 rounded-2xl bg-slate-900/95 text-white border border-indigo-400/60 shadow-2xl flex items-center gap-2.5 sm:gap-3.5 backdrop-blur-md animate-bounce">
-            <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-400/40 flex items-center justify-center shrink-0">
-              <span class="material-symbols-outlined text-[20px] sm:text-[24px]">${promptTarget.config.icon}</span>
-            </div>
-            <div class="text-left font-mono min-w-0 flex-1">
-              <span class="block text-xs font-bold text-indigo-300 truncate">${promptTarget.config.title}</span>
-              <span class="block text-[10px] sm:text-[11px] text-slate-300 truncate">${solvedInfo ? `Pos Tuntas: ${solvedInfo.score}/5 Benar` : "Tantangan 5 Soal HOTS"}</span>
-            </div>
-            <button class="px-3 sm:px-4 py-2 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-mono font-bold text-xs rounded-xl cursor-pointer shadow-md transition-all shrink-0 flex items-center gap-1" id="btn-prompt-enter-action">
-              <span>Masuk</span>
-              <span class="material-symbols-outlined text-[16px]">play_arrow</span>
-            </button>
-          </div>
-        `;
-        document.getElementById("btn-prompt-enter-action")?.addEventListener("click", () => {
-          launchStationMission(promptTarget);
-        });
-      } else {
-        promptEl.classList.add("hidden");
+          `;
+          const handleEnter = (e) => {
+            if (e) { e.preventDefault(); e.stopPropagation(); }
+            promptEl.classList.add("hidden");
+            activePromptKey = null;
+            launchStationMission(promptTarget);
+          };
+          const enterBtn = document.getElementById("btn-prompt-enter-action");
+          const cardWrap = document.getElementById("btn-prompt-card-wrapper");
+          enterBtn?.addEventListener("click", handleEnter);
+          enterBtn?.addEventListener("touchend", handleEnter);
+          cardWrap?.addEventListener("click", handleEnter);
+        }
       }
     }
 
@@ -1297,6 +1355,7 @@ export function initNetQuestCityGame(containerEl, options = {}) {
       sound.click();
     },
     reset: resetCarPosition,
+    teleport: (x, z) => { carState.x = x; carState.z = z; carGroup.position.set(x, 0.2, z); },
     destroy: () => {
       if (boundaryAlertTimer) clearTimeout(boundaryAlertTimer);
       if (toastTimer) clearTimeout(toastTimer);
@@ -1331,7 +1390,7 @@ function open5QuestionsModal(stationObj, questions, onFinished) {
     const correctOptIdx = q.options_id.findIndex(opt => opt.correct === true);
 
     overlay.innerHTML = `
-      <div class="bg-white rounded-2xl border border-slate-200 max-w-xl w-full p-6 shadow-2xl space-y-4 animate-scale-up text-left">
+      <div class="bg-white rounded-2xl border border-slate-200 max-w-xl w-full max-h-[92vh] overflow-y-auto p-4 sm:p-6 shadow-2xl space-y-4 animate-scale-up text-left">
         <div class="flex items-center justify-between border-b border-slate-100 pb-3">
           <div class="flex items-center gap-2.5">
             <span class="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-200 flex items-center justify-center shrink-0">
@@ -1430,8 +1489,8 @@ function open5QuestionsModal(stationObj, questions, onFinished) {
 
   const renderSummary = () => {
     overlay.innerHTML = `
-      <div class="bg-white rounded-2xl border border-slate-200 max-w-md w-full p-6 sm:p-8 shadow-2xl text-center space-y-5 animate-scale-up">
-        <div class="w-16 h-16 rounded-2xl bg-indigo-50 border border-indigo-200 text-indigo-600 flex items-center justify-center mx-auto shadow-sm">
+      <div class="bg-white rounded-2xl border border-slate-200 max-w-md w-full max-h-[92vh] overflow-y-auto p-5 sm:p-8 shadow-2xl text-center space-y-4 sm:space-y-5 animate-scale-up">
+        <div class="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-indigo-50 border border-indigo-200 text-indigo-600 flex items-center justify-center mx-auto shadow-sm">
           <span class="material-symbols-outlined text-[36px]">emoji_events</span>
         </div>
         <div>
