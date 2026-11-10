@@ -56,7 +56,11 @@ export function renderUnifiedWorkbench(container) {
     pointerPos: { x: 0, y: 0, active: false },
 
     // Active Flying Packets Queue (Supports multiple simultaneous/repeated packets!)
-    activePackets: []
+    activePackets: [],
+
+    // Continuous Loop Ping Feature
+    isLoopPing: false,
+    loopPingTimer: null
   };
 
   let animFrameId = null;
@@ -145,9 +149,21 @@ export function renderUnifiedWorkbench(container) {
   };
 
   // --------------------------------------------------------------------------
-  // Pre-configured Topologies
+  // Responsive Canvas Coordinates Helper
+  // --------------------------------------------------------------------------
+  function getCanvasViewport() {
+    const canvas = document.getElementById("cisco-canvas");
+    const w = (canvas && canvas.width > 280) ? canvas.width : 780;
+    const h = (canvas && canvas.height > 200) ? canvas.height : 420;
+    return { w, h, midY: Math.round(h * 0.48) };
+  }
+
+  // --------------------------------------------------------------------------
+  // Pre-configured Topologies (Fully Responsive & Screen-Adaptive)
   // --------------------------------------------------------------------------
   function loadStandardTemplate() {
+    const { w, midY } = getCanvasViewport();
+
     state.nodes = {
       pc0: {
         id: "pc0",
@@ -162,8 +178,8 @@ export function renderUnifiedWorkbench(container) {
         dns: "8.8.8.8",
         mac: "00:AA:11:22:33:01",
         poweredOn: true,
-        x: 90,
-        y: 180
+        x: Math.round(w * 0.14),
+        y: midY
       },
       sw0: {
         id: "sw0",
@@ -178,8 +194,8 @@ export function renderUnifiedWorkbench(container) {
         dns: "8.8.8.8",
         mac: "00:SW:99:88:77:01",
         poweredOn: true,
-        x: 270,
-        y: 180
+        x: Math.round(w * 0.38),
+        y: midY
       },
       rt0: {
         id: "rt0",
@@ -195,8 +211,8 @@ export function renderUnifiedWorkbench(container) {
         dns: "8.8.8.8",
         mac: "00:RT:55:44:33:01",
         poweredOn: true,
-        x: 450,
-        y: 180
+        x: Math.round(w * 0.62),
+        y: midY
       },
       srv0: {
         id: "srv0",
@@ -211,8 +227,8 @@ export function renderUnifiedWorkbench(container) {
         dns: "8.8.8.8",
         mac: "00:BB:44:55:66:02",
         poweredOn: true,
-        x: 630,
-        y: 180
+        x: Math.round(w * 0.86),
+        y: midY
       }
     };
 
@@ -253,6 +269,8 @@ export function renderUnifiedWorkbench(container) {
   }
 
   function loadPeerToPeerTemplate() {
+    const { w, midY } = getCanvasViewport();
+
     state.nodes = {
       pc0: {
         id: "pc0",
@@ -267,8 +285,8 @@ export function renderUnifiedWorkbench(container) {
         dns: "8.8.8.8",
         mac: "00:AA:11:22:33:01",
         poweredOn: true,
-        x: 180,
-        y: 180
+        x: Math.round(w * 0.28),
+        y: midY
       },
       pc1: {
         id: "pc1",
@@ -283,8 +301,8 @@ export function renderUnifiedWorkbench(container) {
         dns: "8.8.8.8",
         mac: "00:AA:11:22:33:02",
         poweredOn: true,
-        x: 500,
-        y: 180
+        x: Math.round(w * 0.72),
+        y: midY
       }
     };
 
@@ -307,6 +325,9 @@ export function renderUnifiedWorkbench(container) {
   }
 
   function loadStarLanTemplate() {
+    const { w, h, midY } = getCanvasViewport();
+    const midX = Math.round(w * 0.5);
+
     state.nodes = {
       sw0: {
         id: "sw0",
@@ -321,8 +342,8 @@ export function renderUnifiedWorkbench(container) {
         dns: "8.8.8.8",
         mac: "00:SW:99:88:77:01",
         poweredOn: true,
-        x: 350,
-        y: 180
+        x: midX,
+        y: midY
       },
       pc0: {
         id: "pc0",
@@ -337,8 +358,8 @@ export function renderUnifiedWorkbench(container) {
         dns: "8.8.8.8",
         mac: "00:AA:11:22:33:01",
         poweredOn: true,
-        x: 130,
-        y: 100
+        x: Math.round(w * 0.18),
+        y: Math.round(h * 0.28)
       },
       pc1: {
         id: "pc1",
@@ -353,8 +374,8 @@ export function renderUnifiedWorkbench(container) {
         dns: "8.8.8.8",
         mac: "00:AA:11:22:33:02",
         poweredOn: true,
-        x: 130,
-        y: 260
+        x: Math.round(w * 0.18),
+        y: Math.round(h * 0.68)
       },
       srv0: {
         id: "srv0",
@@ -369,8 +390,8 @@ export function renderUnifiedWorkbench(container) {
         dns: "8.8.8.8",
         mac: "00:BB:44:55:66:01",
         poweredOn: true,
-        x: 570,
-        y: 180
+        x: Math.round(w * 0.82),
+        y: midY
       }
     };
 
@@ -411,6 +432,17 @@ export function renderUnifiedWorkbench(container) {
   }
 
   function clearCanvas() {
+    if (state.loopPingTimer) {
+      clearInterval(state.loopPingTimer);
+      state.loopPingTimer = null;
+      state.isLoopPing = false;
+      const btn = document.getElementById("btn-toggle-loop-ping");
+      const label = document.getElementById("label-loop-ping");
+      btn?.classList.remove("bg-amber-500", "text-slate-950", "border-amber-600");
+      btn?.classList.add("bg-slate-100", "text-slate-700");
+      if (label) label.textContent = "Loop Ping: OFF";
+    }
+
     state.nodes = {};
     state.links = [];
     state.simulationSteps = [];
@@ -424,7 +456,7 @@ export function renderUnifiedWorkbench(container) {
       target: "-",
       type: "-",
       time: "-",
-      message: "Kanvas kosong. Tambahkan perangkat lalu pasang kabel untuk mulai simulasi."
+      message: "Kanvas kosong. Tambahkan perangkat dari kotak alat di bawah, lalu pasang kabel."
     };
   }
 
@@ -793,44 +825,45 @@ export function renderUnifiedWorkbench(container) {
   // --------------------------------------------------------------------------
   function mountUI() {
     container.innerHTML = `
-      <div class="space-y-4 text-left font-sans select-none">
+      <div id="cisco-workbench-root" class="space-y-4 text-left font-sans select-none bg-slate-50 p-1 sm:p-2.5 rounded-2xl">
         
-        <!-- Top Toolbar -->
+        <!-- Top Toolbar (Clean, Streamlined & Cisco-Accurate) -->
         <div class="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3">
           
-          <!-- Mode & Quick Ping -->
+          <!-- Mode & Continuous Ping Controls -->
           <div class="flex items-center gap-2 flex-wrap">
-            <span class="text-xs font-mono font-bold text-slate-500 uppercase">MODE:</span>
-            <div class="inline-flex rounded-xl p-1 bg-slate-100 border border-slate-200 gap-1">
-              <button id="btn-mode-realtime" class="px-3 py-1.5 text-xs font-mono font-bold rounded-lg transition-all cursor-pointer ${state.mode === 'realtime' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}">
-                ⚡ Realtime
-              </button>
-              <button id="btn-mode-simulation" class="px-3 py-1.5 text-xs font-mono font-bold rounded-lg transition-all cursor-pointer ${state.mode === 'simulation' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}">
-                ⏱️ Simulasi (Step)
-              </button>
-            </div>
+            <span class="px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-2xs">
+              <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span>⚡ Mode Realtime</span>
+            </span>
 
-            <!-- Fast Ping Sender -->
-            <button id="btn-action-send-pdu" class="px-4 py-2 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 active:scale-95 text-white font-mono text-xs font-bold rounded-xl transition-all shadow-md flex items-center gap-1.5 cursor-pointer">
-              <span class="material-symbols-outlined text-[16px]">send</span>
-              <span>Kirim Simple PDU (Ping)</span>
+            <!-- Loop Ping (Continuous Animation Stream) -->
+            <button id="btn-toggle-loop-ping" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 border border-slate-300 font-mono text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs" title="Nyalakan/matikan animasi pengiriman paket berkelanjutan tanpa henti">
+              <span class="material-symbols-outlined text-[16px] text-amber-500">autorenew</span>
+              <span id="label-loop-ping">Loop Ping: OFF</span>
             </button>
-          </div>
 
-          <!-- Quick Actions & Presets -->
-          <div class="flex items-center gap-2 flex-wrap">
-            
-            <!-- Source & Target Selector Quick Bar -->
+            <!-- Route Selector for Ping / Loop Ping -->
             <div class="flex items-center gap-1.5 bg-slate-50 p-1.5 rounded-xl border border-slate-200 text-xs font-mono">
-              <span class="text-slate-400 font-bold">Dari:</span>
+              <span class="text-slate-400 font-bold pl-1">Rute:</span>
               <select id="sel-pdu-source" class="bg-white px-2 py-1 rounded border border-slate-200 font-bold text-indigo-700 cursor-pointer"></select>
-              <span class="text-slate-400 font-bold">➔ Ke:</span>
+              <span class="text-slate-400 font-bold">➔</span>
               <select id="sel-pdu-target" class="bg-white px-2 py-1 rounded border border-slate-200 font-bold text-emerald-700 cursor-pointer"></select>
             </div>
+          </div>
+
+          <!-- Quick Actions, Fullscreen & Templates -->
+          <div class="flex items-center gap-2 flex-wrap">
+            
+            <!-- Fullscreen Button -->
+            <button id="btn-toggle-fullscreen" class="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 active:scale-95 text-indigo-700 border border-indigo-200 font-mono text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs" title="Mode Layar Penuh (Fullscreen)">
+              <span class="material-symbols-outlined text-[16px]">fullscreen</span>
+              <span id="label-fullscreen">Fullscreen</span>
+            </button>
 
             <!-- Inspect Selected Device -->
-            <button id="btn-inspect-selected" class="px-3 py-1.5 bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 font-mono text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-xs cursor-pointer">
-              <span class="material-symbols-outlined text-[16px]">settings</span>
+            <button id="btn-inspect-selected" class="px-3 py-1.5 bg-slate-100 text-slate-700 border border-slate-300 hover:bg-slate-200 font-mono text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer">
+              <span class="material-symbols-outlined text-[16px] text-slate-600">settings</span>
               <span id="label-inspect-selected">Konfigurasi: PC0</span>
             </button>
 
@@ -842,21 +875,21 @@ export function renderUnifiedWorkbench(container) {
                 <span class="material-symbols-outlined text-[14px]">arrow_drop_down</span>
               </button>
               <div id="template-menu" class="hidden absolute right-0 mt-1.5 w-60 bg-white border border-slate-200 rounded-xl shadow-xl py-1.5 z-40 text-xs font-mono">
-                <button id="btn-tpl-standard" class="w-full text-left px-3.5 py-2 hover:bg-indigo-50 flex items-center gap-2 text-slate-700">
+                <button id="btn-tpl-standard" class="w-full text-left px-3.5 py-2 hover:bg-indigo-50 flex items-center gap-2 text-slate-700 cursor-pointer">
                   <span class="material-symbols-outlined text-indigo-600 text-[18px]">account_tree</span>
                   <div>
                     <div class="font-bold">1. Lab Standar TKJ</div>
                     <div class="text-[10px] text-slate-400">PC - Switch - Router - Server</div>
                   </div>
                 </button>
-                <button id="btn-tpl-star" class="w-full text-left px-3.5 py-2 hover:bg-indigo-50 flex items-center gap-2 text-slate-700">
+                <button id="btn-tpl-star" class="w-full text-left px-3.5 py-2 hover:bg-indigo-50 flex items-center gap-2 text-slate-700 cursor-pointer">
                   <span class="material-symbols-outlined text-emerald-600 text-[18px]">hub</span>
                   <div>
                     <div class="font-bold">2. Lab Star LAN</div>
                     <div class="text-[10px] text-slate-400">2 PC + Switch + Server</div>
                   </div>
                 </button>
-                <button id="btn-tpl-p2p" class="w-full text-left px-3.5 py-2 hover:bg-indigo-50 flex items-center gap-2 text-slate-700">
+                <button id="btn-tpl-p2p" class="w-full text-left px-3.5 py-2 hover:bg-indigo-50 flex items-center gap-2 text-slate-700 cursor-pointer">
                   <span class="material-symbols-outlined text-amber-600 text-[18px]">swap_horiz</span>
                   <div>
                     <div class="font-bold">3. Lab Peer-to-Peer</div>
@@ -864,7 +897,7 @@ export function renderUnifiedWorkbench(container) {
                   </div>
                 </button>
                 <div class="border-t border-slate-100 my-1"></div>
-                <button id="btn-tpl-clear" class="w-full text-left px-3.5 py-2 hover:bg-rose-50 flex items-center gap-2 text-rose-600">
+                <button id="btn-tpl-clear" class="w-full text-left px-3.5 py-2 hover:bg-rose-50 flex items-center gap-2 text-rose-600 cursor-pointer">
                   <span class="material-symbols-outlined text-[18px]">delete_sweep</span>
                   <div>
                     <div class="font-bold">Bersihkan Kanvas (Mulai Dari Awal)</div>
@@ -1113,7 +1146,7 @@ export function renderUnifiedWorkbench(container) {
       tbody.innerHTML = `
         <tr>
           <td colspan="7" class="py-6 text-center text-slate-400 font-sans text-xs">
-            Belum ada paket yang dikirim. Tekan tombol <strong>Kirim Simple PDU (Ping)</strong> di atas untuk memulai transmisi.
+            Belum ada paket yang dikirim. Gunakan alat <strong>Kirim PDU (Amplop)</strong> di bawah atau aktifkan <strong>Loop Ping</strong> di atas untuk memulai transmisi.
           </td>
         </tr>
       `;
@@ -1161,26 +1194,71 @@ export function renderUnifiedWorkbench(container) {
   // Event Listeners Setup
   // --------------------------------------------------------------------------
   function setupEventListeners() {
-    // Mode toggles
-    document.getElementById("btn-mode-realtime")?.addEventListener("click", () => {
-      state.mode = "realtime";
-      document.getElementById("btn-mode-realtime")?.classList.add("bg-indigo-600", "text-white");
-      document.getElementById("btn-mode-simulation")?.classList.remove("bg-indigo-600", "text-white");
-      sound.click();
+    // Loop Ping (Continuous Ping Stream) Toggle
+    document.getElementById("btn-toggle-loop-ping")?.addEventListener("click", () => {
+      state.isLoopPing = !state.isLoopPing;
+      const btn = document.getElementById("btn-toggle-loop-ping");
+      const label = document.getElementById("label-loop-ping");
+
+      if (state.isLoopPing) {
+        sound.success();
+        btn?.classList.remove("bg-slate-100", "text-slate-700");
+        btn?.classList.add("bg-amber-500", "text-slate-950", "border-amber-600");
+        if (label) label.textContent = "Loop Ping: ON";
+
+        const triggerContinuousPing = () => {
+          if (!state.isLoopPing) return;
+          const nodeKeys = Object.keys(state.nodes);
+          if (nodeKeys.length >= 2) {
+            const srcId = document.getElementById("sel-pdu-source")?.value || nodeKeys[0];
+            const dstId = document.getElementById("sel-pdu-target")?.value || nodeKeys[nodeKeys.length - 1];
+            sendPacket(srcId, dstId);
+          }
+        };
+
+        triggerContinuousPing();
+        if (state.loopPingTimer) clearInterval(state.loopPingTimer);
+        state.loopPingTimer = setInterval(triggerContinuousPing, 1400);
+      } else {
+        sound.click();
+        if (state.loopPingTimer) {
+          clearInterval(state.loopPingTimer);
+          state.loopPingTimer = null;
+        }
+        btn?.classList.remove("bg-amber-500", "text-slate-950", "border-amber-600");
+        btn?.classList.add("bg-slate-100", "text-slate-700");
+        if (label) label.textContent = "Loop Ping: OFF";
+      }
     });
 
-    document.getElementById("btn-mode-simulation")?.addEventListener("click", () => {
-      state.mode = "simulation";
-      document.getElementById("btn-mode-simulation")?.classList.add("bg-indigo-600", "text-white");
-      document.getElementById("btn-mode-realtime")?.classList.remove("bg-indigo-600", "text-white");
-      sound.click();
+    // Fullscreen Toggle
+    document.getElementById("btn-toggle-fullscreen")?.addEventListener("click", () => {
+      const target = document.getElementById("cisco-workbench-root") || container;
+      if (!document.fullscreenElement) {
+        if (target.requestFullscreen) {
+          target.requestFullscreen().catch(() => {});
+        } else if (target.webkitRequestFullscreen) {
+          target.webkitRequestFullscreen();
+        }
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen();
+        } else if (document.webkitExitFullscreen) {
+          document.webkitExitFullscreen();
+        }
+      }
     });
 
-    // Send PDU button (Can be clicked repeatedly without limits!)
-    document.getElementById("btn-action-send-pdu")?.addEventListener("click", () => {
-      const srcId = document.getElementById("sel-pdu-source")?.value;
-      const dstId = document.getElementById("sel-pdu-target")?.value;
-      sendPacket(srcId, dstId);
+    document.addEventListener("fullscreenchange", () => {
+      const isFs = !!document.fullscreenElement;
+      const label = document.getElementById("label-fullscreen");
+      if (label) label.textContent = isFs ? "Keluar Fullscreen" : "Fullscreen";
+      const canvas = document.getElementById("cisco-canvas");
+      if (canvas) {
+        const rect = canvas.getBoundingClientRect();
+        canvas.width = rect.width;
+        canvas.height = rect.height;
+      }
     });
 
     // Inspect selected
@@ -1195,32 +1273,45 @@ export function renderUnifiedWorkbench(container) {
       e.stopPropagation();
       tplMenu?.classList.toggle("hidden");
     });
+    tplMenu?.addEventListener("click", (e) => {
+      e.stopPropagation();
+    });
     window.addEventListener("click", () => {
       tplMenu?.classList.add("hidden");
     });
 
-    document.getElementById("btn-tpl-standard")?.addEventListener("click", () => {
+    const closeTplMenu = () => tplMenu?.classList.add("hidden");
+
+    document.getElementById("btn-tpl-standard")?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      closeTplMenu();
       loadStandardTemplate();
       sound.success();
       updateDomStatus();
       updateEventListDom();
     });
 
-    document.getElementById("btn-tpl-star")?.addEventListener("click", () => {
+    document.getElementById("btn-tpl-star")?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      closeTplMenu();
       loadStarLanTemplate();
       sound.success();
       updateDomStatus();
       updateEventListDom();
     });
 
-    document.getElementById("btn-tpl-p2p")?.addEventListener("click", () => {
+    document.getElementById("btn-tpl-p2p")?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      closeTplMenu();
       loadPeerToPeerTemplate();
       sound.success();
       updateDomStatus();
       updateEventListDom();
     });
 
-    document.getElementById("btn-tpl-clear")?.addEventListener("click", () => {
+    document.getElementById("btn-tpl-clear")?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      closeTplMenu();
       clearCanvas();
       sound.click();
       updateDomStatus();
@@ -1255,9 +1346,15 @@ export function renderUnifiedWorkbench(container) {
     const newId = `${type}_${Date.now().toString(36).slice(-4)}`;
     const name = `${spec.prefix}${count}`;
 
+    const canvas = document.getElementById("cisco-canvas");
+    const maxW = (canvas && canvas.width > 260) ? canvas.width : 760;
+    const maxH = (canvas && canvas.height > 200) ? canvas.height : 420;
+
     const currentCount = Object.keys(state.nodes).length;
-    const posX = 110 + (currentCount % 5) * 120;
-    const posY = 100 + Math.floor(currentCount / 5) * 130;
+    const cols = maxW > 540 ? 5 : 3;
+    const spacingX = maxW > 540 ? 115 : 85;
+    const posX = Math.max(50, Math.min(maxW - 55, 65 + (currentCount % cols) * spacingX));
+    const posY = Math.max(50, Math.min(maxH - 50, 75 + Math.floor(currentCount / cols) * 105));
 
     const baseOctet = 10 + currentCount;
     const ip = type === "router" ? "192.168.1.1" : (type === "server" ? "10.10.20.50" : `192.168.1.${baseOctet}`);
@@ -1299,8 +1396,15 @@ export function renderUnifiedWorkbench(container) {
 
     const resize = () => {
       const rect = canvas.getBoundingClientRect();
-      canvas.width = rect.width;
-      canvas.height = rect.height;
+      if (rect.width > 0 && rect.height > 0) {
+        canvas.width = rect.width;
+        canvas.height = rect.height;
+        // Keep existing nodes within boundaries so they don't get pushed off-screen
+        Object.values(state.nodes).forEach(n => {
+          n.x = Math.max(50, Math.min(canvas.width - 50, n.x));
+          n.y = Math.max(45, Math.min(canvas.height - 45, n.y));
+        });
+      }
     };
     resize();
     window.addEventListener("resize", resize);
@@ -1367,6 +1471,7 @@ export function renderUnifiedWorkbench(container) {
 
             sound.click();
             openPortPicker(clicked, (chosenPort) => {
+              const srcDev = state.nodes[state.cablePending.fromNodeId];
               state.links.push({
                 id: `link_${Date.now().toString(36)}`,
                 fromNode: state.cablePending.fromNodeId,
@@ -1382,6 +1487,11 @@ export function renderUnifiedWorkbench(container) {
               state.activeTool = "select";
               updateActiveToolDom();
               updateDomStatus();
+
+              const guideText = document.getElementById("canvas-guidance-text");
+              if (guideText) {
+                guideText.textContent = `✓ Kabel terhubung antara ${srcDev?.name} dan ${clicked.name}. Mode kembali ke Kursor. Klik ikon kabel lagi untuk menambah sambungan.`;
+              }
             });
           }
         }
