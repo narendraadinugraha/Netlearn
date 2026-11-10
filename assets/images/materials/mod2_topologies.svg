@@ -1,0 +1,356 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 560" width="100%" height="100%">
+  <defs>
+    <!-- Background Gradients -->
+    <linearGradient id="bgCanvasGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#080e1e" />
+      <stop offset="50%" stop-color="#0b1528" />
+      <stop offset="100%" stop-color="#050914" />
+    </linearGradient>
+
+    <linearGradient id="panelGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#162238" stop-opacity="0.9" />
+      <stop offset="100%" stop-color="#0c1626" stop-opacity="0.95" />
+    </linearGradient>
+
+    <linearGradient id="switchGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0284c7" />
+      <stop offset="100%" stop-color="#0369a1" />
+    </linearGradient>
+
+    <linearGradient id="coreGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#be185d" />
+      <stop offset="100%" stop-color="#831843" />
+    </linearGradient>
+
+    <!-- Drop Shadow Filter -->
+    <filter id="cardGlow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000000" flood-opacity="0.5" />
+    </filter>
+
+    <filter id="nodeGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#0284c7" flood-opacity="0.4" />
+    </filter>
+  </defs>
+
+  <!-- Canvas Background -->
+  <rect width="960" height="560" rx="16" fill="url(#bgCanvasGrad)" stroke="#1e2e4a" stroke-width="2"/>
+
+  <!-- Subtle Blueprint Grid Pattern -->
+  <g opacity="0.08" stroke="#38bdf8" stroke-width="0.75">
+    <line x1="40" y1="0" x2="40" y2="560" />
+    <line x1="160" y1="0" x2="160" y2="560" />
+    <line x1="280" y1="0" x2="280" y2="560" />
+    <line x1="400" y1="0" x2="400" y2="560" />
+    <line x1="520" y1="0" x2="520" y2="560" />
+    <line x1="640" y1="0" x2="640" y2="560" />
+    <line x1="760" y1="0" x2="760" y2="560" />
+    <line x1="880" y1="0" x2="880" y2="560" />
+    <line x1="0" y1="80" x2="960" y2="80" />
+    <line x1="0" y1="180" x2="960" y2="180" />
+    <line x1="0" y1="280" x2="960" y2="280" />
+    <line x1="0" y1="380" x2="960" y2="380" />
+    <line x1="0" y1="480" x2="960" y2="480" />
+  </g>
+
+  <!-- ========================================================================= -->
+  <!-- HEADER TITLE BAR                                                          -->
+  <!-- ========================================================================= -->
+  <g transform="translate(35, 24)">
+    <rect x="0" y="0" width="96" height="24" rx="6" fill="#0284c7" fill-opacity="0.2" stroke="#38bdf8" stroke-width="1.2"/>
+    <text x="48" y="16" fill="#38bdf8" font-family="'JetBrains Mono', monospace" font-size="11" font-weight="700" text-anchor="middle">MODUL 02</text>
+    
+    <text x="110" y="18" fill="#f8fafc" font-family="'Plus Jakarta Sans', Inter, sans-serif" font-size="17" font-weight="800" letter-spacing="-0.3">5 Arsitektur Topologi Fisik &amp; Logis Jaringan Komputer</text>
+    <text x="110" y="38" fill="#94a3b8" font-family="'Inter', sans-serif" font-size="11">Analisis Komparatif: Struktur Geometris Kabel, Titik SPOF, Redundansi, dan Toleransi Kerusakan.</text>
+
+    <!-- Legend status pill -->
+    <rect x="740" y="2" width="150" height="22" rx="4" fill="#0b1325" stroke="#334155" stroke-width="1"/>
+    <circle cx="754" cy="13" r="4" fill="#10b981"/>
+    <text x="766" y="16" fill="#cbd5e1" font-family="'JetBrains Mono', monospace" font-size="9" font-weight="600">STANDAR TEKNIS TKJ</text>
+  </g>
+
+  <!-- ========================================================================= -->
+  <!-- BARIS 1: BUS, STAR, RING (3 Panel x 285px)                                 -->
+  <!-- ========================================================================= -->
+
+  <!-- 1. TOPOLOGI BUS -->
+  <g transform="translate(35, 76)">
+    <rect width="280" height="220" rx="12" fill="url(#panelGrad)" stroke="#38bdf8" stroke-width="1.5" filter="url(#cardGlow)"/>
+    
+    <!-- Header Card -->
+    <rect x="12" y="12" width="130" height="20" rx="4" fill="#0284c7" fill-opacity="0.25" stroke="#0284c7" stroke-width="1"/>
+    <text x="18" y="26" fill="#38bdf8" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="700">1. TOPOLOGI BUS</text>
+    <text x="12" y="46" fill="#94a3b8" font-family="'Inter', sans-serif" font-size="9.5">Kabel Backbone Koaksial RG-58 (BNC)</text>
+
+    <!-- Coaxial Backbone Line -->
+    <line x1="30" y1="110" x2="250" y2="110" stroke="#f59e0b" stroke-width="4.5" stroke-linecap="round"/>
+    
+    <!-- Left Terminator 50 Ohm -->
+    <rect x="18" y="100" width="12" height="20" rx="3" fill="#ef4444" stroke="#f87171" stroke-width="1"/>
+    <text x="24" y="94" fill="#f87171" font-family="'JetBrains Mono', monospace" font-size="7.5" font-weight="700" text-anchor="middle">50-Ohm</text>
+    
+    <!-- Right Terminator 50 Ohm -->
+    <rect x="250" y="100" width="12" height="20" rx="3" fill="#ef4444" stroke="#f87171" stroke-width="1"/>
+    <text x="256" y="94" fill="#f87171" font-family="'JetBrains Mono', monospace" font-size="7.5" font-weight="700" text-anchor="middle">50-Ohm</text>
+
+    <!-- Node 1: PC-A (Bawah) -->
+    <line x1="65" y1="110" x2="65" y2="142" stroke="#38bdf8" stroke-width="1.8"/>
+    <circle cx="65" cy="110" r="3.5" fill="#f59e0b"/>
+    <rect x="48" y="142" width="34" height="26" rx="4" fill="#0f172a" stroke="#38bdf8" stroke-width="1.2"/>
+    <text x="65" y="158" fill="#e2e8f0" font-family="'JetBrains Mono', monospace" font-size="8.5" font-weight="700" text-anchor="middle">PC-A</text>
+
+    <!-- Node 2: PC-B (Atas) -->
+    <line x1="115" y1="110" x2="115" y2="78" stroke="#38bdf8" stroke-width="1.8"/>
+    <circle cx="115" cy="110" r="3.5" fill="#f59e0b"/>
+    <rect x="98" y="52" width="34" height="26" rx="4" fill="#0f172a" stroke="#38bdf8" stroke-width="1.2"/>
+    <text x="115" y="68" fill="#e2e8f0" font-family="'JetBrains Mono', monospace" font-size="8.5" font-weight="700" text-anchor="middle">PC-B</text>
+
+    <!-- Node 3: PC-C (Bawah) -->
+    <line x1="165" y1="110" x2="165" y2="142" stroke="#38bdf8" stroke-width="1.8"/>
+    <circle cx="165" cy="110" r="3.5" fill="#f59e0b"/>
+    <rect x="148" y="142" width="34" height="26" rx="4" fill="#0f172a" stroke="#38bdf8" stroke-width="1.2"/>
+    <text x="165" y="158" fill="#e2e8f0" font-family="'JetBrains Mono', monospace" font-size="8.5" font-weight="700" text-anchor="middle">PC-C</text>
+
+    <!-- Node 4: PC-D (Atas) -->
+    <line x1="215" y1="110" x2="215" y2="78" stroke="#38bdf8" stroke-width="1.8"/>
+    <circle cx="215" cy="110" r="3.5" fill="#f59e0b"/>
+    <rect x="198" y="52" width="34" height="26" rx="4" fill="#0f172a" stroke="#38bdf8" stroke-width="1.2"/>
+    <text x="215" y="68" fill="#e2e8f0" font-family="'JetBrains Mono', monospace" font-size="8.5" font-weight="700" text-anchor="middle">PC-D</text>
+
+    <!-- Footer Specs Badge -->
+    <rect x="12" y="184" width="256" height="24" rx="5" fill="#0b1325" stroke="#1e293b" stroke-width="1"/>
+    <text x="20" y="200" fill="#fca5a5" font-family="'Inter', sans-serif" font-size="8.5" font-weight="600">[!] Titik SPOF: Kabel putus = Semua node mati</text>
+  </g>
+
+  <!-- 2. TOPOLOGI STAR (STANDAR MODERN) -->
+  <g transform="translate(340, 76)">
+    <rect width="280" height="220" rx="12" fill="url(#panelGrad)" stroke="#10b981" stroke-width="1.5" filter="url(#cardGlow)"/>
+    
+    <!-- Header Card -->
+    <rect x="12" y="12" width="135" height="20" rx="4" fill="#065f46" fill-opacity="0.35" stroke="#10b981" stroke-width="1"/>
+    <text x="18" y="26" fill="#34d399" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="700">2. TOPOLOGI STAR</text>
+    <text x="12" y="46" fill="#94a3b8" font-family="'Inter', sans-serif" font-size="9.5">Konsentrator Sentral (Switch Layer 2)</text>
+
+    <!-- Central Switch Box -->
+    <g transform="translate(140, 115)">
+      <!-- Links radiating outward -->
+      <!-- Link to Top PC -->
+      <line x1="0" y1="-18" x2="0" y2="-52" stroke="#10b981" stroke-width="2"/>
+      <!-- Link to Bottom PC -->
+      <line x1="0" y1="18" x2="0" y2="50" stroke="#10b981" stroke-width="2"/>
+      <!-- Link to Left PC -->
+      <line x1="-28" y1="0" x2="-80" y2="0" stroke="#10b981" stroke-width="2"/>
+      <!-- Link to Right Server -->
+      <line x1="28" y1="0" x2="80" y2="0" stroke="#10b981" stroke-width="2"/>
+
+      <!-- Switch Body -->
+      <rect x="-30" y="-18" width="60" height="36" rx="6" fill="url(#switchGrad)" stroke="#38bdf8" stroke-width="1.5" filter="url(#nodeGlow)"/>
+      <text x="0" y="-2" fill="#ffffff" font-family="'JetBrains Mono', monospace" font-size="8.5" font-weight="800" text-anchor="middle">CISCO SW</text>
+      <!-- Switch Port LEDs -->
+      <circle cx="-16" cy="10" r="2" fill="#34d399"/>
+      <circle cx="-8" cy="10" r="2" fill="#34d399"/>
+      <circle cx="0" cy="10" r="2" fill="#34d399"/>
+      <circle cx="8" cy="10" r="2" fill="#34d399"/>
+      <circle cx="16" cy="10" r="2" fill="#34d399"/>
+
+      <!-- Node Top (PC-01) -->
+      <rect x="-18" y="-76" width="36" height="24" rx="4" fill="#0f172a" stroke="#10b981" stroke-width="1.2"/>
+      <text x="0" y="-60" fill="#e2e8f0" font-family="'JetBrains Mono', monospace" font-size="8" font-weight="700" text-anchor="middle">PC-01</text>
+
+      <!-- Node Bottom (PC-02) -->
+      <rect x="-18" y="50" width="36" height="24" rx="4" fill="#0f172a" stroke="#10b981" stroke-width="1.2"/>
+      <text x="0" y="66" fill="#e2e8f0" font-family="'JetBrains Mono', monospace" font-size="8" font-weight="700" text-anchor="middle">PC-02</text>
+
+      <!-- Node Left (PC-03) -->
+      <rect x="-114" y="-12" width="34" height="24" rx="4" fill="#0f172a" stroke="#10b981" stroke-width="1.2"/>
+      <text x="-97" y="4" fill="#e2e8f0" font-family="'JetBrains Mono', monospace" font-size="8" font-weight="700" text-anchor="middle">PC-03</text>
+
+      <!-- Node Right (SRV-01) -->
+      <rect x="80" y="-14" width="38" height="28" rx="4" fill="#0f172a" stroke="#38bdf8" stroke-width="1.2"/>
+      <text x="99" y="3" fill="#38bdf8" font-family="'JetBrains Mono', monospace" font-size="8" font-weight="700" text-anchor="middle">SERVER</text>
+    </g>
+
+    <!-- Footer Specs Badge -->
+    <rect x="12" y="184" width="256" height="24" rx="5" fill="#0b1325" stroke="#1e293b" stroke-width="1"/>
+    <text x="20" y="200" fill="#a7f3d0" font-family="'Inter', sans-serif" font-size="8.5" font-weight="600">[OK] Isolasi Kerusakan: 1 kabel putus, lain tetap jalan</text>
+  </g>
+
+  <!-- 3. TOPOLOGI RING (TOKEN RING) -->
+  <g transform="translate(645, 76)">
+    <rect width="280" height="220" rx="12" fill="url(#panelGrad)" stroke="#a855f7" stroke-width="1.5" filter="url(#cardGlow)"/>
+    
+    <!-- Header Card -->
+    <rect x="12" y="12" width="135" height="20" rx="4" fill="#581c87" fill-opacity="0.35" stroke="#a855f7" stroke-width="1"/>
+    <text x="18" y="26" fill="#c084fc" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="700">3. TOPOLOGI RING</text>
+    <text x="12" y="46" fill="#94a3b8" font-family="'Inter', sans-serif" font-size="9.5">Mekanisme Token Passing (IEEE 802.5)</text>
+
+    <!-- Circular Ring Architecture -->
+    <g transform="translate(140, 115)">
+      <!-- Main Loop Circle -->
+      <circle cx="0" cy="0" r="50" fill="none" stroke="#a855f7" stroke-width="2.5" stroke-dasharray="6,4"/>
+
+      <!-- Direction Arrow Indicators -->
+      <path d="M 0,-50 L 8,-46 L 8,-54 Z" fill="#c084fc"/>
+      <path d="M 50,0 L 46,8 L 54,8 Z" fill="#c084fc"/>
+      <path d="M 0,50 L -8,46 L -8,54 Z" fill="#c084fc"/>
+      <path d="M -50,0 L -46,-8 L -54,-8 Z" fill="#c084fc"/>
+
+      <!-- Center Token Packet Badge -->
+      <rect x="-30" y="-12" width="60" height="24" rx="4" fill="#3b0764" stroke="#c084fc" stroke-width="1"/>
+      <text x="0" y="3" fill="#e9d5ff" font-family="'JetBrains Mono', monospace" font-size="8" font-weight="700" text-anchor="middle">TOKEN</text>
+
+      <!-- 4 Ring Nodes positioned at 0, 90, 180, 270 deg -->
+      <!-- Node North -->
+      <rect x="-16" y="-62" width="32" height="22" rx="4" fill="#0f172a" stroke="#a855f7" stroke-width="1.5"/>
+      <text x="0" y="-48" fill="#e2e8f0" font-family="'JetBrains Mono', monospace" font-size="7.5" font-weight="700" text-anchor="middle">ND-1</text>
+
+      <!-- Node East -->
+      <rect x="40" y="-11" width="32" height="22" rx="4" fill="#0f172a" stroke="#a855f7" stroke-width="1.5"/>
+      <text x="56" y="3" fill="#e2e8f0" font-family="'JetBrains Mono', monospace" font-size="7.5" font-weight="700" text-anchor="middle">ND-2</text>
+
+      <!-- Node South -->
+      <rect x="-16" y="40" width="32" height="22" rx="4" fill="#0f172a" stroke="#a855f7" stroke-width="1.5"/>
+      <text x="0" y="54" fill="#e2e8f0" font-family="'JetBrains Mono', monospace" font-size="7.5" font-weight="700" text-anchor="middle">ND-3</text>
+
+      <!-- Node West -->
+      <rect x="-72" y="-11" width="32" height="22" rx="4" fill="#0f172a" stroke="#a855f7" stroke-width="1.5"/>
+      <text x="-56" y="3" fill="#e2e8f0" font-family="'JetBrains Mono', monospace" font-size="7.5" font-weight="700" text-anchor="middle">ND-4</text>
+    </g>
+
+    <!-- Footer Specs Badge -->
+    <rect x="12" y="184" width="256" height="24" rx="5" fill="#0b1325" stroke="#1e293b" stroke-width="1"/>
+    <text x="20" y="200" fill="#e9d5ff" font-family="'Inter', sans-serif" font-size="8.5" font-weight="600">[OK] Bebas Tabrakan Data (Collision-Free)</text>
+  </g>
+
+  <!-- ========================================================================= -->
+  <!-- BARIS 2: MESH & TREE (2 Panel x 435px)                                    -->
+  <!-- ========================================================================= -->
+
+  <!-- 4. TOPOLOGI MESH (FULL MESH) -->
+  <g transform="translate(35, 310)">
+    <rect width="435" height="225" rx="12" fill="url(#panelGrad)" stroke="#f59e0b" stroke-width="1.5" filter="url(#cardGlow)"/>
+    
+    <!-- Header Card -->
+    <rect x="14" y="12" width="165" height="20" rx="4" fill="#78350f" fill-opacity="0.35" stroke="#f59e0b" stroke-width="1"/>
+    <text x="20" y="26" fill="#fbbf24" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="700">4. TOPOLOGI FULL MESH</text>
+    <text x="14" y="46" fill="#94a3b8" font-family="'Inter', sans-serif" font-size="9.5">Toleransi Kesalahan Maksimal (Fault-Tolerant 99.999%)</text>
+
+    <!-- Mesh Pentagon Layout (Left side 200px) -->
+    <g transform="translate(130, 125)">
+      <!-- 10 Full Mesh Links: (5 * 4) / 2 = 10 Lines -->
+      <!-- A(0, -52), B(50, -16), C(31, 44), D(-31, 44), E(-50, -16) -->
+      <!-- Outer Pentagon -->
+      <line x1="0" y1="-52" x2="50" y2="-16" stroke="#f59e0b" stroke-width="1.8"/>
+      <line x1="50" y1="-16" x2="31" y2="44" stroke="#f59e0b" stroke-width="1.8"/>
+      <line x1="31" y1="44" x2="-31" y2="44" stroke="#f59e0b" stroke-width="1.8"/>
+      <line x1="-31" y1="44" x2="-50" y2="-16" stroke="#f59e0b" stroke-width="1.8"/>
+      <line x1="-50" y1="-16" x2="0" y2="-52" stroke="#f59e0b" stroke-width="1.8"/>
+
+      <!-- Inner Cross Redundant Links -->
+      <line x1="0" y1="-52" x2="31" y2="44" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="4,3"/>
+      <line x1="0" y1="-52" x2="-31" y2="44" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="4,3"/>
+      <line x1="50" y1="-16" x2="-31" y2="44" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="4,3"/>
+      <line x1="50" y1="-16" x2="-50" y2="-16" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="4,3"/>
+      <line x1="31" y1="44" x2="-50" y2="-16" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="4,3"/>
+
+      <!-- 5 Router Nodes -->
+      <g transform="translate(0, -52)">
+        <circle cx="0" cy="0" r="14" fill="#0f172a" stroke="#fbbf24" stroke-width="1.8"/>
+        <text x="0" y="3" fill="#fbbf24" font-family="'JetBrains Mono', monospace" font-size="8" font-weight="800" text-anchor="middle">R-1</text>
+      </g>
+      <g transform="translate(50, -16)">
+        <circle cx="0" cy="0" r="14" fill="#0f172a" stroke="#fbbf24" stroke-width="1.8"/>
+        <text x="0" y="3" fill="#fbbf24" font-family="'JetBrains Mono', monospace" font-size="8" font-weight="800" text-anchor="middle">R-2</text>
+      </g>
+      <g transform="translate(31, 44)">
+        <circle cx="0" cy="0" r="14" fill="#0f172a" stroke="#fbbf24" stroke-width="1.8"/>
+        <text x="0" y="3" fill="#fbbf24" font-family="'JetBrains Mono', monospace" font-size="8" font-weight="800" text-anchor="middle">R-3</text>
+      </g>
+      <g transform="translate(-31, 44)">
+        <circle cx="0" cy="0" r="14" fill="#0f172a" stroke="#fbbf24" stroke-width="1.8"/>
+        <text x="0" y="3" fill="#fbbf24" font-family="'JetBrains Mono', monospace" font-size="8" font-weight="800" text-anchor="middle">R-4</text>
+      </g>
+      <g transform="translate(-50, -16)">
+        <circle cx="0" cy="0" r="14" fill="#0f172a" stroke="#fbbf24" stroke-width="1.8"/>
+        <text x="0" y="3" fill="#fbbf24" font-family="'JetBrains Mono', monospace" font-size="8" font-weight="800" text-anchor="middle">R-5</text>
+      </g>
+    </g>
+
+    <!-- Technical Specs Box (Right side) -->
+    <g transform="translate(245, 62)">
+      <rect width="175" height="115" rx="6" fill="#0b1325" stroke="#1e2e4a" stroke-width="1"/>
+      <text x="12" y="20" fill="#38bdf8" font-family="'JetBrains Mono', monospace" font-size="9" font-weight="700">RUMUS KEBUTUHAN KABEL:</text>
+      <rect x="12" y="28" width="150" height="24" rx="4" fill="#1e293b"/>
+      <text x="87" y="44" fill="#fde68a" font-family="'JetBrains Mono', monospace" font-size="10.5" font-weight="800" text-anchor="middle">Links = N * (N - 1) / 2</text>
+      
+      <text x="12" y="70" fill="#cbd5e1" font-family="'Inter', sans-serif" font-size="9">Untuk N = 5 Router:</text>
+      <text x="12" y="85" fill="#34d399" font-family="'JetBrains Mono', monospace" font-size="9" font-weight="700">Kabel = 5*(4)/2 = 10 Link</text>
+      <text x="12" y="103" fill="#94a3b8" font-family="'Inter', sans-serif" font-size="8.5">Jalur Cadangan: Auto-Reroute</text>
+    </g>
+
+    <!-- Footer Specs Badge -->
+    <rect x="14" y="188" width="407" height="24" rx="5" fill="#0b1325" stroke="#1e293b" stroke-width="1"/>
+    <text x="22" y="204" fill="#fde68a" font-family="'Inter', sans-serif" font-size="8.5" font-weight="600">[OK] Digunakan pada Core Backbone ISP &amp; Data Center Perbankan</text>
+  </g>
+
+  <!-- 5. TOPOLOGI TREE (HIERARKIS 3-TIER) -->
+  <g transform="translate(490, 310)">
+    <rect width="435" height="225" rx="12" fill="url(#panelGrad)" stroke="#ec4899" stroke-width="1.5" filter="url(#cardGlow)"/>
+    
+    <!-- Header Card -->
+    <rect x="14" y="12" width="180" height="20" rx="4" fill="#831843" fill-opacity="0.35" stroke="#ec4899" stroke-width="1"/>
+    <text x="20" y="26" fill="#f472b6" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="700">5. TOPOLOGI TREE (HIERARKI)</text>
+    <text x="14" y="46" fill="#94a3b8" font-family="'Inter', sans-serif" font-size="9.5">Arsitektur Standar Kampus &amp; Gedung Bertingkat</text>
+
+    <!-- 3-Tier Hierarchy Diagram -->
+    <g transform="translate(14, 58)">
+      <!-- Tier 1: Core Switch Layer -->
+      <rect x="160" y="0" width="85" height="24" rx="4" fill="url(#coreGrad)" stroke="#f472b6" stroke-width="1.2"/>
+      <text x="202" y="16" fill="#ffffff" font-family="'JetBrains Mono', monospace" font-size="8.5" font-weight="800" text-anchor="middle">CORE SW-01</text>
+      
+      <!-- Tier Tag 1 -->
+      <text x="0" y="16" fill="#f472b6" font-family="'JetBrains Mono', monospace" font-size="8.5" font-weight="700">TIER 1 (CORE)</text>
+
+      <!-- Distribution Links -->
+      <line x1="180" y1="24" x2="105" y2="52" stroke="#ec4899" stroke-width="1.8"/>
+      <line x1="225" y1="24" x2="300" y2="52" stroke="#ec4899" stroke-width="1.8"/>
+
+      <!-- Tier 2: Distribution Layer -->
+      <text x="0" y="66" fill="#a855f7" font-family="'JetBrains Mono', monospace" font-size="8.5" font-weight="700">TIER 2 (DIST)</text>
+      
+      <!-- Dist Switch 1 (Lantai 1) -->
+      <rect x="65" y="52" width="80" height="22" rx="4" fill="#1e1b4b" stroke="#a855f7" stroke-width="1.2"/>
+      <text x="105" y="66" fill="#e9d5ff" font-family="'JetBrains Mono', monospace" font-size="8" font-weight="700" text-anchor="middle">DIST SW-LT1</text>
+
+      <!-- Dist Switch 2 (Lantai 2) -->
+      <rect x="260" y="52" width="80" height="22" rx="4" fill="#1e1b4b" stroke="#a855f7" stroke-width="1.2"/>
+      <text x="300" y="66" fill="#e9d5ff" font-family="'JetBrains Mono', monospace" font-size="8" font-weight="700" text-anchor="middle">DIST SW-LT2</text>
+
+      <!-- Access Links -->
+      <line x1="90" y1="74" x2="65" y2="98" stroke="#38bdf8" stroke-width="1.2"/>
+      <line x1="120" y1="74" x2="145" y2="98" stroke="#38bdf8" stroke-width="1.2"/>
+      <line x1="285" y1="74" x2="260" y2="98" stroke="#38bdf8" stroke-width="1.2"/>
+      <line x1="315" y1="74" x2="340" y2="98" stroke="#38bdf8" stroke-width="1.2"/>
+
+      <!-- Tier 3: Access PCs -->
+      <text x="0" y="114" fill="#38bdf8" font-family="'JetBrains Mono', monospace" font-size="8.5" font-weight="700">TIER 3 (ACCESS)</text>
+      
+      <!-- Workstation Endpoints -->
+      <rect x="48" y="98" width="34" height="20" rx="3" fill="#0f172a" stroke="#38bdf8" stroke-width="1"/>
+      <text x="65" y="112" fill="#cbd5e1" font-family="'JetBrains Mono', monospace" font-size="7.5" font-weight="700" text-anchor="middle">PC-01</text>
+
+      <rect x="128" y="98" width="34" height="20" rx="3" fill="#0f172a" stroke="#38bdf8" stroke-width="1"/>
+      <text x="145" y="112" fill="#cbd5e1" font-family="'JetBrains Mono', monospace" font-size="7.5" font-weight="700" text-anchor="middle">PC-02</text>
+
+      <rect x="243" y="98" width="34" height="20" rx="3" fill="#0f172a" stroke="#38bdf8" stroke-width="1"/>
+      <text x="260" y="112" fill="#cbd5e1" font-family="'JetBrains Mono', monospace" font-size="7.5" font-weight="700" text-anchor="middle">PC-03</text>
+
+      <rect x="323" y="98" width="34" height="20" rx="3" fill="#0f172a" stroke="#38bdf8" stroke-width="1"/>
+      <text x="340" y="112" fill="#cbd5e1" font-family="'JetBrains Mono', monospace" font-size="7.5" font-weight="700" text-anchor="middle">PC-04</text>
+    </g>
+
+    <!-- Footer Specs Badge -->
+    <rect x="14" y="188" width="407" height="24" rx="5" fill="#0b1325" stroke="#1e293b" stroke-width="1"/>
+    <text x="22" y="204" fill="#fbcfe8" font-family="'Inter', sans-serif" font-size="8.5" font-weight="600">[OK] Modularitas Departemen Sempurna: Kerusakan di LT1 tidak ganggu LT2</text>
+  </g>
+</svg>

@@ -568,5 +568,120 @@ export const HOTS_QUESTIONS = [
     ],
     explanation_id: "Prinsip Least Privilege dan Stateful Firewall / ACL: membuat aturan izin (permit) spesifik untuk IP sumber terpercaya (192.168.1.10) ke IP dan port tujuan (3306), lalu menerapkan penolakan (deny all) untuk sisa lalu lintas lainnya.",
     explanation_en: "Following the Principle of Least Privilege, an ingress ACL explicitly permits traffic only from source IP 192.168.1.10 destined for port 3306, while dropping all other requests via default implicit deny."
+  },
+  // --- TOPIK 1: Pengantar & Jenis Jaringan (Soal 5) ---
+  {
+    id: 26,
+    topic: 1,
+    topic_id: "Pengantar & Jenis Jaringan",
+    topic_en: "Introduction & Network Types",
+    question_id: "Sebuah perusahaan rintisan logistik mengoperasikan armada 50 truk kargo pintar antar-provinsi yang harus mengirimkan data telemetri suhu muatan dan lokasi GPS setiap 30 detik ke server cloud. Jika truk melintasi jalur pedalaman tanpa sinyal seluler 4G/5G, strategi arsitektur transmisi WAN apa yang paling tangguh untuk menjamin integritas data logistik?",
+    question_en: "A logistics startup operates a fleet of 50 smart refrigerated trucks across provinces that must stream temperature and GPS telemetry every 30 seconds to a cloud server. When crossing remote areas lacking 4G/5G coverage, which resilient WAN transmission architecture ensures telemetry integrity?",
+    options_id: [
+      { text: "Hybrid WAN dengan modul failover seluler multi-operator dan satelit LEO (Low Earth Orbit) disertai edge buffer lokal", correct: true },
+      { text: "Memasang kabel UTP Cat6 sepanjang rute jalan tol antar-provinsi", correct: false },
+      { text: "Mengganti seluruh komunikasi dengan jaringan nirkabel Bluetooth PAN jarak dekat", correct: false },
+      { text: "Membatasi koneksi hanya pada Wi-Fi gratis di rest area tanpa penyimpanan lokal", correct: false }
+    ],
+    options_en: [
+      { text: "Hybrid WAN integrating multi-carrier cellular failover, LEO satellite uplink, and local edge buffering", correct: true },
+      { text: "Deploying terrestrial Cat6 UTP copper cabling along interprovincial highways", correct: false },
+      { text: "Relying entirely on short-range Bluetooth PAN wireless links between vehicles", correct: false },
+      { text: "Restricting data upload strictly to rest stop public Wi-Fi hotspots without storage", correct: false }
+    ],
+    explanation_id: "Arsitektur WAN kargo bergerak yang melintasi area pelosok membutuhkan redundansi Hybrid WAN (seluler + satelit orbit rendah LEO seperti Starlink) dan edge buffering di unit kendaraan agar data tidak hilang saat blank spot.",
+    explanation_en: "Mobile fleet architectures across vast territories rely on Hybrid WAN failover (cellular + LEO satellite) paired with on-vehicle edge buffering to prevent telemetry data loss during coverage gaps."
+  },
+  // --- TOPIK 2: Topologi Jaringan & Switch/Hub (Soal 5) ---
+  {
+    id: 27,
+    topic: 2,
+    topic_id: "Topologi Jaringan & Perangkat Switch/Hub",
+    topic_en: "Network Topologies & Switching Devices",
+    question_id: "Dalam perancangan jaringan kampus, teknisi menghubungkan 3 unit Switch Managed dalam topologi segitiga (Mesh/Ring tertutup) untuk jalur redundansi cadangan. Namun sesaat setelah kabel ketiga dicolokkan, indikator LED seluruh switch berkedip serentak tanpa henti dan trafik jaringan macet total (100% CPU utilization). Identifikasi penyebab dan solusi pencegahannya:",
+    question_en: "In a campus network design, technicians interconnected 3 Managed Switches in a redundant closed triangular loop. Immediately after plugging the third patch cable, all switch port LEDs flashed frantically and network throughput collapsed to zero (100% CPU load). Diagnose the cause and preventive protocol:",
+    options_id: [
+      { text: "Terjadi Layer 2 Switching Loop (Broadcast Storm); solusinya adalah mengaktifkan Spanning Tree Protocol (STP / RSTP)", correct: true },
+      { text: "Kabel UTP yang digunakan terbalik polaritas warnanya antara TX dan RX", correct: false },
+      { text: "Kapasitas daya listrik PoE switch melebihi batas watt adaptor", correct: false },
+      { text: "Tegangan listrik statis lantai ruangan merusak port fisik switch", correct: false }
+    ],
+    options_en: [
+      { text: "Layer 2 Switching Loop (Broadcast Storm); the remedy is activating Spanning Tree Protocol (STP / RSTP)", correct: true },
+      { text: "The UTP patch cable used reversed TX/RX wiring polarity", correct: false },
+      { text: "PoE power draw exceeded the power supply wattage ceiling", correct: false },
+      { text: "Electrostatic room floor charge short-circuited the copper ports", correct: false }
+    ],
+    explanation_id: "Pada Layer 2 Ethernet tidak terdapat mekanisme TTL seperti di Layer 3. Jika terdapat jalur melingkar (redundant loop) tanpa protokol pencegah loop, frame broadcast akan berputar tak terhingga (broadcast storm). STP (Spanning Tree Protocol) secara otomatis memblokir port cadangan untuk memutus loop.",
+    explanation_en: "Ethernet Layer 2 frames lack a TTL counter. Redundant physical loops without loop-prevention cause broadcast frames to multiply indefinitely, causing a broadcast storm. STP automatically blocks redundant links until a failure occurs."
+  },
+  // --- TOPIK 3: Model OSI 7 Layer (Soal 5) ---
+  {
+    id: 28,
+    topic: 3,
+    topic_id: "Model OSI & Protokol Komunikasi",
+    topic_en: "OSI Model & Communication Protocols",
+    question_id: "Aplikasi video conference streaming real-time kelas online sering mengalami gangguan suara putus-putus. Setelah dianalisis dengan packet capture, terdeteksi protokol Transport Layer yang digunakan adalah UDP, bukan TCP. Evaluasi mengapa pengembang aplikasi tetap memilih UDP dibandingkan TCP untuk streaming suara interaktif:",
+    question_en: "An interactive online classroom video conference application experiences occasional audio stutter. Wireshark packet capture reveals that audio payloads travel via Transport Layer UDP rather than TCP. Evaluate why engineers deliberately chose UDP over TCP for interactive audio:",
+    options_id: [
+      { text: "UDP tidak memerlukan three-way handshake dan retransmisi paket rusak, sehingga menghasilkan latensi paling minim yang esensial untuk komunikasi live", correct: true },
+      { text: "UDP secara otomatis mengenkripsi seluruh isi video dengan kunci 256-bit", correct: false },
+      { text: "TCP tidak dapat mentransmisikan data multimedia biner di atas 10 kilobyte", correct: false },
+      { text: "UDP menggunakan kabel serat optik sedangkan TCP hanya bekerja di kabel tembaga", correct: false }
+    ],
+    options_en: [
+      { text: "UDP incurs zero three-way handshake overhead and omits packet retransmission, achieving ultra-low latency essential for real-time live interaction", correct: true },
+      { text: "UDP automatically encrypts media streams with 256-bit hardware acceleration", correct: false },
+      { text: "TCP cannot transport binary media payloads exceeding 10 kilobytes", correct: false },
+      { text: "UDP runs strictly over fiber-optic links whereas TCP is limited to copper", correct: false }
+    ],
+    explanation_id: "Untuk transmisi multimedia real-time (VoIP, video conference, online game), latensi rendah jauh lebih krusial daripada keutuhan paket data 100%. TCP akan melakukan retransmisi paket yang hilang yang justru menyebabkan jeda suara (lag parah). UDP membuang paket rusak tanpa menahan alur siaran langsung.",
+    explanation_en: "For real-time interactive media, low latency trumps reliability. TCP's reliable retransmissions introduce unacceptable buffer delays. UDP streams data continuously without waiting for lost packet retries."
+  },
+  // --- TOPIK 4: Subnetting IPv4 & VLSM (Soal 5) ---
+  {
+    id: 29,
+    topic: 4,
+    topic_id: "Pengalamatan IPv4, Subnetting & VLSM",
+    topic_en: "IPv4 Addressing, Subnetting & VLSM",
+    question_id: "Seorang network architect ditugaskan mendesain pengalamatan IP untuk link koneksi serial point-to-point langsung antar dua Router Core (hanya membutuhkan tepat 2 alamat IP host usable). Alokasi subnet mask berbasis VLSM yang paling efisien tanpa membuang alamat IP publik yang berharga adalah:",
+    question_en: "A network architect must assign IP addressing for a direct point-to-point serial interconnection between two Core Routers (strictly requiring exactly 2 usable host addresses). Which VLSM prefix length maximizes IP conservation without address wastage?",
+    options_id: [
+      { text: "/30 (255.255.255.252) yang menghasilkan tepat 4 total IP (1 Network, 2 Usable Host, 1 Broadcast)", correct: true },
+      { text: "/24 (255.255.255.0) yang menyediakan 254 usable host", correct: false },
+      { text: "/28 (255.255.255.240) yang menyediakan 14 usable host", correct: false },
+      { text: "/16 (255.255.0.0) yang menyediakan 65.534 usable host", correct: false }
+    ],
+    options_en: [
+      { text: "/30 (255.255.255.252) allocating exactly 4 total IPs (1 Network ID, 2 Usable Hosts, 1 Broadcast ID)", correct: true },
+      { text: "/24 (255.255.255.0) allocating 254 usable host addresses", correct: false },
+      { text: "/28 (255.255.255.240) allocating 14 usable host addresses", correct: false },
+      { text: "/16 (255.255.0.0) allocating 65,534 usable host addresses", correct: false }
+    ],
+    explanation_id: "Rumus host: 2^n - 2. Untuk 2 host, dibutuhkan n=2 bit host (2^2 - 2 = 2 host). Panjang prefix adalah 32 - 2 = /30 (subnet mask 255.255.255.252). Ini adalah standar industri VLSM paling hemat untuk tautan point-to-point.",
+    explanation_en: "Using the 2^n - 2 host formula, 2 host bits yield exactly 2 usable IPs (2^2 - 2 = 2). The prefix length is 32 - 2 = /30 (255.255.255.252), conserving address space for point-to-point router links."
+  },
+  // --- TOPIK 5: Media Transmisi & Fiber Optik (Soal 5) ---
+  {
+    id: 30,
+    topic: 5,
+    topic_id: "Media Transmisi & Pengkabelan",
+    topic_en: "Transmission Media & Cabling",
+    question_id: "Sebuah pabrik peleburan baja memiliki motor induksi raksasa dan transformator berdaya 20.000 Volt yang menghasilkan medan elektromagnetik (EMI) sangat kuat di sepanjang terowongan kabel. Jalur kabel UTP Cat6 standar yang dipasang sebelumnya mengalami lonjakan bit-error rate hingga 70%. Solusi media transmisi fisik apa yang kebal total terhadap induksi gelombang elektromagnetik ini?",
+    question_en: "A steel manufacturing plant operates high-voltage 20,000V induction motors and transformers creating intense electromagnetic interference (EMI) along utility tunnels. The existing standard Cat6 UTP cabling suffers a 70% packet corruption rate. Which physical transmission medium is fundamentally immune to electromagnetic induction?",
+    options_id: [
+      { text: "Kabel Serat Optik (Fiber Optic) karena mentransmisikan sinyal berupa pulsa cahaya di dalam inti kaca murni dielektrik", correct: true },
+      { text: "Mengganti kabel dengan kawat tembaga telanjang tanpa jaket pelindung", correct: false },
+      { text: "Memasang kabel UTP Cat5e unshielded dengan panjang dua kali lipat", correct: false },
+      { text: "Menghubungkan kedua ujung kabel tembaga langsung ke ground pipa air", correct: false }
+    ],
+    options_en: [
+      { text: "Fiber-optic cabling, because it propagates data as light pulses through a dielectric glass core completely immune to EMI", correct: true },
+      { text: "Replacing the link with unjacketed bare copper wire", correct: false },
+      { text: "Deploying double-length unshielded Cat5e copper cables", correct: false },
+      { text: "Grounding both copper conductors directly to water plumbing pipes", correct: false }
+    ],
+    explanation_id: "Serat optik menggunakan prinsip total internal reflection cahaya (pulsa foton) di dalam bahan kaca/silika non-konduktif (dielektrik). Karena tidak menggunakan aliran elektron tembaga, kabel serat optik kebal 100% terhadap radiasi elektromagnetik (EMI) dan lonjakan petir.",
+    explanation_en: "Fiber optics transmit data as light pulses through non-conductive glass silica cores. Having no metallic conductors, optical fibers are completely immune to electromagnetic interference (EMI) and radio frequency interference (RFI)."
   }
 ];

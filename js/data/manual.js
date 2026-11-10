@@ -2,7 +2,7 @@
 
 export const MANUAL_BOOK = {
   id: {
-    title: "Buku Panduan Tata Cara Penggunaan Aplikasi NetLearn",
+    title: "Panduan Pengguna NetLearn",
     subtitle: "Panduan Lengkap Langkah Demi Langkah Media Pembelajaran Mandiri Jaringan Komputer TKJ",
     sections: [
       {

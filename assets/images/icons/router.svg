@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <radialGradient id="rtGrad" cx="40%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#4338ca"/>
+    </radialGradient>
+  </defs>
+  <!-- Classic Core Cisco-style Round Chassis -->
+  <circle cx="32" cy="32" r="24" fill="url(#rtGrad)" stroke="#3730a3" stroke-width="2.5"/>
+  <circle cx="32" cy="32" r="21" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1.5"/>
+  <!-- 4 Inward/Outward Routing Direction Arrows -->
+  <g fill="#ffffff">
+    <path d="M16 32 L24 28 L24 31 L29 31 L29 33 L24 33 L24 36 Z"/>
+    <path d="M48 32 L40 28 L40 31 L35 31 L35 33 L40 33 L40 36 Z"/>
+    <path d="M32 16 L28 24 L31 24 L31 29 L33 29 L33 24 L36 24 Z"/>
+    <path d="M32 48 L28 40 L31 40 L31 35 L33 35 L33 40 L36 40 Z"/>
+  </g>
+  <circle cx="32" cy="32" r="3.5" fill="#a5b4fc"/>
+</svg>

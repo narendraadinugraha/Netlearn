@@ -8,7 +8,8 @@ import { MANUAL_BOOK } from "./data/manual.js";
 import { translations, getLang, setLang, t, applyI18nToDOM } from "./services/i18n.js";
 import { BADGES, LEVELS, calculateLevel, sound } from "./services/gamification.js";
 import { exportToWord, exportToCsv } from "./services/export.js";
-import { renderTopicSimulation } from "./services/simulations.js";
+import { renderTopicSimulation, renderUnifiedWorkbench } from "./services/simulations.js";
+import { initNetQuestCityGame, cleanupNetQuestCityGame } from "./services/game3d.js";
 import {
   CONFIG,
   loadEnvConfig,
@@ -46,7 +47,7 @@ export const state = {
   currentView: "dashboard",
   testState: null,
   soundMuted: false,
-  theme: localStorage.getItem("netlearn_theme") || "light",
+  theme: "light",
   userStats: {
     xp: 0,
     readMaterials: [],
@@ -103,22 +104,38 @@ export async function handleLogout() {
 // App Lifecycle & Initialization
 // ============================================================================
 document.addEventListener("DOMContentLoaded", async () => {
-  await loadEnvConfig();
-  if (isUsingLiveSupabase()) {
-    try {
-      const liveUser = await checkLiveSession();
-      state.currentUser = liveUser;
-    } catch (e) {
-      console.warn("Session restore error:", e);
-      state.currentUser = null;
-    }
+  // 1. Instant synchronous pre-render check (eliminates FOUC / layout flash)
+  const cachedUser = getCurrentUser();
+  state.currentUser = cachedUser;
+  updateRoleAccess(); // Strictly hides teacher controls for students/guests at timestamp 0
+
+  if (cachedUser) {
+    showAppLayout();
+    updateNavUser();
   } else {
-    state.currentUser = getCurrentUser();
+    const initialMode = window.location.hash.toLowerCase().includes("register") ? "register" : "login";
+    showAuthLayout(initialMode);
   }
 
   applyTheme(state.theme);
   setupGlobalEvents();
   applyI18nToDOM();
+
+  // 2. Load configurations and verify remote session asynchronously
+  await loadEnvConfig();
+  if (isUsingLiveSupabase()) {
+    try {
+      const liveUser = await checkLiveSession();
+      state.currentUser = liveUser;
+      updateRoleAccess();
+    } catch (e) {
+      console.warn("Session restore error:", e);
+      state.currentUser = null;
+      updateRoleAccess();
+    }
+  } else {
+    state.currentUser = cachedUser;
+  }
 
   if (state.currentUser) {
     showAppLayout();
@@ -131,7 +148,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
     const isTeacher = state.currentUser.role === "teacher" || state.currentUser.user?.user_metadata?.role === "teacher";
     const targetHash = window.location.hash.replace("#", "").trim();
-    const validViews = ["dashboard", "materials", "simulation", "quizzes", "pretest", "posttest", "manual", "profile", "admin"];
+    const validViews = ["dashboard", "materials", "simulation", "quizzes", "minigame", "pretest", "posttest", "manual", "profile", "admin"];
     const initialView = validViews.includes(targetHash) ? targetHash : (isTeacher ? "admin" : "dashboard");
     navigateTo(initialView);
   } else {
@@ -144,31 +161,29 @@ document.addEventListener("DOMContentLoaded", async () => {
 // Role-Based Menu Filtering (GURU vs SISWA)
 // ============================================================================
 function updateRoleAccess() {
-  const adminNavBtn = document.getElementById("nav-btn-admin");
   const isTeacher = state.currentUser && (state.currentUser.role === "teacher" || state.currentUser.user?.user_metadata?.role === "teacher");
 
-  if (adminNavBtn) {
+  document.querySelectorAll(".admin-nav-btn, #nav-btn-admin, #top-nav-admin").forEach(btn => {
     if (isTeacher) {
-      adminNavBtn.style.display = "flex";
+      btn.classList.remove("hidden");
+      btn.style.setProperty("display", "inline-flex", "important");
     } else {
-      adminNavBtn.style.display = "none";
+      btn.classList.add("hidden");
+      btn.style.setProperty("display", "none", "important");
     }
-  }
+  });
 }
 
 // ============================================================================
 // Theme Management
 // ============================================================================
-function applyTheme(theme) {
+function applyTheme() {
   const html = document.documentElement;
-  const themeIcon = document.getElementById("theme-icon");
-  if (theme === "dark") {
-    html.classList.add("dark");
-    if (themeIcon) themeIcon.textContent = "dark_mode";
-  } else {
-    html.classList.remove("dark");
-    if (themeIcon) themeIcon.textContent = "light_mode";
-  }
+  html.classList.remove("dark");
+  html.classList.add("light");
+  try {
+    localStorage.setItem("netlearn_theme", "light");
+  } catch (e) {}
 }
 
 // ============================================================================
@@ -313,11 +328,17 @@ function updateHUD() {
       statusEl.className = "text-on-surface-variant";
     }
   }
+
+  // Academic Curriculum Progress Telemetry
+  const curriculumEl = document.getElementById("hud-curriculum-counter");
+  if (curriculumEl) {
+    curriculumEl.textContent = `${readCount}/${totalModules} ${isId ? "Modul" : "Modules"} (${percent}%)`;
+  }
 }
 
 function updateNavUser() {
   const container = document.getElementById("nav-user-area");
-  if (!container) return;
+  const topUserContainer = document.getElementById("top-user-area");
 
   if (state.currentUser) {
     const meta = state.currentUser.user?.user_metadata || {};
@@ -333,29 +354,58 @@ function updateNavUser() {
       ? `<img src="${avatar}" alt="${name}" class="w-8 h-8 rounded-full object-cover shrink-0 shadow-xs border border-outline-variant" />` 
       : `<div class="w-8 h-8 rounded-full ${isTeacher ? "bg-secondary text-on-secondary" : "bg-primary text-on-primary"} flex items-center justify-center font-bold text-xs shrink-0 shadow-xs font-mono">${name.charAt(0).toUpperCase()}</div>`;
 
-    container.innerHTML = `
-      <div class="flex items-center gap-2.5 min-w-0 cursor-pointer hover:opacity-85 transition-opacity" id="sidebar-user-click" title="${getLang() === "id" ? "Buka Profil Pengguna" : "View Profile"}">
-        ${avatarHtml}
-        <div class="flex flex-col min-w-0">
-          <span class="text-xs font-bold text-on-surface truncate leading-tight">${name}</span>
-          <span class="text-[10px] text-on-surface-variant font-mono truncate leading-tight mt-0.5">${roleText}</span>
+    if (container) {
+      container.innerHTML = `
+        <div class="flex items-center gap-2.5 min-w-0 cursor-pointer hover:opacity-85 transition-opacity" id="sidebar-user-click" title="${getLang() === "id" ? "Buka Profil Pengguna" : "View Profile"}">
+          ${avatarHtml}
+          <div class="flex flex-col min-w-0">
+            <span class="text-xs font-bold text-on-surface truncate leading-tight">${name}</span>
+            <span class="text-[10px] text-on-surface-variant font-mono truncate leading-tight mt-0.5">${roleText}</span>
+          </div>
         </div>
-      </div>
-      <button class="p-1.5 rounded-lg text-outline hover:text-error hover:bg-error/10 transition-colors cursor-pointer" id="btn-sidebar-logout" title="${t("navLogout")}">
-        <span class="material-symbols-outlined text-[18px]">logout</span>
-      </button>
-    `;
+        <button class="p-1.5 rounded-lg text-outline hover:text-error hover:bg-error/10 transition-colors cursor-pointer" id="btn-sidebar-logout" title="${t("navLogout")}">
+          <span class="material-symbols-outlined text-[18px]">logout</span>
+        </button>
+      `;
+      document.getElementById("sidebar-user-click")?.addEventListener("click", () => navigateTo("profile"));
+      document.getElementById("btn-sidebar-logout")?.addEventListener("click", handleLogout);
+    }
 
-    document.getElementById("sidebar-user-click")?.addEventListener("click", () => navigateTo("profile"));
-    document.getElementById("btn-sidebar-logout")?.addEventListener("click", handleLogout);
+    if (topUserContainer) {
+      topUserContainer.innerHTML = `
+        <div class="flex items-center gap-2 cursor-pointer hover:opacity-85 transition-opacity" id="top-user-click" title="${getLang() === "id" ? "Buka Profil Pengguna" : "View Profile"}">
+          ${avatarHtml}
+          <div class="hidden xl:flex flex-col min-w-0 max-w-[130px]">
+            <span class="text-xs font-bold text-on-surface truncate leading-tight">${name}</span>
+            <span class="text-[9px] text-on-surface-variant font-mono truncate leading-tight">${roleText}</span>
+          </div>
+        </div>
+        <button class="p-1 rounded text-outline hover:text-error transition-colors ml-1 cursor-pointer" id="btn-top-logout" title="${t("navLogout")}">
+          <span class="material-symbols-outlined text-[16px]">logout</span>
+        </button>
+      `;
+      document.getElementById("top-user-click")?.addEventListener("click", () => navigateTo("profile"));
+      document.getElementById("btn-top-logout")?.addEventListener("click", handleLogout);
+    }
   } else {
-    container.innerHTML = `
-      <button class="w-full py-2 px-3 bg-primary text-on-primary text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 hover:bg-primary-container transition-colors shadow-xs cursor-pointer" id="btn-sidebar-login">
-        <span class="material-symbols-outlined text-[16px]">login</span>
-        <span>${t("navLogin")}</span>
-      </button>
-    `;
-    document.getElementById("btn-sidebar-login")?.addEventListener("click", () => showAuthLayout("login"));
+    if (container) {
+      container.innerHTML = `
+        <button class="w-full py-2 px-3 bg-primary text-on-primary text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 hover:bg-primary-container transition-colors shadow-xs cursor-pointer" id="btn-sidebar-login">
+          <span class="material-symbols-outlined text-[16px]">login</span>
+          <span>${t("navLogin")}</span>
+        </button>
+      `;
+      document.getElementById("btn-sidebar-login")?.addEventListener("click", () => showAuthLayout("login"));
+    }
+    if (topUserContainer) {
+      topUserContainer.innerHTML = `
+        <button class="h-8 px-3 bg-primary text-on-primary text-xs font-semibold rounded-lg flex items-center gap-1.5 hover:bg-primary-container transition-colors cursor-pointer" id="btn-top-login">
+          <span class="material-symbols-outlined text-[15px]">login</span>
+          <span>${t("navLogin")}</span>
+        </button>
+      `;
+      document.getElementById("btn-top-login")?.addEventListener("click", () => showAuthLayout("login"));
+    }
   }
 
   updateRoleAccess();
@@ -427,8 +477,9 @@ export function navigateTo(viewName, params = {}) {
     materials: isId ? "Modul & Materi" : "Materials & Modules",
     simulation: isId ? "Lab Simulasi & VLSM" : "Simulation Lab & VLSM",
     quizzes: isId ? "Kuis & Bank Soal" : "Quizzes & Bank",
-    manual: isId ? "Buku Panduan Aplikasi" : "User Guide & Manual",
+    manual: isId ? "Panduan Pengguna" : "User Guide",
     admin: isId ? "Panel Guru" : "Teacher Console",
+    minigame: isId ? "NetDrive 3D: Mini Game Quest" : "NetDrive 3D: Quest City",
     profile: isId ? "Profil Pengguna" : "Student Profile",
     "posttest-results": isId ? "Hasil Evaluasi & Diagnostik" : "Assessment Results & Diagnostics"
   };
@@ -442,6 +493,15 @@ export function navigateTo(viewName, params = {}) {
 
   const appView = document.getElementById("app-view");
   if (!appView) return;
+
+  // Stop test timer if navigating away from exam
+  if (viewName !== "pretest" && viewName !== "posttest" && viewName !== "quiz") {
+    stopTestTimer();
+  }
+  // Cleanup 3D mini-game if navigating away
+  if (viewName !== "minigame") {
+    cleanupNetQuestCityGame();
+  }
 
   window.scrollTo({ top: 0, behavior: "smooth" });
 
@@ -464,11 +524,17 @@ export function navigateTo(viewName, params = {}) {
     case "posttest":
       renderTestRunner(appView, "post");
       break;
+    case "quiz":
+      renderTestRunner(appView, params.type || "topic-1");
+      break;
     case "posttest-results":
       renderResults(appView, params.result);
       break;
     case "quizzes":
-      renderQuizzes(appView);
+      renderQuizzes(appView, params.tab || "topics");
+      break;
+    case "minigame":
+      renderMiniGame(appView);
       break;
     case "admin":
       renderAdmin(appView);
@@ -491,11 +557,16 @@ function setupGlobalEvents() {
   document.getElementById("nav-brand")?.addEventListener("click", () => {
     navigateTo(state.currentUser ? "dashboard" : "auth");
   });
+  document.getElementById("header-brand-click")?.addEventListener("click", () => {
+    navigateTo(state.currentUser ? "dashboard" : "auth");
+  });
 
   document.querySelectorAll(".nav-item-btn").forEach(btn => {
     btn.addEventListener("click", () => {
       const view = btn.dataset.view;
       if (view) navigateTo(view);
+      document.getElementById("app-sidebar")?.classList.remove("mobile-open");
+      document.getElementById("sidebar-backdrop")?.classList.remove("active");
     });
   });
 
@@ -768,9 +839,6 @@ function renderAuth(container, mode = "login") {
               </svg>
               <span>${isLogin ? t("googleSignIn") : (isId ? "Daftar Cepat dengan Akun Google" : "Quick Register with Google")}</span>
             </button>
-            <p class="text-[10px] text-outline text-center mt-1.5 font-mono">
-              ${isId ? "⚡ Akun otomatis terdaftar jika belum pernah dibuat" : "⚡ Automatically registers your account if not yet created"}
-            </p>
           </div>
         </div>
 
@@ -974,11 +1042,13 @@ function renderAuth(container, mode = "login") {
 function renderDashboard(container) {
   const meta = state.currentUser?.user?.user_metadata || {};
   const isId = getLang() === "id";
-  const studentName = state.currentUser?.name || meta.full_name || (isId ? "Siswa CS302" : "CS302 Student");
+  const studentName = state.currentUser?.name || meta.full_name || (isId ? "Siswa TKJ" : "Networking Student");
+  const studentClass = state.currentUser?.className || meta.class_name || "XI TKJ 1";
 
-  // Metrics dynamically derived from active state.userStats (strictly 0 for newly created accounts)
+  // Metrics dynamically derived from active state.userStats
   const totalModules = MATERIALS.length || 6;
-  const readCount = Math.min(totalModules, (state.userStats?.readMaterials || []).length);
+  const readList = state.userStats?.readMaterials || [];
+  const readCount = Math.min(totalModules, readList.length);
   const percentModules = Math.round((readCount / totalModules) * 100);
 
   const preResult = (state.userStats?.results || []).find(r => r.type === "pre");
@@ -1008,251 +1078,390 @@ function renderDashboard(container) {
   }
 
   // Lab completed count: count of watched videos/completed labs
-  const labCount = Math.min(totalModules, (state.userStats?.watchedVideos || []).length);
+  const labList = state.userStats?.watchedVideos || [];
+  const labCount = Math.min(totalModules, labList.length);
   const labPercent = Math.round((labCount / totalModules) * 100);
 
   // Helper functions for module title & summary
   const getModTitle = (m) => (isId ? (m?.title_id || m?.title) : (m?.title_en || m?.title || m?.title_id)) || "Modul Kurikulum";
   const getModSummary = (m) => (isId ? (m?.summary_id || m?.summary) : (m?.summary_en || m?.summary || m?.summary_id)) || "";
 
-  // Active module workbench: find first unread module, or module 0
-  const nextUnreadIdx = MATERIALS.findIndex(m => !state.userStats?.readMaterials?.includes(m.id));
+  // Active module: first unread module, or module 0
+  const nextUnreadIdx = MATERIALS.findIndex(m => !readList.includes(m.id));
   const activeModIdx = nextUnreadIdx >= 0 ? nextUnreadIdx : 0;
   const activeMod = MATERIALS[activeModIdx] || MATERIALS[0];
   const activeTitle = getModTitle(activeMod);
   const activeSummary = getModSummary(activeMod);
-  const isActiveModDone = state.userStats?.readMaterials?.includes(activeMod.id);
-  const activeModPercent = isActiveModDone ? 100 : (state.userStats?.watchedVideos?.includes(activeMod.id) ? 50 : 0);
+  const isActiveModDone = readList.includes(activeMod.id);
+  const activeModPercent = isActiveModDone ? 100 : (labList.includes(activeMod.id) ? 50 : 0);
 
-  // Cognitive skills calculation (if tests taken, show real estimates, otherwise 0%)
+  // Cognitive skills calculation
   const c4Score = postResult ? Math.min(100, Math.round(postPercent * 1.05)) : (preResult ? Math.round(prePercent * 0.9) : 0);
   const c5Score = postResult ? Math.min(100, Math.round(postPercent * 0.95)) : (preResult ? Math.round(prePercent * 0.85) : 0);
   const c6Score = postResult ? Math.min(100, Math.round(postPercent * 1.0)) : (preResult ? Math.round(prePercent * 0.8) : 0);
 
+  // Architectural SVG Diagram & Authentic Photography mapping per module
+  const modSvgMap = {
+    1: "assets/images/materials/mod1_network_scopes.svg",
+    2: "assets/images/materials/mod2_topologies.svg",
+    3: "assets/images/materials/mod3_osi_layers.svg",
+    4: "assets/images/materials/mod4_subnetting_structure.svg",
+    5: "assets/images/materials/mod5_hardware_media.svg",
+    6: "assets/images/materials/mod6_dns_dhcp_dora.svg"
+  };
+  const modPhotoMap = {
+    1: "assets/images/datacenter_rack.jpg",
+    2: "assets/images/network_switch.jpg",
+    3: "assets/images/materials/mod3_osi_layers.svg",
+    4: "assets/images/materials/mod4_subnetting_structure.svg",
+    5: "assets/images/fiber_optics.jpg",
+    6: "assets/images/materials/mod6_dns_dhcp_dora.svg"
+  };
+  const activeSvg = modSvgMap[activeMod.id] || modSvgMap[1];
+  const activePhoto = modPhotoMap[activeMod.id] || "assets/images/network_switch.jpg";
+
+  // Specific topic tags per module
+  const modTagsMap = {
+    1: ["PAN / LAN / MAN / WAN", "Bandwidth", "Latensi"],
+    2: ["Star / Bus / Mesh / Ring", "Switch L2", "Collision Domain"],
+    3: ["Model OSI 7 Layer", "TCP/IP Suite", "Enkapsulasi L2-L7"],
+    4: ["IPv4 CIDR Prefix", "Subnet Mask", "Alokasi VLSM"],
+    5: ["UTP / STP T568A/B", "Serat Optik", "Router / Switch"],
+    6: ["Layanan DNS Server", "DHCP DORA Flow", "Default Gateway"]
+  };
+
   container.innerHTML = `
     <div class="flex flex-col space-y-6 max-w-7xl mx-auto w-full">
       
-      <!-- Minimalist Course & Welcome Header -->
-      <div class="bg-surface-container-lowest border border-outline-variant rounded-2xl p-5 sm:p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div class="space-y-1.5 max-w-2xl">
-          <div class="flex items-center gap-2">
-            <span class="text-xs font-mono font-semibold px-2 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">NetLearn TKJ</span>
-            <span class="text-xs text-on-surface-variant font-mono">• ${state.currentUser?.className ? `${state.currentUser.className} • ` : ""}${isId ? "Tahun Ajaran 2025/2026" : "Academic Year 2025/2026"}</span>
-          </div>
-          <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-on-surface">
-            ${isId ? `Selamat Datang, ${state.currentUser?.name || studentName}` : `Welcome, ${state.currentUser?.name || studentName}`}
-          </h1>
-          <p class="text-xs text-on-surface-variant leading-relaxed">
-            ${isId ? "Akses modul kurikulum, simulator lab CLI & VLSM, serta pantau evaluasi kognitif Anda secara mandiri." : "Access curriculum modules, CLI & VLSM lab simulators, and track your evaluation progress."}
-          </p>
+      <!-- HERO WELCOME BANNER (Authentic Photography, Delicate Architectural Grid, Anti-Slop) -->
+      <section class="taste-card relative overflow-hidden rounded-2xl bg-gradient-to-r from-white via-white/95 to-slate-50 border border-slate-200/90 p-6 sm:p-8 shadow-xs" data-enter="hero">
+        
+        <!-- Real Authentic Datacenter Photography (Soft Architectural Fade) -->
+        <div class="absolute inset-y-0 right-0 w-full sm:w-2/3 pointer-events-none select-none overflow-hidden">
+          <img 
+            src="assets/images/datacenter_rack.jpg" 
+            alt="Modern Enterprise Data Center Infrastructure" 
+            class="w-full h-full object-cover object-right opacity-[0.20] filter contrast-125 saturate-125"
+          />
+          <div class="absolute inset-0 bg-gradient-to-r from-white via-white/70 to-transparent"></div>
+          <div class="absolute inset-0 bg-gradient-to-t from-white via-transparent to-transparent"></div>
         </div>
-        <div class="flex items-center gap-2.5 shrink-0 flex-wrap">
-          <button class="h-9 px-4 bg-primary hover:bg-primary-container text-on-primary font-semibold text-xs rounded-xl flex items-center gap-2 transition-colors cursor-pointer shadow-xs" id="btn-hero-continue">
-            <span class="material-symbols-outlined text-[18px]">play_circle</span>
-            <span>${isActiveModDone ? (isId ? "Semua Modul Tuntas" : "Review Modules") : (isId ? "Lanjutkan Modul" : "Continue Learning")}</span>
-          </button>
-          <button class="h-9 px-3.5 bg-surface-container-low hover:bg-surface-container text-on-surface border border-outline-variant font-medium text-xs rounded-xl flex items-center gap-2 transition-colors cursor-pointer" id="btn-hero-lab">
-            <span class="material-symbols-outlined text-[18px] text-primary">terminal</span>
-            <span>${isId ? "Buka Lab" : "Simulation Lab"}</span>
-          </button>
-        </div>
-      </div>
 
-      <!-- Top 4 Metrics Row (Clean Dynamic Minimalist Cards) -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- Delicate Architectural Technical Grid -->
+        <div class="absolute inset-0 net-blueprint-bg opacity-40 pointer-events-none"></div>
+
+        <div class="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+          <div class="space-y-4 max-w-2xl">
+            <!-- Header Badges -->
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200/80 font-mono text-xs font-semibold shadow-2xs">
+                <span class="w-2 h-2 rounded-full bg-indigo-600 animate-pulse"></span>
+                Kurikulum Merdeka • SMK TKJ
+              </span>
+              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white text-slate-600 border border-slate-200 text-xs font-medium shadow-2xs">
+                ${studentClass} • Semester Genap
+              </span>
+            </div>
+
+            <!-- Greeting Headline -->
+            <div class="space-y-1.5">
+              <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight font-display text-slate-900">
+                ${isId ? `Halo, ${studentName} 👋` : `Welcome back, ${studentName} 👋`}
+              </h1>
+              <p class="text-sm text-slate-600 leading-relaxed max-w-xl">
+                ${isId 
+                  ? "Selamat datang di NetLearn. Mari jelajahi cara kerja jaringan komputer, koneksi internet, dan transmisi data melalui simulasi visual yang mudah dan menyenangkan." 
+                  : "Interactive networking workstation. Master protocol architectures, experiment on virtual lab topologies, and track your analytical HOTS competencies."}
+              </p>
+            </div>
+
+            <!-- Quick Action CTA Buttons -->
+            <div class="flex items-center gap-3 pt-1 flex-wrap">
+              <button class="taste-btn h-10 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs rounded-xl flex items-center gap-2 cursor-pointer shadow-xs transition-all" id="btn-hero-continue">
+                <span class="material-symbols-outlined text-[19px]">play_circle</span>
+                <span>${isActiveModDone ? (isId ? "Tinjau Materi Belajar" : "Review Modules") : (isId ? `Mulai Belajar Modul 0${activeMod.id}` : `Start Module 0${activeMod.id}`)}</span>
+              </button>
+              <button class="taste-btn h-10 px-4 bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 font-medium text-xs rounded-xl flex items-center gap-2 cursor-pointer shadow-xs transition-colors" id="btn-hero-lab">
+                <span class="material-symbols-outlined text-[18px] text-indigo-600">science</span>
+                <span>${isId ? "Buka Lab Simulasi" : "Open Simulator Lab"}</span>
+              </button>
+              <button class="taste-btn h-10 px-3.5 bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 font-medium text-xs rounded-xl flex items-center gap-1.5 cursor-pointer transition-colors" id="btn-read-rfc">
+                <span class="material-symbols-outlined text-[18px] text-slate-400">help</span>
+                <span>${isId ? "Panduan Cepat" : "Quick Guide"}</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Right Side: Learning Progress Widget (Glass Porcelain Treatment) -->
+          <div class="taste-card hidden lg:flex flex-col gap-3.5 bg-white/90 backdrop-blur-md p-5 rounded-2xl border border-slate-200 shadow-sm min-w-[280px]">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
+                  <span class="material-symbols-outlined text-[18px]">verified</span>
+                </div>
+                <div>
+                  <div class="font-bold text-xs text-slate-900">Kemajuan Belajar</div>
+                  <div class="text-[11px] text-slate-500">6 Modul Kurikulum</div>
+                </div>
+              </div>
+              <span class="inline-flex items-center gap-1 text-[11px] font-mono text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                Aktif
+              </span>
+            </div>
+
+            <div class="space-y-2.5 text-xs">
+              <div class="flex justify-between items-center">
+                <span class="text-slate-600">${isId ? "Materi Selesai:" : "Completed:"}</span>
+                <span class="font-bold text-slate-900">${readCount}/${totalModules} (${percentModules}%)</span>
+              </div>
+              <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                <div class="bg-indigo-600 h-full rounded-full transition-all duration-300" style="width: ${percentModules}%;"></div>
+              </div>
+
+              <div class="flex justify-between items-center pt-1">
+                <span class="text-slate-600">${isId ? "Eksperimen Lab:" : "Lab Experiments:"}</span>
+                <span class="font-bold text-emerald-700">${labCount}/${totalModules} Praktik</span>
+              </div>
+
+              <div class="flex justify-between items-center">
+                <span class="text-slate-600">${isId ? "Hasil Ujian:" : "Assessment:"}</span>
+                <span class="font-bold ${postResult ? 'text-indigo-600' : (preResult ? 'text-amber-600' : 'text-slate-500')}">
+                  ${postResult ? `Posttest: ${postPercent} Poin` : (preResult ? `Pretest: ${prePercent} Poin` : "Belum Ujian")}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4 CLEAN METRICS ROW -->
+      <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" aria-label="Learning Metrics">
         
         <!-- Metric 1: Module Completion -->
-        <div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant shadow-xs flex flex-col justify-between">
-          <div class="flex items-center justify-between text-on-surface-variant">
-            <span class="text-xs font-mono uppercase tracking-wider text-outline font-semibold">${isId ? "Penyelesaian Modul" : "Module Progress"}</span>
-            <span class="material-symbols-outlined text-[20px] text-primary">pie_chart</span>
-          </div>
-          <div class="my-2.5">
-            <div class="text-2xl font-bold text-on-surface tracking-tight">
-              ${readCount} <span class="text-outline font-normal text-sm">/ ${totalModules} ${isId ? "Modul" : "Modules"}</span>
+        <div class="taste-card bg-gradient-to-b from-white to-slate-50/70 p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between">
+          <div class="flex items-center justify-between text-slate-500">
+            <span class="text-xs font-semibold text-slate-600">${isId ? "Materi Kurikulum" : "Curriculum Modules"}</span>
+            <div class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center justify-center">
+              <span class="material-symbols-outlined text-[18px]">library_books</span>
             </div>
-            <div class="text-xs font-mono text-outline mt-0.5">${percentModules}% ${isId ? "Materi Selesai" : "Completed"}</div>
           </div>
-          <div class="w-full bg-surface-container-high h-1.5 rounded-full overflow-hidden">
-            <div class="bg-primary h-full rounded-full transition-all duration-300" style="width: ${percentModules}%;"></div>
+          <div class="my-3">
+            <div class="text-2xl font-bold text-slate-900 tracking-tight">
+              ${readCount} <span class="text-slate-500 font-normal text-xs">/ ${totalModules} ${isId ? "Modul Selesai" : "Modules"}</span>
+            </div>
+            <div class="text-xs text-slate-500 mt-0.5">${percentModules}% ${isId ? "dari seluruh kurikulum" : "completed"}</div>
+          </div>
+          <div class="grid grid-cols-6 gap-1.5 pt-1">
+            ${[1, 2, 3, 4, 5, 6].map(i => {
+              const isDone = readList.includes(i);
+              const isCurrent = i === activeMod.id && !isDone;
+              return `<div class="h-1.5 rounded-full transition-all ${isDone ? 'bg-indigo-600' : (isCurrent ? 'bg-indigo-300 animate-pulse' : 'bg-slate-100')}" title="Modul 0${i}"></div>`;
+            }).join("")}
           </div>
         </div>
 
-        <!-- Metric 2: Benchmark Delta -->
-        <div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant shadow-xs flex flex-col justify-between">
-          <div class="flex items-center justify-between text-on-surface-variant">
-            <span class="text-xs font-mono uppercase tracking-wider text-outline font-semibold">${isId ? "Nilai Evaluasi" : "Assessment Score"}</span>
-            <span class="material-symbols-outlined text-[20px] text-secondary">trending_up</span>
-          </div>
-          <div class="my-2.5">
-            <div class="text-2xl font-bold text-on-surface tracking-tight">
-              ${postResult ? postPercent : "0"} <span class="text-outline font-normal text-sm">/ 100</span>
-              ${postResult && preResult ? `<span class="text-xs font-mono text-secondary ml-1.5 font-bold">${gainDeltaLabel}</span>` : ""}
-            </div>
-            <div class="text-xs font-mono text-outline mt-0.5">
-              ${postResult ? (isId ? "Hasil HOTS Posttest" : "HOTS Posttest Score") : (isId ? "Belum Ujian Posttest" : "No Posttest Yet")}
+        <!-- Metric 2: Assessment Score -->
+        <div class="taste-card bg-gradient-to-b from-white to-slate-50/70 p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between">
+          <div class="flex items-center justify-between text-slate-500">
+            <span class="text-xs font-semibold text-slate-600">${isId ? "Nilai Evaluasi" : "Assessment Score"}</span>
+            <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center">
+              <span class="material-symbols-outlined text-[18px]">psychology</span>
             </div>
           </div>
-          <div class="w-full bg-surface-container-high h-1.5 rounded-full overflow-hidden">
-            <div class="bg-secondary h-full rounded-full transition-all duration-300" style="width: ${postPercent}%;"></div>
+          <div class="my-3">
+            <div class="text-2xl font-bold text-slate-900 tracking-tight">
+              ${postResult ? postPercent : (preResult ? prePercent : "0")} <span class="text-slate-500 font-normal text-xs">/ 100 Poin</span>
+              ${postResult && preResult ? `<span class="text-xs text-emerald-600 ml-1.5 font-bold">${gainDeltaLabel}</span>` : ""}
+            </div>
+            <div class="text-xs text-slate-500 mt-0.5">
+              ${postResult ? (isId ? "Hasil Akhir Posttest" : "Posttest Result") : (preResult ? (isId ? "Nilai Awal Pretest" : "Pretest Baseline") : (isId ? "Belum Mengerjakan Ujian" : "No Tests Taken"))}
+            </div>
+          </div>
+          <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+            <div class="bg-emerald-600 h-full rounded-full transition-all duration-300" style="width: ${postResult ? postPercent : prePercent}%;"></div>
           </div>
         </div>
 
-        <!-- Metric 3: Lab Terminal Scenarios -->
-        <div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant shadow-xs flex flex-col justify-between">
-          <div class="flex items-center justify-between text-on-surface-variant">
-            <span class="text-xs font-mono uppercase tracking-wider text-outline font-semibold">${isId ? "Lab Simulasi" : "Lab Terminal"}</span>
-            <span class="material-symbols-outlined text-[20px] text-primary">dns</span>
-          </div>
-          <div class="my-2.5">
-            <div class="text-2xl font-bold text-on-surface tracking-tight">
-              ${labCount} <span class="text-outline font-normal text-sm">/ ${totalModules} ${isId ? "Selesai" : "Done"}</span>
+        <!-- Metric 3: Lab Experiments -->
+        <div class="taste-card bg-gradient-to-b from-white to-slate-50/70 p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between">
+          <div class="flex items-center justify-between text-slate-500">
+            <span class="text-xs font-semibold text-slate-600">${isId ? "Praktik Lab Virtual" : "Lab Experiments"}</span>
+            <div class="w-8 h-8 rounded-lg bg-sky-50 text-sky-600 border border-sky-100 flex items-center justify-center">
+              <span class="material-symbols-outlined text-[18px]">science</span>
             </div>
-            <div class="text-xs font-mono text-outline mt-0.5">${labCount > 0 ? (isId ? "Praktikum Selesai" : "Labs Completed") : (isId ? "Belum Ada Lab Diselesaikan" : "No Labs Completed")}</div>
           </div>
-          <div class="w-full bg-surface-container-high h-1.5 rounded-full overflow-hidden">
-            <div class="bg-primary h-full rounded-full transition-all duration-300" style="width: ${labPercent}%;"></div>
+          <div class="my-3">
+            <div class="text-2xl font-bold text-slate-900 tracking-tight">
+              ${labCount} <span class="text-slate-500 font-normal text-xs">/ ${totalModules} ${isId ? "Skenario" : "Labs"}</span>
+            </div>
+            <div class="text-xs text-slate-500 mt-0.5">
+              ${labCount > 0 ? (isId ? "Skenario Telah Dicoba" : "Completed Labs") : (isId ? "Siap Dieksplorasi" : "Ready to Start")}
+            </div>
+          </div>
+          <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+            <div class="bg-sky-500 h-full rounded-full transition-all duration-300" style="width: ${labPercent}%;"></div>
           </div>
         </div>
 
-        <!-- Metric 4: Cadence & Streak -->
-        <div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant shadow-xs flex flex-col justify-between">
-          <div class="flex items-center justify-between text-on-surface-variant">
-            <span class="text-xs font-mono uppercase tracking-wider text-outline font-semibold">${isId ? "Keaktifan" : "Activity"}</span>
-            <span class="material-symbols-outlined text-[20px] text-amber-500">bolt</span>
-          </div>
-          <div class="my-2.5">
-            <div class="text-2xl font-bold text-on-surface tracking-tight">
-              ${readCount > 0 || preResult || postResult ? "1" : "0"} <span class="text-outline font-normal text-sm">${isId ? "Hari Aktif" : "Days Active"}</span>
+        <!-- Metric 4: Experience Points -->
+        <div class="taste-card bg-gradient-to-b from-white to-slate-50/70 p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between">
+          <div class="flex items-center justify-between text-slate-500">
+            <span class="text-xs font-semibold text-slate-600">${isId ? "Pencapaian XP" : "Experience Points"}</span>
+            <div class="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 border border-amber-100 flex items-center justify-center">
+              <span class="material-symbols-outlined text-[18px]">bolt</span>
             </div>
-            <div class="text-xs font-mono text-outline mt-0.5">${isId ? "Sesi Belajar Anda" : "Active session"}</div>
           </div>
-          <div class="flex items-center gap-1">
-            <div class="w-2.5 h-2.5 rounded-xs ${readCount > 0 || preResult ? 'bg-primary' : 'bg-surface-container-high'}"></div>
-            <div class="w-2.5 h-2.5 rounded-xs bg-surface-container-high"></div>
-            <div class="w-2.5 h-2.5 rounded-xs bg-surface-container-high"></div>
-            <div class="w-2.5 h-2.5 rounded-xs bg-surface-container-high"></div>
-            <div class="w-2.5 h-2.5 rounded-xs bg-surface-container-high"></div>
-            <div class="w-2.5 h-2.5 rounded-xs bg-surface-container-high"></div>
-            <div class="w-2.5 h-2.5 rounded-xs bg-surface-container-high"></div>
+          <div class="my-3">
+            <div class="text-2xl font-bold text-amber-600 tracking-tight">
+              ${state.userStats?.xp || 0} <span class="text-slate-500 font-normal text-xs">XP</span>
+            </div>
+            <div class="text-xs text-slate-500 mt-0.5">${isId ? "Poin aktif dari materi & kuis" : "Earned from tests and labs"}</div>
+          </div>
+          <div class="flex items-center gap-1.5">
+            ${[1, 2, 3, 4, 5, 6, 7].map(d => {
+              const active = d <= (readCount + 1);
+              return `<div class="flex-1 h-1.5 rounded-full ${active ? 'bg-amber-400' : 'bg-slate-100'}" title="Aktivitas ${d}"></div>`;
+            }).join("")}
           </div>
         </div>
-      </div>
+      </section>
 
-      <!-- Main 70/30 Grid (Stitch Architecture) -->
+      <!-- MAIN 2-COLUMN SECTION (8 Cols Content / 4 Cols Diagnostics) -->
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         
-        <!-- Left 70% Column (approx 8 cols) -->
+        <!-- LEFT 8 COLS: ACTIVE FOCUS MODULE & ROADMAP -->
         <div class="lg:col-span-8 space-y-6">
           
-          <!-- In-Progress Module Workbench Card (Focus on current active module) -->
-          <div class="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-xs overflow-hidden">
-            <div class="p-4 bg-surface-container-low border-b border-outline-variant flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div class="flex items-center gap-2">
-                <span class="px-2 py-0.5 bg-primary text-on-primary font-mono text-xs rounded font-bold">MODUL 0${activeMod.id}</span>
-                <span class="font-mono text-xs text-on-surface-variant truncate">${activeTitle}</span>
+          <!-- SPOTLIGHT: ACTIVE FOCUS MODULE -->
+          <div class="taste-card bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+            <!-- Header Bar -->
+            <div class="px-5 py-3.5 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div class="flex items-center gap-2.5">
+                <span class="px-2.5 py-1 bg-indigo-600 text-white font-mono text-xs rounded-md font-bold">TARGET: MODUL 0${activeMod.id}</span>
+                <span class="text-xs text-slate-500 font-medium truncate">${activeMod.category || "Jaringan Komputer"}</span>
               </div>
-              <span class="font-mono text-xs text-secondary font-semibold">CS302 #${activeMod.slug || 'lab'}</span>
+              <span class="text-xs text-indigo-700 font-semibold flex items-center gap-1 font-mono">
+                <span class="material-symbols-outlined text-[15px]">schedule</span>
+                ${activeMod.readTime || "10 min"} • Video ${activeMod.video?.duration || "12:00"}
+              </span>
             </div>
 
-            <div class="p-5 space-y-4">
-              <div>
-                <div class="flex items-center justify-between">
-                  <h2 class="text-lg font-bold text-on-surface">${activeTitle}</h2>
-                  <span class="text-xs font-mono font-bold ${isActiveModDone ? 'text-secondary bg-secondary-container/50' : 'text-primary bg-primary-fixed'} px-2 py-0.5 rounded">
-                    ${activeModPercent}% ${isActiveModDone ? (isId ? "SELESAI" : "COMPLETED") : (isId ? "SIAP DIPELAJARI" : "IN PROGRESS")}
-                  </span>
-                </div>
-                <p class="text-xs text-on-surface-variant mt-1.5 leading-relaxed">
-                  ${isId ? `Fokus Aktif: <strong class="text-on-surface font-semibold">${activeTitle}</strong>. ${activeSummary || "Pelajari materi jaringan, tonton rekaman video teori, dan ikuti simulasi interaktif."}` : `Active Focus: <strong class="text-on-surface font-semibold">${activeTitle}</strong>. ${activeSummary || "Master foundational networking concepts, video lectures, and hands-on simulation labs."}`}
-                </p>
-              </div>
-
-              <!-- Interactive VT-100 Micro Terminal Preview -->
-              <div class="terminal-window">
-                <div class="terminal-header">
-                  <div class="terminal-dots">
-                    <span class="terminal-dot red"></span>
-                    <span class="terminal-dot yellow"></span>
-                    <span class="terminal-dot green"></span>
+            <div class="p-5 sm:p-6 space-y-5">
+              <div class="flex flex-col md:flex-row gap-5 items-start">
+                
+                <!-- Left: Content & Competencies -->
+                <div class="space-y-3.5 flex-1 min-w-0">
+                  <div class="flex items-center justify-between gap-2 flex-wrap">
+                    <h2 class="text-lg font-bold font-display text-slate-900">${activeTitle}</h2>
+                    <span class="text-xs font-mono font-bold ${isActiveModDone ? 'text-emerald-700 bg-emerald-50 border border-emerald-200' : 'text-indigo-700 bg-indigo-50 border border-indigo-200'} px-2.5 py-0.5 rounded-full">
+                      ${activeModPercent}% ${isActiveModDone ? (isId ? "TUNTAS" : "COMPLETED") : (isId ? "SEDANG BERJALAN" : "IN PROGRESS")}
+                    </span>
                   </div>
-                  <span class="font-mono">netlearn-edge01# ip route show vrf student-sandbox</span>
-                  <span class="text-[10px] font-mono text-gray-400">VT-100</span>
+
+                  <p class="text-sm text-slate-600 leading-relaxed">
+                    ${activeSummary || "Pelajari fundamental jaringan, analisis diagram topologi, dan ikuti simulasi interaktif."}
+                  </p>
+
+                  <!-- Competency Checklist / Learning Targets -->
+                  <div class="p-3.5 bg-slate-50 rounded-xl border border-slate-200/80 space-y-2 text-xs">
+                    <div class="text-[11px] font-bold text-indigo-700 uppercase tracking-wider">Capaian Pembelajaran Modul 0${activeMod.id}:</div>
+                    <div class="flex items-center gap-2 text-slate-700">
+                      <span class="material-symbols-outlined text-[18px] ${isActiveModDone ? 'text-emerald-600' : 'text-slate-400'}">check_circle</span>
+                      <span>Membaca konsep teori &amp; pemahaman arsitektur protokol</span>
+                    </div>
+                    <div class="flex items-center gap-2 text-slate-700">
+                      <span class="material-symbols-outlined text-[18px] ${labList.includes(activeMod.id) ? 'text-emerald-600' : 'text-slate-400'}">check_circle</span>
+                      <span>Menyimak video edukasi &amp; analisis studi kasus nyata</span>
+                    </div>
+                    <div class="flex items-center gap-2 text-slate-700">
+                      <span class="material-symbols-outlined text-[18px] ${postResult ? 'text-emerald-600' : 'text-slate-400'}">check_circle</span>
+                      <span>Eksperimen simulator &amp; evaluasi soal analitis HOTS</span>
+                    </div>
+                  </div>
                 </div>
-                <div class="terminal-body font-mono text-xs">
-                  <span class="text-gray-400">10.14.0.0/16 is variably subnetted, 4 subnets, 2 masks</span><br>
-                  <span class="text-sky-300">C    10.14.32.0/27 is directly connected, GigabitEthernet0/0/0</span><br>
-                  <span class="text-sky-300">L    10.14.32.1/32 is directly connected, GigabitEthernet0/0/0</span><br>
-                  <span class="text-emerald-400">O    10.14.64.0/28 [110/2] via 192.168.10.2, 00:04:12, GigabitEthernet0/0/1</span><br>
-                  <div class="mt-2 text-white flex items-center gap-1">
-                    <span class="terminal-prompt">netlearn-edge01#</span>
-                    <span class="text-gray-200">show ip ospf neighbor</span>
-                    <span class="terminal-cursor"></span>
+
+                <!-- Right: Schematic & Hardware Photo Preview Frame -->
+                <div class="w-full md:w-64 bg-slate-50 rounded-xl border border-slate-200 p-3 flex flex-col items-center justify-center shrink-0">
+                  <div class="taste-photo-frame w-full h-36 rounded-lg bg-white border border-slate-200/80 p-2 flex items-center justify-center cursor-pointer shadow-xs relative overflow-hidden group">
+                    <img src="${activeSvg}" alt="${activeTitle}" class="max-h-32 w-full object-contain filter drop-shadow-sm relative z-10" />
+                    <img src="${activePhoto}" alt="" class="absolute inset-0 w-full h-full object-cover opacity-10 filter blur-[1px] group-hover:scale-105 transition-transform" />
+                  </div>
+                  <div class="w-full flex items-center justify-between text-[11px] font-mono text-slate-500 mt-2 px-1">
+                    <span>SKEMA TOPOLOGI</span>
+                    <span class="text-indigo-600 font-bold">MODUL 0${activeMod.id}</span>
                   </div>
                 </div>
               </div>
 
               <!-- Action Buttons -->
-              <div class="flex flex-wrap items-center gap-2 pt-1">
-                <button class="h-9 px-4 bg-primary hover:bg-primary-container text-on-primary text-xs font-medium rounded-lg flex items-center gap-2 transition-colors cursor-pointer" id="btn-resume-lab">
-                  <span class="material-symbols-outlined text-[16px]">${isActiveModDone ? "refresh" : "play_circle"}</span>
-                  <span>${isActiveModDone ? (isId ? "Buka Modul Ini" : "Open Module") : (readCount === 0 ? (isId ? "Mulai Belajar Modul 1" : "Start Module 1") : (isId ? "Lanjutkan Modul" : "Resume Module"))}</span>
-                  <span class="px-1 py-0.2 bg-white/20 rounded font-mono text-[10px]">↵ Enter</span>
+              <div class="flex flex-wrap items-center gap-2.5 pt-3 border-t border-slate-100">
+                <button class="taste-btn h-9 px-4 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg flex items-center gap-2 cursor-pointer shadow-xs" id="btn-resume-lab">
+                  <span class="material-symbols-outlined text-[17px]">${isActiveModDone ? "refresh" : "play_circle"}</span>
+                  <span>${isActiveModDone ? (isId ? "Tinjau Modul Ini" : "Review Module") : (readCount === 0 ? (isId ? "Mulai Belajar Modul 1" : "Start Module 1") : (isId ? "Lanjutkan Modul" : "Resume Module"))}</span>
                 </button>
-                <button class="h-9 px-3 bg-surface-container-low hover:bg-surface-container text-on-surface text-xs font-mono rounded-lg border border-outline-variant flex items-center gap-1.5 transition-colors cursor-pointer" id="btn-read-rfc">
-                  <span class="material-symbols-outlined text-[16px] text-outline">description</span>
-                  <span>${isId ? "Buku Manual Lab" : "Manual Book"}</span>
+                <button class="taste-btn h-9 px-3.5 bg-white hover:bg-slate-50 text-slate-800 text-xs font-medium rounded-lg border border-slate-200 flex items-center gap-1.5 cursor-pointer shadow-xs" id="btn-hero-lab-secondary">
+                  <span class="material-symbols-outlined text-[16px] text-indigo-600">science</span>
+                  <span>${isId ? "Buka Simulator Lab" : "Open Simulator"}</span>
                 </button>
-                <button class="h-9 px-3 text-on-surface-variant hover:text-on-surface text-xs font-mono rounded-lg flex items-center gap-1 transition-colors ml-auto cursor-pointer" id="btn-view-all-modules">
-                  <span>${isId ? "Lihat Semua Modul" : "View All Modules"}</span>
+                <button class="taste-btn h-9 px-3 text-slate-500 hover:text-slate-900 text-xs font-medium rounded-lg flex items-center gap-1 transition-colors ml-auto cursor-pointer" id="btn-view-all-modules">
+                  <span>${isId ? "Lihat Semua Modul" : "View All"}</span>
                   <span class="material-symbols-outlined text-[16px]">chevron_right</span>
                 </button>
               </div>
             </div>
           </div>
 
-          <!-- Curriculum Modules Matrix (Dynamically Rendered from MATERIALS) -->
-          <div class="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-xs overflow-hidden">
-            <div class="p-4 flex items-center justify-between bg-surface-container-low border-b border-outline-variant">
+          <!-- CURRICULUM ROADMAP MATRIX (ALL 6 MODULES) -->
+          <div class="taste-card bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+            <div class="px-5 py-4 flex items-center justify-between bg-slate-50 border-b border-slate-200">
               <div>
-                <h3 class="text-sm font-bold text-on-surface font-mono">${isId ? "Matriks Modul Kurikulum" : "Curriculum Modules Matrix"}</h3>
-                <p class="text-[11px] font-mono text-outline">${isId ? "SEMESTER GENAP 2025 • STANDAR AKADEMIK TKJ" : "SPRING 2025 TERM • ACCREDITED TRACK"}</p>
+                <h3 class="text-sm font-bold font-display text-slate-900">${isId ? "Peta Kurikulum Modul Jaringan TKJ" : "Curriculum Modules Matrix"}</h3>
+                <p class="text-xs text-slate-500 mt-0.5">${isId ? "6 Modul Berstandar Kurikulum Merdeka &amp; SKKNI" : "Accredited Vocational Track"}</p>
               </div>
-              <span class="text-xs font-mono text-on-surface-variant font-medium">${readCount}/${totalModules} ${isId ? "Tuntas" : "Completed"}</span>
+              <span class="text-xs font-mono text-indigo-700 font-semibold bg-indigo-50 px-2.5 py-1 rounded-full border border-indigo-200">
+                ${readCount}/${totalModules} ${isId ? "Tuntas" : "Completed"}
+              </span>
             </div>
 
-            <div class="divide-y divide-outline-variant text-xs">
+            <div class="divide-y divide-slate-100">
               ${MATERIALS.map(m => {
-                const isModDone = state.userStats?.readMaterials?.includes(m.id);
+                const isModDone = readList.includes(m.id);
                 const isModActive = m.id === activeMod.id && !isModDone;
-                const isVideoDone = state.userStats?.watchedVideos?.includes(m.id);
                 const mTitle = getModTitle(m);
+                const tags = modTagsMap[m.id] || ["Jaringan Komputer", "Protokol"];
 
                 return `
-                  <div class="p-4 flex items-center justify-between ${isModActive ? 'bg-surface-container-low/60' : 'hover:bg-surface-container-low/50'} transition-colors">
-                    <div class="flex items-center gap-3 min-w-0">
-                      <div class="w-8 h-8 rounded-lg ${isModDone ? 'bg-secondary-container text-on-secondary-container' : (isModActive ? 'bg-primary text-on-primary' : 'bg-surface-container-high text-outline')} flex items-center justify-center shrink-0 font-mono text-xs font-bold">
-                        ${isModDone ? '<span class="material-symbols-outlined text-[18px]">check_circle</span>' : `0${m.id}`}
+                  <div class="taste-card p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${isModActive ? 'bg-indigo-50/40' : 'hover:bg-slate-50/70'} transition-colors">
+                    <div class="flex items-start sm:items-center gap-3.5 min-w-0">
+                      <!-- Module Authentic Thumbnail Image & Number Badge -->
+                      <div class="relative w-12 h-12 rounded-xl overflow-hidden border border-slate-200/90 shrink-0 shadow-2xs group-hover:scale-105 transition-transform bg-slate-100 flex items-center justify-center">
+                        <img src="${modPhotoMap[m.id] || 'assets/images/network_switch.jpg'}" alt="Modul 0${m.id}" class="w-full h-full object-cover ${m.id === 3 || m.id === 4 || m.id === 6 ? 'p-1.5 object-contain' : ''}" />
+                        <div class="absolute bottom-0 inset-x-0 bg-slate-900/70 backdrop-blur-xs text-[9px] font-mono text-center text-white font-bold leading-tight py-0.5">0${m.id}</div>
                       </div>
+
                       <div class="min-w-0">
-                        <div class="flex items-center gap-2">
-                          <span class="font-mono text-[11px] ${isModActive ? 'text-secondary font-bold' : 'text-outline'}">MOD-0${m.id}</span>
-                          <span class="${isModActive ? 'font-bold' : 'font-semibold'} text-on-surface truncate">${mTitle}</span>
-                          ${isModActive ? `<span class="px-1.5 py-0.2 bg-primary/10 text-primary font-mono text-[9px] rounded font-bold uppercase">${isId ? "Fokus" : "Active"}</span>` : ""}
+                        <div class="flex items-center gap-2 flex-wrap">
+                          <span class="font-mono text-xs ${isModActive ? 'text-indigo-600 font-bold' : 'text-slate-500'}">MOD-0${m.id}</span>
+                          <span class="${isModActive ? 'font-bold text-slate-900' : 'font-semibold text-slate-800'} text-sm truncate">${mTitle}</span>
+                          ${isModActive ? `<span class="px-2 py-0.5 bg-indigo-100 text-indigo-700 border border-indigo-200 font-mono text-[10px] rounded-full font-bold uppercase">Fokus Aktif</span>` : ""}
+                          ${isModDone ? `<span class="px-2 py-0.5 bg-emerald-100 text-emerald-700 border border-emerald-200 font-mono text-[10px] rounded-full font-bold uppercase">Selesai</span>` : ""}
                         </div>
-                        <div class="font-mono text-[11px] text-outline">
-                          ${isModDone 
-                            ? (isId ? "✓ Modul Tuntas Dipelajari" : "✓ Module Completed") 
-                            : (isVideoDone ? (isId ? "Video ditonton • Belum membaca materi" : "Video watched • Reading pending") : (isId ? "Modul Pembelajaran Mandiri" : "Self-paced Learning Module"))}
+
+                        <!-- Topic Badges -->
+                        <div class="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                          ${tags.map(tag => `
+                            <span class="px-2 py-0.5 bg-slate-100 text-slate-600 border border-slate-200/80 rounded text-[11px] font-mono">${tag}</span>
+                          `).join("")}
                         </div>
                       </div>
                     </div>
-                    <div class="flex items-center gap-3 shrink-0">
-                      <span class="hidden sm:inline font-mono text-[11px] ${isModDone ? 'text-secondary font-bold' : 'text-outline'}">
-                        ${isModDone ? (isId ? "Selesai" : "Completed") : (isModActive ? (isId ? "Sedang Berjalan" : "In Progress") : (isId ? "Tersedia" : "Available"))}
-                      </span>
-                      <button class="h-7 px-2.5 ${isModActive ? 'bg-primary text-on-primary' : 'bg-surface-container-low text-on-surface'} font-mono text-xs rounded border border-outline-variant hover:bg-surface-container transition-colors cursor-pointer mod-review-btn" data-mod="${m.id}">
-                        ${isModDone ? (isId ? "Tinjau" : "Review") : (isModActive ? (isId ? "Lanjutkan" : "Resume") : (isId ? "Buka" : "Open"))}
+
+                    <!-- Right Status & Action Button -->
+                    <div class="flex items-center gap-3 shrink-0 self-end sm:self-center">
+                      <button class="taste-btn h-8 px-3.5 ${isModActive ? 'bg-indigo-600 text-white font-semibold shadow-xs' : (isModDone ? 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50' : 'bg-white text-slate-600 border border-slate-200 hover:text-slate-900 hover:bg-slate-50')} text-xs rounded-lg cursor-pointer mod-review-btn flex items-center gap-1.5 transition-all" data-mod="${m.id}">
+                        <span class="material-symbols-outlined text-[15px]">${isModDone ? "refresh" : "arrow_forward"}</span>
+                        <span>${isModDone ? (isId ? "Tinjau" : "Review") : (isModActive ? (isId ? "Lanjutkan" : "Resume") : (isId ? "Pelajari" : "Open"))}</span>
                       </button>
                     </div>
                   </div>
@@ -1262,102 +1471,129 @@ function renderDashboard(container) {
           </div>
         </div>
 
-        <!-- Right 30% Column (approx 4 cols) -->
+        <!-- RIGHT 4 COLS: ASSESSMENT & LAB LAUNCHERS -->
         <div class="lg:col-span-4 space-y-6">
           
-          <!-- Benchmark & Normalized Gain Diagnostics Card (Derived Dynamically) -->
-          <div class="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant shadow-xs space-y-4">
-            <div class="flex items-center justify-between">
-              <h3 class="text-xs font-mono uppercase tracking-wider text-outline font-bold">${isId ? "Diagnostik Psikometrik" : "Psychometric Diagnostics"}</h3>
-              <span class="px-2 py-0.5 rounded font-mono text-[10px] ${hakeGainLabel !== '-' ? 'bg-secondary-fixed text-on-secondary-fixed font-bold' : 'bg-surface-container-high text-outline'}">
-                Hake g = ${hakeGainLabel}
+          <!-- HOTS EVALUATION DIAGNOSTIC CARD -->
+          <div class="taste-card bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4">
+            <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+              <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-[18px] text-indigo-600">psychology</span>
+                <h3 class="text-xs font-mono uppercase tracking-wider text-slate-900 font-bold">${isId ? "Evaluasi Pemahaman HOTS" : "Bloom HOTS Mastery"}</h3>
+              </div>
+              <span class="px-2 py-0.5 rounded-full font-mono text-[10px] ${hakeGainLabel !== '-' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200 font-bold' : 'bg-slate-50 text-slate-500 border border-slate-200'}">
+                Gain: g = ${hakeGainLabel}
               </span>
             </div>
 
-            <div class="p-3 bg-surface-container-low rounded-lg border border-outline-variant space-y-2">
-              <div class="flex items-center justify-between text-xs font-mono">
-                <span class="text-on-surface-variant font-medium">${isId ? "Garis Dasar Pretest" : "Diagnostic Baseline"}</span>
-                <span class="${preResult ? 'text-primary font-bold' : 'text-outline'}">${preResult ? `${prePercent}%` : (isId ? "Belum Ujian (0%)" : "Not Taken (0%)")}</span>
+            <!-- Pretest vs Posttest Compare Box -->
+            <div class="p-3.5 bg-slate-50 rounded-xl border border-slate-200/80 space-y-2.5">
+              <div>
+                <div class="flex items-center justify-between text-xs mb-1">
+                  <span class="text-slate-600 font-medium">${isId ? "Baseline Pretest:" : "Pretest Baseline:"}</span>
+                  <span class="${preResult ? 'text-amber-700 font-bold' : 'text-slate-400'}">${preResult ? `${prePercent}% (${preScoreVal}/${preTotalVal})` : (isId ? "Belum Ujian" : "Pending")}</span>
+                </div>
+                <div class="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                  <div class="bg-amber-500 h-full rounded-full transition-all duration-300" style="width: ${prePercent}%;"></div>
+                </div>
               </div>
-              <div class="w-full bg-surface-container-high h-2 rounded-full overflow-hidden">
-                <div class="bg-primary h-full rounded-full transition-all duration-300" style="width: ${prePercent}%;"></div>
-              </div>
-              <div class="flex items-center justify-between text-xs font-mono pt-1">
-                <span class="text-on-surface-variant font-medium">${isId ? "Nilai Akhir Posttest" : "HOTS Posttest Score"}</span>
-                <span class="${postResult ? 'text-secondary font-bold' : 'text-outline'}">${postResult ? `${postPercent}%` : (isId ? "Belum Ujian (0%)" : "Not Taken (0%)")}</span>
-              </div>
-              <div class="w-full bg-surface-container-high h-2 rounded-full overflow-hidden">
-                <div class="bg-secondary h-full rounded-full transition-all duration-300" style="width: ${postPercent}%;"></div>
+
+              <div>
+                <div class="flex items-center justify-between text-xs mb-1">
+                  <span class="text-slate-600 font-medium">${isId ? "Nilai Akhir Posttest:" : "Final Posttest:"}</span>
+                  <span class="${postResult ? 'text-indigo-600 font-bold' : 'text-slate-400'}">${postResult ? `${postPercent}% (${postScoreVal}/${postTotalVal})` : (isId ? "Belum Ujian" : "Pending")}</span>
+                </div>
+                <div class="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                  <div class="bg-indigo-600 h-full rounded-full transition-all duration-300" style="width: ${postPercent}%;"></div>
+                </div>
               </div>
             </div>
 
-            <!-- Cognitive Levels Distribution -->
-            <div class="space-y-2 pt-1 text-xs">
-              <span class="block text-[11px] font-mono text-outline uppercase font-semibold">${isId ? "Distribusi Kemampuan Kognitif (HOTS)" : "Cognitive Skill Breakdown (Bloom HOTS)"}</span>
+            <!-- Cognitive Levels Breakdown (C4, C5, C6) -->
+            <div class="space-y-3 pt-1 text-xs">
+              <span class="block text-[11px] font-mono text-slate-500 uppercase font-bold tracking-wider">${isId ? "Distribusi Kemampuan Kognitif:" : "Cognitive Mastery Breakdown:"}</span>
               
-              <div class="flex items-center justify-between text-xs font-mono">
-                <span class="text-on-surface">C4 Analisis (Subnetting)</span>
-                <span class="${c4Score > 0 ? 'font-bold text-secondary' : 'text-outline font-mono'}">${c4Score}%</span>
-              </div>
-              <div class="w-full bg-surface-container-high h-1.5 rounded-full overflow-hidden">
-                <div class="bg-secondary h-full rounded-full transition-all duration-300" style="width: ${c4Score}%;"></div>
-              </div>
-
-              <div class="flex items-center justify-between text-xs font-mono pt-1">
-                <span class="text-on-surface">C5 Sintesis (Routing OSPF)</span>
-                <span class="${c5Score > 0 ? 'font-bold text-primary' : 'text-outline font-mono'}">${c5Score}%</span>
-              </div>
-              <div class="w-full bg-surface-container-high h-1.5 rounded-full overflow-hidden">
-                <div class="bg-primary h-full rounded-full transition-all duration-300" style="width: ${c5Score}%;"></div>
+              <!-- C4 -->
+              <div>
+                <div class="flex items-center justify-between text-xs mb-1">
+                  <span class="text-slate-700">C4 - Analisis (Subnetting &amp; L2/L3)</span>
+                  <span class="${c4Score > 0 ? 'font-bold text-indigo-600' : 'text-slate-400'}">${c4Score}%</span>
+                </div>
+                <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                  <div class="bg-indigo-600 h-full rounded-full transition-all duration-300" style="width: ${c4Score}%;"></div>
+                </div>
               </div>
 
-              <div class="flex items-center justify-between text-xs font-mono pt-1">
-                <span class="text-on-surface">C6 Evaluasi (Troubleshooting)</span>
-                <span class="${c6Score > 0 ? 'font-bold text-tertiary' : 'text-outline font-mono'}">${c6Score}%</span>
+              <!-- C5 -->
+              <div>
+                <div class="flex items-center justify-between text-xs mb-1">
+                  <span class="text-slate-700">C5 - Sintesis (Routing Hop &amp; Gateway)</span>
+                  <span class="${c5Score > 0 ? 'font-bold text-emerald-600' : 'text-slate-400'}">${c5Score}%</span>
+                </div>
+                <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                  <div class="bg-emerald-600 h-full rounded-full transition-all duration-300" style="width: ${c5Score}%;"></div>
+                </div>
               </div>
-              <div class="w-full bg-surface-container-high h-1.5 rounded-full overflow-hidden">
-                <div class="bg-tertiary h-full rounded-full transition-all duration-300" style="width: ${c6Score}%;"></div>
+
+              <!-- C6 -->
+              <div>
+                <div class="flex items-center justify-between text-xs mb-1">
+                  <span class="text-slate-700">C6 - Evaluasi (Troubleshooting Jaringan)</span>
+                  <span class="${c6Score > 0 ? 'font-bold text-sky-600' : 'text-slate-400'}">${c6Score}%</span>
+                </div>
+                <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                  <div class="bg-sky-500 h-full rounded-full transition-all duration-300" style="width: ${c6Score}%;"></div>
+                </div>
               </div>
             </div>
 
-            <button class="w-full py-2 bg-surface-container-low hover:bg-surface-container text-primary font-mono text-xs font-bold rounded-lg border border-outline-variant transition-colors flex items-center justify-center gap-1.5 cursor-pointer" id="btn-view-diagnostic-report">
-              <span>${isId ? "Lihat Evaluasi Soal HOTS" : "View Evaluative HOTS Exam"}</span>
-              <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+            <button class="taste-btn w-full py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold text-xs rounded-xl border border-indigo-200 cursor-pointer flex items-center justify-center gap-2 mt-2 transition-colors" id="btn-view-diagnostic-report">
+              <span class="material-symbols-outlined text-[17px]">quiz</span>
+              <span>${isId ? "Buka Lembar Evaluasi HOTS" : "View Evaluative HOTS Exam"}</span>
             </button>
           </div>
 
-          <!-- Quick Virtual Lab Utilities Card -->
-          <div class="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant shadow-xs space-y-3">
-            <h3 class="text-xs font-mono uppercase tracking-wider text-outline font-bold">${isId ? "Peralatan Laboratorium Virtual" : "Interactive Lab Tools"}</h3>
+          <!-- VIRTUAL LAB LAUNCHERS -->
+          <div class="taste-card bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-3.5">
+            <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+              <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-[18px] text-indigo-600">science</span>
+                <h3 class="text-xs font-mono uppercase tracking-wider text-slate-900 font-bold">${isId ? "Alat Praktik Virtual Lab" : "Interactive Tools"}</h3>
+              </div>
+              <span class="text-[10px] font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 font-bold">READY</span>
+            </div>
             
-            <div class="grid grid-cols-1 gap-2">
-              <button class="p-3 bg-surface-container-low hover:bg-surface-container rounded-lg border border-outline-variant flex items-center gap-3 transition-colors text-left cursor-pointer" id="btn-tool-subnet">
-                <div class="w-9 h-9 rounded-lg bg-primary-fixed text-primary flex items-center justify-center shrink-0">
-                  <span class="material-symbols-outlined text-[20px]">calculate</span>
+            <div class="grid grid-cols-1 gap-2.5">
+              <!-- Tool 1: Interactive Lab -->
+              <button class="taste-card taste-btn p-3 bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-200/80 flex items-center gap-3 transition-colors text-left cursor-pointer group" id="btn-tool-topology">
+                <div class="w-11 h-11 rounded-lg overflow-hidden border border-slate-200 shrink-0 shadow-2xs">
+                  <img src="assets/images/network_switch.jpg" alt="Lab Switch" class="w-full h-full object-cover group-hover:scale-105 transition-transform" />
                 </div>
                 <div class="min-w-0">
-                  <span class="block text-xs font-bold text-on-surface">${isId ? "Kalkulator Subnetting VLSM" : "VLSM Subnet Calculator"}</span>
-                  <span class="block text-[11px] text-on-surface-variant font-mono">${isId ? "Alokasi prefix CIDR & rincian bit" : "CIDR prefix allocation & binary bits"}</span>
+                  <span class="block text-xs font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">${isId ? "Lab Interkoneksi (Packet Routing)" : "Packet Routing Lab"}</span>
+                  <span class="block text-[11px] text-slate-500 mt-0.5">${isId ? "Simulasi interaktif kabel, switch L2, dan router" : "Interactive topology &amp; packet trace"}</span>
                 </div>
               </button>
 
-              <button class="p-3 bg-surface-container-low hover:bg-surface-container rounded-lg border border-outline-variant flex items-center gap-3 transition-colors text-left cursor-pointer" id="btn-tool-topology">
-                <div class="w-9 h-9 rounded-lg bg-secondary-fixed text-on-secondary-fixed flex items-center justify-center shrink-0">
-                  <span class="material-symbols-outlined text-[20px]">hub</span>
+              <!-- Tool 2: VLSM Subnet Calculator -->
+              <button class="taste-card taste-btn p-3 bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-200/80 flex items-center gap-3 transition-colors text-left cursor-pointer group" id="btn-tool-subnet">
+                <div class="w-11 h-11 rounded-lg overflow-hidden border border-slate-200 shrink-0 shadow-2xs">
+                  <img src="assets/images/fiber_optics.jpg" alt="VLSM Media" class="w-full h-full object-cover group-hover:scale-105 transition-transform" />
                 </div>
                 <div class="min-w-0">
-                  <span class="block text-xs font-bold text-on-surface">${isId ? "Simulator Topologi 3D" : "3D Topology Simulator"}</span>
-                  <span class="block text-[11px] text-on-surface-variant font-mono">${isId ? "Simulasi jejak ping Three.js" : "Packet ping trace in Three.js"}</span>
+                  <span class="block text-xs font-bold text-slate-900 group-hover:text-emerald-600 transition-colors">${isId ? "Kalkulator Subnetting VLSM" : "VLSM Subnet Calculator"}</span>
+                  <span class="block text-[11px] text-slate-500 mt-0.5">${isId ? "Alokasi prefix CIDR, broadcast IP &amp; subnet mask" : "CIDR prefix allocation &amp; binary bits"}</span>
                 </div>
               </button>
 
-              <button class="p-3 bg-surface-container-low hover:bg-surface-container rounded-lg border border-outline-variant flex items-center gap-3 transition-colors text-left cursor-pointer" id="btn-tool-pretest">
-                <div class="w-9 h-9 rounded-lg bg-surface-container-high text-on-surface flex items-center justify-center shrink-0">
+              <!-- Tool 3: Pretest Diagnostics -->
+              <button class="taste-card taste-btn p-3 bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-200/80 flex items-center gap-3 transition-colors text-left cursor-pointer group" id="btn-tool-pretest">
+                <div class="w-10 h-10 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 border border-amber-100 group-hover:bg-amber-100 transition-colors">
                   <span class="material-symbols-outlined text-[20px]">quiz</span>
                 </div>
                 <div class="min-w-0">
-                  <span class="block text-xs font-bold text-on-surface">${isId ? "Pretest Diagnostik" : "Diagnostic Pretest"}</span>
-                  <span class="block text-[11px] text-on-surface-variant font-mono">25 Soal Cerita Kasus HOTS</span>
+                  <span class="block text-xs font-bold text-slate-900 group-hover:text-amber-600 transition-colors">${isId ? "Pretest Diagnostik HOTS" : "Diagnostic Pretest"}</span>
+                  <span class="block text-[11px] text-slate-500 mt-0.5">25 Soal Cerita Analitis Jaringan Komputer</span>
                 </div>
               </button>
             </div>
@@ -1376,6 +1612,7 @@ function renderDashboard(container) {
     }
   });
   document.getElementById("btn-hero-lab")?.addEventListener("click", () => navigateTo("simulation"));
+  document.getElementById("btn-hero-lab-secondary")?.addEventListener("click", () => navigateTo("simulation"));
   document.getElementById("btn-resume-lab")?.addEventListener("click", () => {
     if (activeMod) {
       openMaterialModal(activeMod.id);
@@ -1394,7 +1631,7 @@ function renderDashboard(container) {
   });
   document.getElementById("btn-tool-subnet")?.addEventListener("click", () => navigateTo("simulation"));
   document.getElementById("btn-tool-topology")?.addEventListener("click", () => navigateTo("simulation"));
-  document.getElementById("btn-tool-pretest")?.addEventListener("click", () => navigateTo("pretest"));
+  document.getElementById("btn-tool-pretest")?.addEventListener("click", () => navigateTo("quizzes"));
 
   container.querySelectorAll(".mod-review-btn, .mod-resume-btn").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -1410,6 +1647,15 @@ function renderDashboard(container) {
 function renderMaterials(container) {
   const isId = getLang() === "id";
 
+  const modSvgMap = {
+    1: "assets/images/materials/mod1_network_scopes.svg",
+    2: "assets/images/materials/mod2_topologies.svg",
+    3: "assets/images/materials/mod3_osi_layers.svg",
+    4: "assets/images/materials/mod4_subnetting_structure.svg",
+    5: "assets/images/materials/mod5_hardware_media.svg",
+    6: "assets/images/materials/mod6_dns_dhcp_dora.svg"
+  };
+
   container.innerHTML = `
     <div class="max-w-7xl mx-auto space-y-6 w-full">
       
@@ -1419,11 +1665,11 @@ function renderMaterials(container) {
           <div class="flex items-center gap-1.5 font-mono text-xs text-outline uppercase tracking-wider">
             <span>${isId ? "Portal Akademik" : "Academic Portal"}</span>
             <span class="text-outline-variant">/</span>
-            <span>CS302 Networks</span>
+            <span>NetLearn</span>
             <span class="text-outline-variant">/</span>
             <span class="text-on-surface font-semibold">${isId ? "Materi & Modul" : "Course Materials"}</span>
           </div>
-          <h1 class="text-2xl sm:text-3xl font-extrabold text-on-surface tracking-tight">${t("materialsTitle")}</h1>
+          <h1 class="text-2xl sm:text-3xl font-extrabold font-display text-on-surface tracking-tight">${t("materialsTitle")}</h1>
           <p class="text-xs sm:text-sm text-on-surface-variant">${t("materialsSubtitle")}</p>
         </div>
         <div class="flex items-center gap-2">
@@ -1434,54 +1680,61 @@ function renderMaterials(container) {
         </div>
       </div>
 
-      <!-- Modules Grid -->
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5" id="modules-cards-grid">
+      <!-- Modules Grid with Architectural Previews -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="modules-cards-grid">
         ${MATERIALS.map(m => {
           const isRead = state.userStats.readMaterials.includes(m.id);
           const isWatched = state.userStats.watchedVideos.includes(m.id);
+          const svgPath = modSvgMap[m.id] || modSvgMap[1];
 
           return `
-            <div class="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-xs p-5 flex flex-col justify-between hover:shadow-md hover:border-primary/50 hover:-translate-y-0.5 transition-all duration-200">
-              <div>
-                <div class="flex items-center justify-between mb-3">
-                  <span class="text-2xl">${m.icon}</span>
-                  <div class="flex items-center gap-1.5">
-                    <span class="px-2 py-0.5 rounded-full font-mono text-[10px] ${isRead ? "bg-secondary-container text-on-secondary-container font-bold" : "bg-slate-100 text-slate-600"}">
-                      ${isRead ? (isId ? "Selesai" : "Completed") : (isId ? "Belum Dibaca" : "Not Read")}
+            <div class="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-xs flex flex-col justify-between overflow-hidden hover:shadow-md hover:border-primary/50 transition-all duration-200">
+              <!-- Visual Architectural Schematic Banner -->
+              <div class="bg-[#0b1325] h-36 border-b border-outline-variant p-3 flex items-center justify-center relative overflow-hidden group">
+                <img src="${svgPath}" alt="${isId ? m.title_id : m.title_en}" class="h-full w-full object-contain filter drop-shadow-sm transition-transform duration-300 group-hover:scale-105" />
+                <span class="absolute top-2.5 left-2.5 px-2 py-0.5 rounded font-mono text-[10px] font-bold bg-black/60 text-white backdrop-blur-xs border border-white/10">
+                  MOD-0${m.id}
+                </span>
+                <span class="absolute top-2.5 right-2.5 px-2 py-0.5 rounded font-mono text-[10px] ${isRead ? "bg-emerald-500/90 text-white font-bold" : "bg-slate-800/80 text-gray-300"} backdrop-blur-xs">
+                  ${isRead ? (isId ? "✓ TUNTAS" : "✓ COMPLETED") : (isId ? "TERSEDIA" : "AVAILABLE")}
+                </span>
+              </div>
+
+              <div class="p-5 flex-1 flex flex-col justify-between">
+                <div>
+                  <div class="flex items-center justify-between mb-2">
+                    <span class="text-[10px] font-mono font-semibold uppercase tracking-wider text-primary">
+                      ${m.category}
                     </span>
-                    <span class="px-2 py-0.5 rounded-full font-mono text-[10px] bg-blue-50 text-primary border border-blue-100">
+                    <span class="px-2 py-0.2 rounded font-mono text-[10px] bg-primary/10 text-primary border border-primary/20">
                       ${m.readTime}
                     </span>
                   </div>
+
+                  <h3 class="text-base font-bold font-display text-on-surface leading-snug mb-1.5">
+                    ${isId ? m.title_id : m.title_en}
+                  </h3>
+                  <p class="text-xs text-on-surface-variant leading-relaxed line-clamp-2 mb-4">
+                    ${isId ? m.summary_id : m.summary_en}
+                  </p>
                 </div>
 
-                <div class="text-[10px] font-mono font-semibold uppercase tracking-wider text-primary mb-1">
-                  ${m.category}
-                </div>
+                <div class="pt-4 border-t border-outline-variant space-y-2.5">
+                  <div class="flex items-center justify-between text-xs font-mono text-outline">
+                    <span>${isId ? "Vidio Pembelajaran:" : "Video Lesson:"}</span>
+                    <span class="${isWatched ? "text-secondary font-semibold" : ""}">${isWatched ? (isId ? "✓ Sudah Ditonton" : "✓ Watched") : m.video.duration}</span>
+                  </div>
 
-                <h3 class="text-base font-bold text-on-surface leading-snug mb-1.5">
-                  ${isId ? m.title_id : m.title_en}
-                </h3>
-                <p class="text-xs text-on-surface-variant leading-relaxed line-clamp-3 mb-4">
-                  ${isId ? m.summary_id : m.summary_en}
-                </p>
-              </div>
-
-              <div class="pt-4 border-t border-outline-variant space-y-2">
-                <div class="flex items-center justify-between text-xs font-mono text-outline">
-                  <span>${isId ? "Video Kuliah:" : "Lecture Video:"}</span>
-                  <span class="${isWatched ? "text-secondary font-semibold" : ""}">${isWatched ? (isId ? "Sudah Ditonton" : "Watched") : m.video.duration}</span>
-                </div>
-
-                <div class="grid grid-cols-2 gap-2 pt-1">
-                  <button class="h-8 px-2 bg-primary hover:bg-primary-container text-on-primary font-medium text-xs rounded-lg flex items-center justify-center gap-1.5 transition-colors cursor-pointer open-material-btn shadow-xs" data-id="${m.id}">
-                    <span class="material-symbols-outlined text-[15px]">menu_book</span>
-                    <span>${isId ? "Baca Modul" : "Read"}</span>
-                  </button>
-                  <button class="h-8 px-2 bg-blue-50/70 hover:bg-blue-100 text-primary font-medium text-xs rounded-lg border border-blue-200/80 flex items-center justify-center gap-1.5 transition-colors cursor-pointer open-video-btn" data-id="${m.id}">
-                    <span class="material-symbols-outlined text-[15px]">play_circle</span>
-                    <span>${isId ? "Tonton Video" : "Video"}</span>
-                  </button>
+                  <div class="grid grid-cols-2 gap-2 pt-1">
+                    <button class="h-8 px-2 bg-primary hover:bg-primary-container text-on-primary font-medium text-xs rounded-lg flex items-center justify-center gap-1.5 transition-colors cursor-pointer open-material-btn shadow-xs" data-id="${m.id}">
+                      <span class="material-symbols-outlined text-[15px]">menu_book</span>
+                      <span>${isId ? "Baca Modul" : "Read"}</span>
+                    </button>
+                    <button class="h-8 px-2 bg-surface-container-low hover:bg-surface-container text-on-surface font-medium text-xs rounded-lg border border-outline-variant flex items-center justify-center gap-1.5 transition-colors cursor-pointer open-video-btn" data-id="${m.id}">
+                      <span class="material-symbols-outlined text-[15px] text-primary">play_circle</span>
+                      <span>${isId ? "Tonton Video" : "Video"}</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1506,7 +1759,7 @@ function renderMaterials(container) {
   });
 
   document.getElementById("btn-export-all-materials")?.addEventListener("click", () => {
-    let fullHtml = `<h1>Silabus Lengkap Jaringan Komputer CS302</h1>`;
+    let fullHtml = `<h1>Silabus Lengkap Jaringan Komputer</h1>`;
     MATERIALS.forEach(m => {
       fullHtml += `
         <hr/>
@@ -1515,371 +1768,548 @@ function renderMaterials(container) {
         <div>${isId ? m.content_id : m.content_en}</div>
       `;
     });
-    exportToWord("Silabus_Lengkap_Jaringan_Komputer", "Silabus Lengkap Jaringan Komputer CS302", fullHtml);
+    exportToWord("Silabus_Lengkap_Jaringan_Komputer", "Silabus Lengkap Jaringan Komputer", fullHtml);
     showToast("Mengunduh Semua Modul", "Seluruh modul pembelajaran diekspor ke Word.", "file_download");
   });
 }
 
 // ============================================================================
-// VIEW 4: SIMULATION LAB & SUBNET CALCULATOR (Stitch interactive_network_lab)
+// VIEW 4: SIMULATION LAB & VIRTUAL WORKBENCH (Unified Mini Packet Tracer)
 // ============================================================================
 function renderSimulation(container) {
   const isId = getLang() === "id";
+
+  const MODES = [
+    { 
+      id: "workbench", 
+      label: isId ? "Simulasi Pengiriman Paket Data" : "Packet Transmission Simulator", 
+      icon: "send", 
+      sub: isId ? "Animasi transmisi data paket, header dissector, pengujian ping & perutean" : "Packet transmission animation, header dissector, ping & routing" 
+    },
+    { 
+      id: "topology", 
+      label: isId ? "5 Topologi Jaringan Fisik" : "5 Physical Topologies", 
+      icon: "hub", 
+      sub: isId ? "Topologi Bus, Star, Ring, Mesh, Tree & uji kabel rusak beraset interaktif" : "Bus, Star, Ring, Mesh, Tree & fault simulation with interactive assets" 
+    },
+    { 
+      id: "vlsm", 
+      label: isId ? "Kalkulator Pembagi IP (Subnetting)" : "IP Subnetting Calculator", 
+      icon: "calculate", 
+      sub: isId ? "Bagi alamat IP ruangan & hitung subnet mask" : "Subnet allocation for rooms & CIDR masks" 
+    }
+  ];
+
+  let currentMode = "workbench";
 
   container.innerHTML = `
     <div class="max-w-7xl mx-auto space-y-6 w-full">
       
       <!-- Simulation Lab Header -->
-      <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-2 border-b border-outline-variant">
-        <div>
-          <div class="flex items-center gap-1.5 font-mono text-xs text-outline uppercase tracking-wider">
-            <span>${isId ? "Portal Akademik" : "Academic Portal"}</span>
-            <span class="text-outline-variant">/</span>
-            <span>CS302 Networks</span>
-            <span class="text-outline-variant">/</span>
-            <span class="text-on-surface font-semibold">${isId ? "Lab Simulasi" : "Simulation Lab"}</span>
-          </div>
-          <h1 class="text-2xl sm:text-3xl font-extrabold text-on-surface tracking-tight">${isId ? "Lab Simulasi Jaringan & Kalkulator Subnetting VLSM" : "Interactive Network Lab & Subnet Calculator"}</h1>
-          <p class="text-xs sm:text-sm text-on-surface-variant">${isId ? "Engine perhitungan subnetting VLSM dinamis, perincian bit biner, dan visualisasi topologi Three.js 3D interaktif." : "Classless Inter-Domain Routing (CIDR), VLSM allocation engine, and real-time Three.js topology visualization."}</p>
-        </div>
-        <div class="flex items-center gap-2">
-          <span class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-secondary-fixed text-on-secondary-fixed rounded-lg text-xs font-mono font-bold">
-            <span class="w-2 h-2 rounded-full bg-secondary animate-pulse"></span>
-            Simulator Engine v2.4
-          </span>
-        </div>
-      </div>
-
-      <!-- Two-Tab Switcher -->
-      <div class="flex items-center gap-2 border-b border-outline-variant pb-2">
-        <button class="px-4 py-2 bg-primary text-on-primary font-mono text-xs font-bold rounded-lg shadow-xs flex items-center gap-1.5 sim-tab-btn active cursor-pointer" data-tab="subnet">
-          <span class="material-symbols-outlined text-[16px]">calculate</span>
-          <span>${isId ? "Kalkulator Subnetting VLSM" : "VLSM Subnet Calculator"}</span>
-        </button>
-        <button class="px-4 py-2 bg-surface-container-low text-on-surface font-mono text-xs font-semibold rounded-lg hover:bg-surface-container transition-colors flex items-center gap-1.5 sim-tab-btn cursor-pointer" data-tab="topology">
-          <span class="material-symbols-outlined text-[16px]">hub</span>
-          <span>${isId ? "Kanvas Topologi Three.js 3D" : "Three.js 3D Topology Canvas"}</span>
-        </button>
-      </div>
-
-      <!-- TAB 1: VLSM Subnet Calculator (Matching Stitch Design) -->
-      <div id="sim-tab-subnet-content" class="space-y-6">
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          
-          <!-- Input Card (5 cols) -->
-          <div class="lg:col-span-5 bg-surface-container-lowest p-5 rounded-xl border border-outline-variant shadow-xs space-y-4">
-            <div class="flex items-center justify-between border-b border-outline-variant pb-2">
-              <h3 class="text-sm font-bold text-on-surface font-mono">${isId ? "Konfigurasi Blok Dasar CIDR" : "CIDR Base Configuration"}</h3>
-              <span class="text-[10px] font-mono text-outline">RFC 4632</span>
-            </div>
-
-            <div>
-              <label class="block text-xs font-mono font-semibold text-on-surface mb-1">${isId ? "Alamat Jaringan Dasar (Base IP)" : "Base Network Address"}</label>
-              <input 
-                type="text" 
-                id="subnet-input-ip" 
-                value="192.168.10.0" 
-                class="w-full px-3 py-2 bg-surface-container-low border border-outline-variant rounded-lg font-mono text-xs text-on-surface focus:outline-none focus:ring-1 focus:ring-primary"
-              />
-            </div>
-
-            <div>
-              <label class="block text-xs font-mono font-semibold text-on-surface mb-1">${isId ? "Prefix CIDR Awal" : "Base CIDR Prefix"}</label>
-              <select id="subnet-select-cidr" class="w-full px-3 py-2 bg-surface-container-low border border-outline-variant rounded-lg font-mono text-xs text-on-surface focus:outline-none focus:ring-1 focus:ring-primary">
-                <option value="24" selected>/24 - 255.255.255.0 (256 IP, 254 Host)</option>
-                <option value="25">/25 - 255.255.255.128 (128 IP, 126 Host)</option>
-                <option value="26">/26 - 255.255.255.192 (64 IP, 62 Host)</option>
-                <option value="27">/27 - 255.255.255.224 (32 IP, 30 Host)</option>
-                <option value="28">/28 - 255.255.255.240 (16 IP, 14 Host)</option>
-                <option value="29">/29 - 255.255.255.248 (8 IP, 6 Host)</option>
-                <option value="30">/30 - 255.255.255.252 (4 IP, 2 Host - Point to Point)</option>
-              </select>
-            </div>
-
-            <div class="p-3 bg-surface-container-low rounded-lg border border-outline-variant text-xs space-y-1.5 font-mono">
-              <span class="block text-[11px] font-bold text-primary">${isId ? "Kebutuhan Host Departemen (Skenario CS302):" : "Department Host Requirements:"}</span>
-              <div class="flex justify-between text-on-surface-variant">
-                <span>• Dept A (Engineering):</span> <span class="font-bold text-on-surface">60 Host (/26)</span>
-              </div>
-              <div class="flex justify-between text-on-surface-variant">
-                <span>• Dept B (Marketing):</span> <span class="font-bold text-on-surface">28 Host (/27)</span>
-              </div>
-              <div class="flex justify-between text-on-surface-variant">
-                <span>• Dept C (Server DMZ):</span> <span class="font-bold text-on-surface">12 Host (/28)</span>
-              </div>
-              <div class="flex justify-between text-on-surface-variant">
-                <span>• Dept D (Link Router WAN):</span> <span class="font-bold text-on-surface">2 Host (/30)</span>
-              </div>
-            </div>
-
-            <button class="w-full py-2.5 bg-primary hover:bg-primary-container text-on-primary font-mono text-xs font-bold rounded-lg shadow-xs flex items-center justify-center gap-1.5 cursor-pointer" id="btn-calc-execute">
-              <span class="material-symbols-outlined text-[16px]">bolt</span>
-              <span>${isId ? "Hitung & Tampilkan Alokasi VLSM" : "Calculate & Render Allocation"}</span>
-            </button>
-          </div>
-
-          <!-- Output Calculations (7 cols) -->
-          <div class="lg:col-span-7 space-y-5">
-            
-            <!-- Quick Telemetry Grid -->
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div class="p-3 bg-surface-container-lowest rounded-xl border border-outline-variant">
-                <span class="block text-[10px] font-mono uppercase text-outline">Subnet Mask</span>
-                <span class="text-xs font-mono font-bold text-on-surface" id="res-mask">255.255.255.0</span>
-              </div>
-              <div class="p-3 bg-surface-container-lowest rounded-xl border border-outline-variant">
-                <span class="block text-[10px] font-mono uppercase text-outline">Wildcard</span>
-                <span class="text-xs font-mono font-bold text-secondary" id="res-wildcard">0.0.0.255</span>
-              </div>
-              <div class="p-3 bg-surface-container-lowest rounded-xl border border-outline-variant">
-                <span class="block text-[10px] font-mono uppercase text-outline">${isId ? "Total Subnet" : "Total Subnets"}</span>
-                <span class="text-xs font-mono font-bold text-primary" id="res-subnets">4 Aktif</span>
-              </div>
-              <div class="p-3 bg-surface-container-lowest rounded-xl border border-outline-variant">
-                <span class="block text-[10px] font-mono uppercase text-outline">${isId ? "Host Tersedia" : "Usable Hosts"}</span>
-                <span class="text-xs font-mono font-bold text-on-surface" id="res-hosts">254 Total</span>
-              </div>
-            </div>
-
-            <!-- Subnet Allocation Table (Stitch Spec) -->
-            <div class="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-xs overflow-hidden">
-              <div class="p-3.5 bg-surface-container-low border-b border-outline-variant flex items-center justify-between">
-                <h4 class="text-xs font-mono font-bold text-on-surface">${isId ? "Tabel Alokasi Subnetting VLSM" : "Subnet Allocation Registry (VLSM)"}</h4>
-                <span class="text-[10px] font-mono text-secondary font-bold">${isId ? "Bebas Tumpang-Tindih (Valid)" : "Zero Overlap Verified"}</span>
-              </div>
-
-              <div class="overflow-x-auto">
-                <table class="w-full text-left font-mono text-xs">
-                  <thead class="bg-surface-container text-outline text-[11px] uppercase border-b border-outline-variant">
-                    <tr>
-                      <th class="p-3">Subnet</th>
-                      <th class="p-3">CIDR</th>
-                      <th class="p-3">${isId ? "Network Addr" : "Network Addr"}</th>
-                      <th class="p-3">${isId ? "Rentang Host Valid" : "Usable Range"}</th>
-                      <th class="p-3">Broadcast</th>
-                      <th class="p-3">Host</th>
-                    </tr>
-                  </thead>
-                  <tbody class="divide-y divide-outline-variant" id="subnet-table-body">
-                    <tr class="hover:bg-surface-container-low/60">
-                      <td class="p-3 font-bold text-primary">Subnet A (Eng)</td>
-                      <td class="p-3"><span class="px-1.5 py-0.5 rounded bg-primary-fixed text-primary font-bold">/26</span></td>
-                      <td class="p-3">192.168.10.0</td>
-                      <td class="p-3 text-secondary font-semibold">192.168.10.1 - 192.168.10.62</td>
-                      <td class="p-3">192.168.10.63</td>
-                      <td class="p-3 font-bold">62</td>
-                    </tr>
-                    <tr class="hover:bg-surface-container-low/60">
-                      <td class="p-3 font-bold text-primary">Subnet B (Mkt)</td>
-                      <td class="p-3"><span class="px-1.5 py-0.5 rounded bg-primary-fixed text-primary font-bold">/27</span></td>
-                      <td class="p-3">192.168.10.64</td>
-                      <td class="p-3 text-secondary font-semibold">192.168.10.65 - 192.168.10.94</td>
-                      <td class="p-3">192.168.10.95</td>
-                      <td class="p-3 font-bold">30</td>
-                    </tr>
-                    <tr class="hover:bg-surface-container-low/60">
-                      <td class="p-3 font-bold text-primary">Subnet C (DMZ)</td>
-                      <td class="p-3"><span class="px-1.5 py-0.5 rounded bg-primary-fixed text-primary font-bold">/28</span></td>
-                      <td class="p-3">192.168.10.96</td>
-                      <td class="p-3 text-secondary font-semibold">192.168.10.97 - 192.168.10.110</td>
-                      <td class="p-3">192.168.10.111</td>
-                      <td class="p-3 font-bold">14</td>
-                    </tr>
-                    <tr class="hover:bg-surface-container-low/60">
-                      <td class="p-3 font-bold text-primary">Subnet D (WAN)</td>
-                      <td class="p-3"><span class="px-1.5 py-0.5 rounded bg-secondary-fixed text-on-secondary-fixed font-bold">/30</span></td>
-                      <td class="p-3">192.168.10.112</td>
-                      <td class="p-3 text-secondary font-semibold">192.168.10.113 - 192.168.10.114</td>
-                      <td class="p-3">192.168.10.115</td>
-                      <td class="p-3 font-bold">2</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <!-- Binary Octet Visualization -->
-            <div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant shadow-xs space-y-2">
-              <span class="block text-xs font-mono font-bold text-on-surface">${isId ? "Visualisasi 32-Bit Biner Subnet Mask (/26)" : "32-Bit Binary Breakdown (/26 Mask)"}</span>
-              <div class="flex flex-wrap items-center gap-1 font-mono text-xs pt-1">
-                <span class="p-1 rounded bg-primary-container text-white">11111111</span>
-                <span>.</span>
-                <span class="p-1 rounded bg-primary-container text-white">11111111</span>
-                <span>.</span>
-                <span class="p-1 rounded bg-primary-container text-white">11111111</span>
-                <span>.</span>
-                <span class="p-1 rounded bg-secondary-container text-on-secondary-container font-bold">11</span>
-                <span class="p-1 rounded bg-surface-container text-on-surface-variant">000000</span>
-              </div>
-              <div class="flex items-center gap-4 text-[11px] font-mono text-outline pt-1">
-                <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-xs bg-primary-container"></span> ${isId ? "Bit Network (24)" : "Network Bits (24)"}</span>
-                <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-xs bg-secondary-container"></span> ${isId ? "Bit Subnet (2)" : "Subnet Bits (2)"}</span>
-                <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-xs bg-surface-container"></span> ${isId ? "Bit Host (6)" : "Host Bits (6)"}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- TAB 2: Three.js 3D Topology Simulator -->
-      <div id="sim-tab-topology-content" class="hidden space-y-4">
-        <div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant shadow-xs flex items-center justify-between">
+      <div class="bg-surface-container-lowest p-5 sm:p-6 rounded-2xl border border-outline-variant shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div class="space-y-1.5">
           <div class="flex items-center gap-2">
-            <span class="material-symbols-outlined text-primary text-[20px]">hub</span>
-            <span class="text-xs font-mono font-bold text-on-surface">${isId ? "Simulasi Topologi Jaringan Interaktif 3D (Three.js)" : "Interactive 3D Campus Node Topology (Three.js)"}</span>
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-primary/10 text-primary border border-primary/20 rounded-md text-xs font-mono font-bold">
+              <span class="material-symbols-outlined text-[14px]">science</span>
+              ${isId ? "Laboratorium Virtual" : "Virtual Sandbox"}
+            </span>
+            <span class="text-xs font-mono text-outline">NetQuest Lab v3.2</span>
           </div>
-          <div class="flex items-center gap-2">
-            <button class="px-3 py-1.5 bg-primary text-on-primary font-mono text-xs rounded hover:bg-primary-container transition-colors cursor-pointer" id="btn-ping-sim">
-              <span>${isId ? "Uji Kirim Paket Ping" : "Ping Packet Trace"}</span>
-            </button>
-            <button class="px-3 py-1.5 bg-surface-container-low text-on-surface font-mono text-xs rounded border border-outline-variant hover:bg-surface-container transition-colors cursor-pointer" id="btn-reset-3d">
-              <span>${isId ? "Reset Kamera" : "Reset Camera"}</span>
-            </button>
-          </div>
+          <h1 class="text-2xl sm:text-3xl font-extrabold text-on-surface tracking-tight font-headline">
+            ${isId ? "Laboratorium Jaringan Komputer" : "Computer Networking Laboratory"}
+          </h1>
+          <p class="text-xs sm:text-sm text-on-surface-variant max-w-2xl leading-relaxed">
+            ${isId 
+              ? "Ruang praktik interaktif visual. Anda dapat menguji pengiriman data paket (ping & routing), mengeksplorasi 5 topologi fisik dengan aset perangkat nyata, serta menghitung subnetting VLSM secara mandiri."
+              : "Visual interactive sandbox. Test packet routing, explore 5 physical topologies with realistic hardware assets, and calculate VLSM subnets."}
+          </p>
         </div>
 
-        <div id="three-canvas-container" class="w-full">
-          <!-- Canvas Three.js disuntikkan di sini -->
+        <div class="flex items-center gap-2 shrink-0">
+          <div class="p-3 bg-surface-container-low rounded-xl border border-outline-variant flex items-center gap-3">
+            <div class="w-10 h-10 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+              <span class="material-symbols-outlined text-2xl">verified</span>
+            </div>
+            <div class="text-left font-mono">
+              <span class="text-[10px] text-outline uppercase block">${isId ? "Status Lab" : "Lab Status"}</span>
+              <span class="text-xs font-bold text-emerald-400 flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                ${isId ? "Siap Digunakan" : "Ready"}
+              </span>
+            </div>
+          </div>
         </div>
+      </div>
+
+      <!-- Mode Switcher (Clean 3-Tab Bar) -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        ${MODES.map(m => `
+          <button 
+            class="p-3.5 rounded-xl text-left transition-all duration-200 sim-mode-tab-btn flex flex-col gap-1.5 border cursor-pointer ${
+              m.id === currentMode 
+                ? "bg-primary text-on-primary border-primary shadow-sm" 
+                : "bg-surface-container-lowest text-on-surface border-outline-variant hover:bg-surface-container hover:border-outline"
+            }" 
+            data-mode-id="${m.id}">
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-[20px]">${m.icon}</span>
+              <span class="font-bold text-sm truncate">${m.label}</span>
+            </div>
+            <span class="text-xs opacity-85 leading-snug">${m.sub}</span>
+          </button>
+        `).join("")}
+      </div>
+
+      <!-- Main Active Workspace -->
+      <div id="sim-active-workspace" class="w-full">
+        <!-- Rendered dynamically -->
       </div>
     </div>
   `;
 
-  // Tab switching logic
-  const subnetTabBtn = container.querySelector('[data-tab="subnet"]');
-  const topTabBtn = container.querySelector('[data-tab="topology"]');
-  const subnetContent = document.getElementById("sim-tab-subnet-content");
-  const topContent = document.getElementById("sim-tab-topology-content");
+  const workspace = container.querySelector("#sim-active-workspace");
+  const tabButtons = container.querySelectorAll(".sim-mode-tab-btn");
 
-  subnetTabBtn?.addEventListener("click", () => {
-    subnetTabBtn.classList.add("bg-primary", "text-on-primary", "active");
-    subnetTabBtn.classList.remove("bg-surface-container-low", "text-on-surface");
-    topTabBtn.classList.remove("bg-primary", "text-on-primary", "active");
-    topTabBtn.classList.add("bg-surface-container-low", "text-on-surface");
-    subnetContent.classList.remove("hidden");
-    topContent.classList.add("hidden");
-  });
-
-  topTabBtn?.addEventListener("click", () => {
-    topTabBtn.classList.add("bg-primary", "text-on-primary", "active");
-    topTabBtn.classList.remove("bg-surface-container-low", "text-on-surface");
-    subnetTabBtn.classList.remove("bg-primary", "text-on-primary", "active");
-    subnetTabBtn.classList.add("bg-surface-container-low", "text-on-surface");
-    topContent.classList.remove("hidden");
-    subnetContent.classList.add("hidden");
-    initThreeJsTopology();
-  });
-
-  document.getElementById("btn-calc-execute")?.addEventListener("click", () => {
+  function switchMode(modeId) {
+    currentMode = modeId;
     sound.click();
-    showToast(isId ? "Subnet Berhasil Dihitung" : "Subnets Recalculated", isId ? "Tabel alokasi VLSM untuk blok 192.168.10.0 diperbarui." : "VLSM tables updated successfully for base network 192.168.10.0.", "calculate");
-  });
-}
 
-// Three.js interactive 3D node simulation helper
-function initThreeJsTopology() {
-  const container = document.getElementById("three-canvas-container");
-  if (!container || container.querySelector("canvas")) return;
-
-  const width = container.clientWidth || 800;
-  const height = 420;
-
-  const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x0b111a);
-
-  const camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 1000);
-  camera.position.set(0, 8, 14);
-  camera.lookAt(0, 0, 0);
-
-  const renderer = new THREE.WebGLRenderer({ antialias: true });
-  renderer.setSize(width, height);
-  container.appendChild(renderer.domElement);
-
-  // Lights
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
-  scene.add(ambientLight);
-
-  const dirLight = new THREE.DirectionalLight(0x38bdf8, 1.2);
-  dirLight.position.set(5, 10, 7);
-  scene.add(dirLight);
-
-  // Central Router node
-  const routerGeo = new THREE.CylinderGeometry(1.2, 1.2, 0.5, 32);
-  const routerMat = new THREE.MeshStandardMaterial({ color: 0x1f4e79, metalness: 0.3, roughness: 0.4 });
-  const routerMesh = new THREE.Mesh(routerGeo, routerMat);
-  scene.add(routerMesh);
-
-  // Surrounding nodes (Switches & Hosts)
-  const nodeCount = 5;
-  const nodes = [];
-  const radius = 5;
-
-  for (let i = 0; i < nodeCount; i++) {
-    const angle = (i / nodeCount) * Math.PI * 2;
-    const x = Math.cos(angle) * radius;
-    const z = Math.sin(angle) * radius;
-
-    const boxGeo = new THREE.BoxGeometry(0.8, 0.8, 0.8);
-    const boxMat = new THREE.MeshStandardMaterial({ color: i === 0 ? 0x006d38 : 0x00375e });
-    const boxMesh = new THREE.Mesh(boxGeo, boxMat);
-    boxMesh.position.set(x, 0, z);
-    scene.add(boxMesh);
-    nodes.push(boxMesh);
-
-    // Connecting line to center
-    const lineMat = new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.6 });
-    const points = [new THREE.Vector3(0, 0, 0), new THREE.Vector3(x, 0, z)];
-    const lineGeo = new THREE.BufferGeometry().setFromPoints(points);
-    const line = new THREE.Line(lineGeo, lineMat);
-    scene.add(line);
-  }
-
-  // Animation Loop
-  let frameId;
-  function animate() {
-    frameId = requestAnimationFrame(animate);
-    routerMesh.rotation.y += 0.005;
-    nodes.forEach((n, idx) => {
-      n.rotation.y += 0.01;
-      n.position.y = Math.sin(Date.now() * 0.002 + idx) * 0.2;
+    // Update buttons styling
+    tabButtons.forEach(btn => {
+      const bId = btn.dataset.modeId;
+      if (bId === currentMode) {
+        btn.classList.add("bg-primary", "text-on-primary", "border-primary", "shadow-sm");
+        btn.classList.remove("bg-surface-container-lowest", "text-on-surface", "hover:bg-surface-container", "hover:border-outline");
+      } else {
+        btn.classList.remove("bg-primary", "text-on-primary", "border-primary", "shadow-sm");
+        btn.classList.add("bg-surface-container-lowest", "text-on-surface", "hover:bg-surface-container", "hover:border-outline");
+      }
     });
-    renderer.render(scene, camera);
+
+    renderActiveMode(modeId);
   }
-  animate();
 
-  document.getElementById("btn-ping-sim")?.addEventListener("click", () => {
-    sound.badge();
-    showToast(getLang() === "id" ? "Paket ICMP Ping Terkirim" : "Ping Broadcast Executed", getLang() === "id" ? "Balasan ICMP Echo Reply diterima dari 5 node dengan 0% packet loss." : "ICMP Echo Reply received from 5 topology nodes with 0% packet loss.", "wifi_tethering");
+  function renderActiveMode(modeId) {
+    if (!workspace) return;
+    workspace.innerHTML = "";
+
+    if (modeId === "workbench") {
+      // MODE 1: Dedicated Data Packet Transmission & Routing Workbench
+      renderUnifiedWorkbench(workspace);
+    } else if (modeId === "topology") {
+      // MODE 2: Dedicated Topology Simulator (Bus, Star, Ring, Mesh, Tree)
+      renderTopicSimulation(2, workspace);
+    } else if (modeId === "vlsm") {
+      // MODE 3: Dedicated VLSM Allocation Engine & Binary Breakdown
+      workspace.innerHTML = `
+        <div class="space-y-6">
+          <!-- Interactive CIDR Bit Slicer -->
+          <div id="mod4-cidr-box"></div>
+
+          <!-- Multi-Department VLSM Scenario Allocation Engine -->
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            <!-- Input Configuration Card -->
+            <div class="lg:col-span-5 bg-surface-container-lowest p-5 rounded-xl border border-outline-variant shadow-xs space-y-4">
+              <div class="flex items-center justify-between border-b border-outline-variant pb-2">
+                <h3 class="text-sm font-bold text-on-surface font-mono">${isId ? "Konfigurasi Blok Dasar CIDR & VLSM" : "CIDR & VLSM Base Configuration"}</h3>
+                <span class="text-[10px] font-mono text-outline">RFC 4632</span>
+              </div>
+
+              <div>
+                <label class="block text-xs font-mono font-semibold text-on-surface mb-1">${isId ? "Alamat Jaringan Dasar (Base IP)" : "Base Network Address"}</label>
+                <input 
+                  type="text" 
+                  id="subnet-input-ip" 
+                  value="192.168.10.0" 
+                  class="w-full px-3 py-2 bg-surface-container-low border border-outline-variant rounded-lg font-mono text-xs text-on-surface focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+              </div>
+
+              <div>
+                <label class="block text-xs font-mono font-semibold text-on-surface mb-1">${isId ? "Prefix CIDR Awal" : "Base CIDR Prefix"}</label>
+                <select id="subnet-select-cidr" class="w-full px-3 py-2 bg-surface-container-low border border-outline-variant rounded-lg font-mono text-xs text-on-surface focus:outline-none focus:ring-1 focus:ring-primary">
+                  <option value="24" selected>/24 - 255.255.255.0 (256 IP, 254 Host)</option>
+                  <option value="25">/25 - 255.255.255.128 (128 IP, 126 Host)</option>
+                  <option value="26">/26 - 255.255.255.192 (64 IP, 62 Host)</option>
+                  <option value="27">/27 - 255.255.255.224 (32 IP, 30 Host)</option>
+                  <option value="28">/28 - 255.255.255.240 (16 IP, 14 Host)</option>
+                  <option value="29">/29 - 255.255.255.248 (8 IP, 6 Host)</option>
+                  <option value="30">/30 - 255.255.255.252 (4 IP, 2 Host - Point to Point)</option>
+                </select>
+              </div>
+
+              <div class="p-3 bg-surface-container-low rounded-lg border border-outline-variant text-xs space-y-1.5 font-mono">
+                <span class="block text-[11px] font-bold text-primary">${isId ? "Kebutuhan Host Departemen (Studi Kasus VLSM):" : "Department Host Requirements:"}</span>
+                <div class="flex justify-between text-on-surface-variant">
+                  <span>• Subnet A (Lab / Eng):</span> <span class="font-bold text-on-surface">60 Host (/26)</span>
+                </div>
+                <div class="flex justify-between text-on-surface-variant">
+                  <span>• Subnet B (Kantor Guru):</span> <span class="font-bold text-on-surface">28 Host (/27)</span>
+                </div>
+                <div class="flex justify-between text-on-surface-variant">
+                  <span>• Subnet C (Server DMZ):</span> <span class="font-bold text-on-surface">12 Host (/28)</span>
+                </div>
+                <div class="flex justify-between text-on-surface-variant">
+                  <span>• Subnet D (Router WAN):</span> <span class="font-bold text-on-surface">2 Host (/30)</span>
+                </div>
+              </div>
+
+              <button class="w-full py-2.5 bg-primary hover:bg-primary-container text-on-primary font-mono text-xs font-bold rounded-lg shadow-xs flex items-center justify-center gap-1.5 cursor-pointer" id="btn-calc-execute">
+                <span class="material-symbols-outlined text-[16px]">bolt</span>
+                <span>${isId ? "Hitung & Sinkronkan Alokasi VLSM" : "Calculate & Render Allocation"}</span>
+              </button>
+            </div>
+
+            <!-- Output Calculations -->
+            <div class="lg:col-span-7 space-y-5">
+              <!-- Quick Telemetry Grid -->
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div class="p-3 bg-surface-container-lowest rounded-xl border border-outline-variant">
+                  <span class="block text-[10px] font-mono uppercase text-outline">Subnet Mask</span>
+                  <span class="text-xs font-mono font-bold text-on-surface" id="res-mask">255.255.255.0</span>
+                </div>
+                <div class="p-3 bg-surface-container-lowest rounded-xl border border-outline-variant">
+                  <span class="block text-[10px] font-mono uppercase text-outline">Wildcard</span>
+                  <span class="text-xs font-mono font-bold text-secondary" id="res-wildcard">0.0.0.255</span>
+                </div>
+                <div class="p-3 bg-surface-container-lowest rounded-xl border border-outline-variant">
+                  <span class="block text-[10px] font-mono uppercase text-outline">${isId ? "Total Subnet" : "Total Subnets"}</span>
+                  <span class="text-xs font-mono font-bold text-primary" id="res-subnets">4 Aktif</span>
+                </div>
+                <div class="p-3 bg-surface-container-lowest rounded-xl border border-outline-variant">
+                  <span class="block text-[10px] font-mono uppercase text-outline">${isId ? "Host Tersedia" : "Usable Hosts"}</span>
+                  <span class="text-xs font-mono font-bold text-on-surface" id="res-hosts">254 Total</span>
+                </div>
+              </div>
+
+              <!-- Subnet Allocation Table -->
+              <div class="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-xs overflow-hidden">
+                <div class="p-3.5 bg-surface-container-low border-b border-outline-variant flex items-center justify-between">
+                  <h4 class="text-xs font-mono font-bold text-on-surface">${isId ? "Tabel Alokasi Subnetting VLSM" : "Subnet Allocation Registry (VLSM)"}</h4>
+                  <span class="text-[10px] font-mono text-secondary font-bold">${isId ? "Bebas Tumpang-Tindih (Valid)" : "Zero Overlap Verified"}</span>
+                </div>
+
+                <div class="overflow-x-auto">
+                  <table class="w-full text-left font-mono text-xs">
+                    <thead class="bg-surface-container text-outline text-[11px] uppercase border-b border-outline-variant">
+                      <tr>
+                        <th class="p-3">Subnet</th>
+                        <th class="p-3">CIDR</th>
+                        <th class="p-3">Network Addr</th>
+                        <th class="p-3">${isId ? "Rentang Host Valid" : "Usable Range"}</th>
+                        <th class="p-3">Broadcast</th>
+                        <th class="p-3">Host</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-outline-variant" id="subnet-table-body">
+                      <tr class="hover:bg-surface-container-low/60">
+                        <td class="p-3 font-bold text-primary">Subnet A (Lab)</td>
+                        <td class="p-3"><span class="px-1.5 py-0.5 rounded bg-primary-fixed text-primary font-bold">/26</span></td>
+                        <td class="p-3" id="v-suba-net">192.168.10.0</td>
+                        <td class="p-3 text-secondary font-semibold" id="v-suba-range">192.168.10.1 - 192.168.10.62</td>
+                        <td class="p-3" id="v-suba-bcast">192.168.10.63</td>
+                        <td class="p-3 font-bold">62</td>
+                      </tr>
+                      <tr class="hover:bg-surface-container-low/60">
+                        <td class="p-3 font-bold text-primary">Subnet B (Guru)</td>
+                        <td class="p-3"><span class="px-1.5 py-0.5 rounded bg-primary-fixed text-primary font-bold">/27</span></td>
+                        <td class="p-3" id="v-subb-net">192.168.10.64</td>
+                        <td class="p-3 text-secondary font-semibold" id="v-subb-range">192.168.10.65 - 192.168.10.94</td>
+                        <td class="p-3" id="v-subb-bcast">192.168.10.95</td>
+                        <td class="p-3 font-bold">30</td>
+                      </tr>
+                      <tr class="hover:bg-surface-container-low/60">
+                        <td class="p-3 font-bold text-primary">Subnet C (DMZ)</td>
+                        <td class="p-3"><span class="px-1.5 py-0.5 rounded bg-primary-fixed text-primary font-bold">/28</span></td>
+                        <td class="p-3" id="v-subc-net">192.168.10.96</td>
+                        <td class="p-3 text-secondary font-semibold" id="v-subc-range">192.168.10.97 - 192.168.10.110</td>
+                        <td class="p-3" id="v-subc-bcast">192.168.10.111</td>
+                        <td class="p-3 font-bold">14</td>
+                      </tr>
+                      <tr class="hover:bg-surface-container-low/60">
+                        <td class="p-3 font-bold text-primary">Subnet D (WAN)</td>
+                        <td class="p-3"><span class="px-1.5 py-0.5 rounded bg-secondary-fixed text-on-secondary-fixed font-bold">/30</span></td>
+                        <td class="p-3" id="v-subd-net">192.168.10.112</td>
+                        <td class="p-3 text-secondary font-semibold" id="v-subd-range">192.168.10.113 - 192.168.10.114</td>
+                        <td class="p-3" id="v-subd-bcast">192.168.10.115</td>
+                        <td class="p-3 font-bold">2</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Binary Octet Breakdown -->
+              <div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant shadow-xs space-y-2">
+                <span class="block text-xs font-mono font-bold text-on-surface">${isId ? "Visualisasi 32-Bit Biner Subnet Mask (/26)" : "32-Bit Binary Breakdown (/26 Mask)"}</span>
+                <div class="flex flex-wrap items-center gap-1 font-mono text-xs pt-1">
+                  <span class="p-1 rounded bg-primary-container text-white">11111111</span>
+                  <span>.</span>
+                  <span class="p-1 rounded bg-primary-container text-white">11111111</span>
+                  <span>.</span>
+                  <span class="p-1 rounded bg-primary-container text-white">11111111</span>
+                  <span>.</span>
+                  <span class="p-1 rounded bg-secondary-container text-on-secondary-container font-bold">11</span>
+                  <span class="p-1 rounded bg-surface-container text-on-surface-variant">000000</span>
+                </div>
+                <div class="flex items-center gap-4 text-[11px] font-mono text-outline pt-1">
+                  <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-xs bg-primary-container"></span> ${isId ? "Bit Network (24)" : "Network Bits (24)"}</span>
+                  <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-xs bg-secondary-container"></span> ${isId ? "Bit Subnet (2)" : "Subnet Bits (2)"}</span>
+                  <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-xs bg-surface-container"></span> ${isId ? "Bit Host (6)" : "Host Bits (6)"}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      // Render interactive slider box
+      renderTopicSimulation(4, workspace.querySelector("#mod4-cidr-box"));
+
+      // Recalculate button handler
+      workspace.querySelector("#btn-calc-execute")?.addEventListener("click", () => {
+        sound.click();
+        const baseIp = workspace.querySelector("#subnet-input-ip")?.value.trim() || "192.168.10.0";
+        const parts = baseIp.split(".");
+        if (parts.length === 4) {
+          const prefix = `${parts[0]}.${parts[1]}.${parts[2]}`;
+          workspace.querySelector("#v-suba-net").textContent = `${prefix}.0`;
+          workspace.querySelector("#v-suba-range").textContent = `${prefix}.1 - ${prefix}.62`;
+          workspace.querySelector("#v-suba-bcast").textContent = `${prefix}.63`;
+
+          workspace.querySelector("#v-subb-net").textContent = `${prefix}.64`;
+          workspace.querySelector("#v-subb-range").textContent = `${prefix}.65 - ${prefix}.94`;
+          workspace.querySelector("#v-subb-bcast").textContent = `${prefix}.95`;
+
+          workspace.querySelector("#v-subc-net").textContent = `${prefix}.96`;
+          workspace.querySelector("#v-subc-range").textContent = `${prefix}.97 - ${prefix}.110`;
+          workspace.querySelector("#v-subc-bcast").textContent = `${prefix}.111`;
+
+          workspace.querySelector("#v-subd-net").textContent = `${prefix}.112`;
+          workspace.querySelector("#v-subd-range").textContent = `${prefix}.113 - ${prefix}.114`;
+          workspace.querySelector("#v-subd-bcast").textContent = `${prefix}.115`;
+        }
+        showToast(
+          isId ? "Subnet Berhasil Dihitung" : "Subnets Recalculated", 
+          isId ? `Tabel alokasi VLSM untuk blok dasar ${baseIp} berhasil diperbarui.` : `VLSM tables updated successfully for base network ${baseIp}.`, 
+          "calculate"
+        );
+      });
+    }
+  }
+
+  // Setup mode tab listeners
+  tabButtons.forEach(btn => {
+    btn.addEventListener("click", () => {
+      switchMode(btn.dataset.modeId);
+    });
   });
 
-  document.getElementById("btn-reset-3d")?.addEventListener("click", () => {
-    camera.position.set(0, 8, 14);
-    camera.lookAt(0, 0, 0);
-  });
+  // Initial render: Unified Workbench
+  renderActiveMode("workbench");
 }
 
 // ============================================================================
 // VIEW 5: PROCTORED TEST RUNNER (Pretest & Posttest - Stitch posttest_hots_quiz)
 // ============================================================================
-function renderTestRunner(container, type = "pre") {
-  const isPre = type === "pre";
-  const title = isPre ? t("testPreTitle") : t("testPostTitle");
-  const isId = getLang() === "id";
+let testTimerInterval = null;
 
-  // Initialize test state
-  if (!state.testState || state.testState.type !== type) {
-    state.testState = {
-      type: type,
-      currentIndex: 0,
-      answers: new Array(HOTS_QUESTIONS.length).fill(null),
-      bookmarks: new Set(),
-      secondsRemaining: 35 * 60, // 35 minutes
-      sessionHash: "8f4a-" + Math.random().toString(36).substring(2, 6)
+function stopTestTimer() {
+  if (testTimerInterval) {
+    clearInterval(testTimerInterval);
+    testTimerInterval = null;
+  }
+}
+
+function startTestTimer(type) {
+  stopTestTimer();
+  testTimerInterval = setInterval(() => {
+    if (!state.testState || !state.testState.started) {
+      stopTestTimer();
+      return;
+    }
+    state.testState.secondsRemaining--;
+    const el = document.getElementById("test-timer-display");
+    if (el) {
+      const mins = Math.max(0, Math.floor(state.testState.secondsRemaining / 60));
+      const secs = Math.max(0, state.testState.secondsRemaining % 60);
+      el.textContent = `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+      if (state.testState.secondsRemaining <= 300) {
+        el.parentElement.className = "flex items-center gap-1.5 px-3 py-1.5 bg-red-500/15 border border-red-500/40 rounded-lg font-mono text-xs font-bold text-red-400 animate-pulse";
+      }
+    }
+    if (state.testState.secondsRemaining <= 0) {
+      stopTestTimer();
+      showToast(getLang() === "id" ? "Waktu Ujian Telah Habis!" : "Time's Up!", getLang() === "id" ? "Jawaban Anda otomatis dikumpulkan." : "Answers auto-submitted.", "timer_off");
+      finishExam(type);
+    }
+  }, 1000);
+}
+
+const TOPIC_NAMES = [
+  "Pengantar & Jenis Jaringan (PAN, LAN, MAN, WAN)",
+  "Topologi Jaringan & Perangkat Switch/Hub",
+  "Model OSI 7 Layer & Protokol Komunikasi",
+  "Pengalamatan IPv4, Subnetting & VLSM",
+  "Media Transmisi, Kabel UTP & Fiber Optik",
+  "Layanan Jaringan: DNS, DHCP & NAT"
+];
+
+function getQuestionsForTest(type) {
+  if (type && type.startsWith("topic-")) {
+    const topicId = parseInt(type.replace("topic-", ""), 10);
+    return HOTS_QUESTIONS.filter(q => q.topic === topicId);
+  }
+  return HOTS_QUESTIONS;
+}
+
+function getTestMeta(type, isId) {
+  if (type === "pre") {
+    return {
+      title: isId ? "Pretest Diagnostik Jaringan" : "Diagnostic Baseline Pretest",
+      badge: isId ? "BENCHMARK AWAL" : "DIAGNOSTIC BASELINE",
+      durationMins: 35,
+      totalQuestions: 25,
+      description: isId ? "Mengukur garis dasar pemahaman awal siswa untuk kalkulasi normalized gain Hake. Mencakup konsep fundamental arsitektur jaringan, subnetting, dan protokol komunikasi." : "Establishes initial cognitive baseline for Hake normalized gain calculation."
     };
   }
+  if (type === "post") {
+    return {
+      title: isId ? "Ujian Akhir HOTS Posttest" : "HOTS Posttest Examination",
+      badge: isId ? "SUMATIF FINAL" : "FINAL SUMMATIVE",
+      durationMins: 35,
+      totalQuestions: 25,
+      description: isId ? "Evaluasi proctored akhir berstandar HOTS (Bloom C4 Analisis, C5 Evaluasi, C6 Pemecahan Masalah) untuk mengukur ketuntasan kompetensi teknis jaringan." : "Final evaluative assessment measuring C4 Analysis, C5 Synthesis, and C6 Evaluation mastery."
+    };
+  }
+  if (type && type.startsWith("topic-")) {
+    const topicId = parseInt(type.replace("topic-", ""), 10);
+    const topicName = TOPIC_NAMES[topicId - 1] || ("Topik " + topicId);
+    const qs = HOTS_QUESTIONS.filter(q => q.topic === topicId);
+    return {
+      title: isId ? ("Kuis Formatif: " + topicName) : ("Topic " + topicId + " Quiz: " + topicName),
+      badge: isId ? ("KUIS TOPIK " + topicId) : ("TOPIC " + topicId + " QUIZ"),
+      durationMins: topicId === 6 ? 12 : 10,
+      totalQuestions: qs.length,
+      description: isId ? ("Uji pemahaman mandiri untuk " + topicName + " berbasis studi kasus analitis HOTS.") : "Formative topic evaluation with contextual HOTS scenario questions."
+    };
+  }
+  return {
+    title: isId ? "Kuis Jaringan Komputer" : "Computer Network Quiz",
+    badge: "KUIS",
+    durationMins: 15,
+    totalQuestions: HOTS_QUESTIONS.length,
+    description: ""
+  };
+}
 
+function renderTestRunner(container, type = "pre") {
+  const isId = getLang() === "id";
+  const meta = getTestMeta(type, isId);
+  const questionsList = getQuestionsForTest(type);
+
+  // STEP 1: If test hasn't started yet, display the YES/NO Confirmation Screen
+  if (!state.testState || state.testState.type !== type || !state.testState.started) {
+    stopTestTimer();
+
+    // Check if user already took this test previously (for Remedial context)
+    const prevResult = (state.userStats?.results || []).find(r => r.type === type);
+
+    container.innerHTML = `
+      <div class="max-w-xl mx-auto my-6 sm:my-10 bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-6 text-center">
+        
+        <!-- Icon & Badge -->
+        <div class="w-16 h-16 rounded-2xl bg-indigo-50 border border-indigo-200 text-indigo-600 flex items-center justify-center mx-auto shadow-sm">
+          <span class="material-symbols-outlined text-[34px]">${type.startsWith("topic-") ? "psychology" : (type === "pre" ? "assignment" : "verified")}</span>
+        </div>
+
+        <div class="space-y-2">
+          <div class="flex items-center justify-center gap-2 flex-wrap">
+            <span class="px-3 py-1 rounded-full bg-slate-100 border border-slate-200 font-mono text-xs text-indigo-700 font-bold">
+              ${meta.badge}
+            </span>
+            ${prevResult ? `<span class="px-2.5 py-0.5 rounded-full bg-amber-50 border border-amber-200 font-mono text-[11px] text-amber-700 font-bold">${isId ? "SESI REMEDIAL" : "REMEDIAL SESSION"}</span>` : ""}
+          </div>
+          
+          <h2 class="text-xl sm:text-2xl font-bold font-display text-slate-900">
+            ${prevResult 
+              ? (isId ? `Mulai Remedial ${meta.title}?` : `Start Remedial ${meta.title}?`) 
+              : (isId ? `Mulai ${meta.title}?` : `Start ${meta.title}?`)}
+          </h2>
+
+          <p class="text-xs sm:text-sm text-slate-600 leading-relaxed max-w-md mx-auto">
+            ${isId 
+              ? `Apakah Anda siap untuk mulai mengerjakan soal sekarang? Waktu <strong>${meta.durationMins} menit</strong> akan langsung berjalan setelah Anda menekan tombol <strong>'Ya, Mulai Sekarang'</strong>.` 
+              : `Are you ready to begin? The ${meta.durationMins}-minute countdown timer will start immediately once you confirm.`}
+          </p>
+        </div>
+
+        <!-- Previous score badge if remedial -->
+        ${prevResult ? `
+          <div class="p-3 bg-amber-50/70 rounded-xl border border-amber-200 flex items-center justify-between text-xs font-mono">
+            <span class="text-amber-800 font-medium">${isId ? "Nilai Sebelumnya:" : "Previous Score:"}</span>
+            <span class="font-bold text-amber-900">${prevResult.score_percentage !== undefined ? prevResult.score_percentage : Math.round((prevResult.score / (prevResult.total_questions || meta.totalQuestions)) * 100)} / 100 (${prevResult.score}/${prevResult.total_questions || meta.totalQuestions} ${isId ? "Benar" : "Correct"})</span>
+          </div>
+        ` : ""}
+
+        <!-- Rules & Info Grid -->
+        <div class="p-4 bg-slate-50 rounded-xl border border-slate-200 grid grid-cols-2 gap-3 text-left font-mono text-xs">
+          <div class="flex items-center gap-2 text-slate-700">
+            <span class="material-symbols-outlined text-[18px] text-indigo-600">timer</span>
+            <span>${meta.durationMins} Menit Durasi</span>
+          </div>
+          <div class="flex items-center gap-2 text-slate-700">
+            <span class="material-symbols-outlined text-[18px] text-sky-600">quiz</span>
+            <span>${meta.totalQuestions} Butir Soal HOTS</span>
+          </div>
+          <div class="flex items-center gap-2 text-slate-700">
+            <span class="material-symbols-outlined text-[18px] text-amber-600">score</span>
+            <span>Nilai Langsung Keluar</span>
+          </div>
+          <div class="flex items-center gap-2 text-slate-700">
+            <span class="material-symbols-outlined text-[18px] text-emerald-600">refresh</span>
+            <span>Bisa Remedial Ulang</span>
+          </div>
+        </div>
+
+        <!-- YES / NO Confirmation Buttons -->
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+          <button class="w-full sm:w-auto px-6 h-11 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm" id="btn-start-exam-yes">
+            <span class="material-symbols-outlined text-[19px]">play_arrow</span>
+            <span>${isId ? "Ya, Mulai Sekarang" : "Yes, Start Now"}</span>
+          </button>
+          <button class="w-full sm:w-auto px-6 h-11 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-medium text-xs rounded-xl flex items-center justify-center gap-2 transition-colors cursor-pointer" id="btn-start-exam-no">
+            <span class="material-symbols-outlined text-[19px] text-slate-500">close</span>
+            <span>${isId ? "Batal / Kembali" : "Cancel / Return"}</span>
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.getElementById("btn-start-exam-yes")?.addEventListener("click", () => {
+      state.testState = {
+        type: type,
+        started: true,
+        currentIndex: 0,
+        answers: new Array(questionsList.length).fill(null),
+        bookmarks: new Set(),
+        secondsRemaining: meta.durationMins * 60,
+        sessionHash: "nq-" + Math.random().toString(36).substring(2, 6)
+      };
+      startTestTimer(type);
+      renderTestRunner(container, type);
+    });
+
+    document.getElementById("btn-start-exam-no")?.addEventListener("click", () => {
+      navigateTo("quizzes");
+    });
+
+    return;
+  }
+
+  // STEP 2: Render Active Exam with Live Countdown Timer
   const ts = state.testState;
-  const q = HOTS_QUESTIONS[ts.currentIndex];
+  const q = questionsList[ts.currentIndex] || questionsList[0];
 
   const minutes = Math.floor(ts.secondsRemaining / 60);
   const seconds = ts.secondsRemaining % 60;
@@ -1887,32 +2317,32 @@ function renderTestRunner(container, type = "pre") {
 
   container.innerHTML = `
     <div class="max-w-6xl mx-auto space-y-6 w-full">
-      
       <!-- Top Proctored Exam Header Bar -->
-      <div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-xl bg-primary text-on-primary flex items-center justify-center font-bold">
-            <span class="material-symbols-outlined text-[22px]">${isPre ? "assignment" : "verified"}</span>
+          <div class="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold">
+            <span class="material-symbols-outlined text-[22px]">${type.startsWith("topic-") ? "psychology" : (type === "pre" ? "assignment" : "verified")}</span>
           </div>
           <div>
-            <div class="flex items-center gap-2 font-mono text-xs text-outline">
-              <span>${isId ? "Ujian Proctored CS302" : "CS302 Proctored Assessment"}</span>
+            <div class="flex items-center gap-2 font-mono text-xs text-slate-500">
+              <span>${isId ? "Asesmen Berbatas Waktu" : "Timed Assessment"}</span>
               <span>•</span>
-              <span>Hash: <strong class="text-on-surface">${ts.sessionHash}</strong></span>
+              <span>Sesi: <strong class="text-slate-800">${ts.sessionHash}</strong></span>
             </div>
-            <h1 class="text-base sm:text-lg font-bold text-on-surface">${title}</h1>
+            <h1 class="text-base sm:text-lg font-bold text-slate-900 font-display">${meta.title}</h1>
           </div>
         </div>
 
         <div class="flex items-center gap-3 self-end sm:self-auto">
-          <!-- Countdown Timer -->
-          <div class="flex items-center gap-1.5 px-3 py-1.5 bg-surface-container-low border border-outline-variant rounded-lg font-mono text-xs font-bold text-primary">
+          <!-- Countdown Timer Display (Running Per Second) -->
+          <div class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg font-mono text-xs font-bold text-emerald-400">
             <span class="material-symbols-outlined text-[16px]">timer</span>
             <span id="test-timer-display">${timeFormatted}</span>
           </div>
 
-          <button class="h-8 px-3 bg-error hover:bg-error/90 text-on-error font-mono text-xs font-bold rounded-lg transition-colors cursor-pointer" id="btn-submit-exam-early">
-            ${isId ? "Selesai & Kumpulkan" : "Finish & Submit"}
+          <button class="h-8 px-3.5 bg-red-600 hover:bg-red-700 text-white font-mono text-xs font-bold rounded-lg transition-colors cursor-pointer flex items-center gap-1 shadow-sm" id="btn-submit-exam-early">
+            <span class="material-symbols-outlined text-[15px]">send</span>
+            <span>${isId ? "Selesai & Kumpulkan" : "Submit Exam"}</span>
           </button>
         </div>
       </div>
@@ -1921,24 +2351,24 @@ function renderTestRunner(container, type = "pre") {
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         
         <!-- Left 8 Cols: Active Question Card -->
-        <div class="lg:col-span-8 bg-surface-container-lowest p-6 rounded-xl border border-outline-variant shadow-xs space-y-5">
+        <div class="lg:col-span-8 bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-5">
           
-          <div class="flex items-center justify-between border-b border-outline-variant pb-3 text-xs font-mono">
-            <span class="px-2.5 py-0.5 rounded bg-primary-fixed text-primary font-bold">
-              ${isId ? `Soal Nomor ${ts.currentIndex + 1} dari ${HOTS_QUESTIONS.length}` : `Question ${ts.currentIndex + 1} of ${HOTS_QUESTIONS.length}`}
+          <div class="flex items-center justify-between border-b border-slate-100 pb-3 text-xs font-mono">
+            <span class="px-2.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 font-bold">
+              ${isId ? `Soal Nomor ${ts.currentIndex + 1} dari ${questionsList.length}` : `Question ${ts.currentIndex + 1} of ${questionsList.length}`}
             </span>
-            <button class="flex items-center gap-1 px-2.5 py-1 rounded border border-outline-variant text-outline hover:text-amber-600 hover:border-amber-500 transition-colors cursor-pointer" id="btn-bookmark-question">
+            <button class="flex items-center gap-1 px-2.5 py-1 rounded border border-slate-200 text-slate-600 hover:text-amber-600 hover:border-amber-400 transition-colors cursor-pointer bg-slate-50" id="btn-bookmark-question">
               <span class="material-symbols-outlined text-[16px] ${ts.bookmarks.has(ts.currentIndex) ? "text-amber-500 fill-1" : ""}">bookmark</span>
               <span>${ts.bookmarks.has(ts.currentIndex) ? (isId ? "Ditandai Ragu" : "Bookmarked") : (isId ? "Tandai Ragu-ragu" : "Bookmark")}</span>
             </button>
           </div>
 
           <!-- Question Scenario Text -->
-          <div>
-            <div class="text-[11px] font-mono text-outline mb-1 font-semibold uppercase tracking-wider">
-              ${isId ? q.topic_id : q.topic_en}
+          <div class="space-y-2">
+            <div class="text-[11px] font-mono text-indigo-700 font-semibold uppercase tracking-wider">
+              TOPIK: ${isId ? q.topic_id : q.topic_en}
             </div>
-            <p class="text-sm sm:text-base text-on-surface font-medium leading-relaxed">
+            <p class="text-sm sm:text-base text-slate-900 font-medium leading-relaxed">
               ${isId ? q.question_id : q.question_en}
             </p>
           </div>
@@ -1951,13 +2381,13 @@ function renderTestRunner(container, type = "pre") {
 
               return `
                 <div 
-                  class="p-3.5 rounded-xl border transition-all cursor-pointer flex items-start gap-3 option-row ${isSelected ? "border-primary bg-primary-fixed/20 shadow-xs ring-1 ring-primary" : "border-outline-variant bg-surface-container-lowest hover:bg-surface-container-low"}"
+                  class="p-3.5 rounded-xl border transition-all cursor-pointer flex items-start gap-3 option-row ${isSelected ? "border-indigo-600 bg-indigo-50/80 ring-2 ring-indigo-500/20 text-indigo-950 font-medium" : "border-slate-200 bg-slate-50 hover:bg-indigo-50/40 hover:border-indigo-300 text-slate-800"}"
                   data-opt-index="${optIndex}"
                 >
-                  <div class="w-6 h-6 rounded-full border flex items-center justify-center font-mono text-xs font-bold shrink-0 mt-0.5 ${isSelected ? "bg-primary text-on-primary border-primary" : "border-outline text-outline"}">
+                  <div class="w-6 h-6 rounded-full border flex items-center justify-center font-mono text-xs font-bold shrink-0 mt-0.5 ${isSelected ? "bg-indigo-600 text-white border-indigo-600" : "border-slate-300 bg-white text-slate-600"}">
                     ${optionLetter}
                   </div>
-                  <span class="text-xs sm:text-sm text-on-surface leading-normal select-none">
+                  <span class="text-xs sm:text-sm leading-normal select-none">
                     ${opt.text}
                   </span>
                 </div>
@@ -1966,45 +2396,51 @@ function renderTestRunner(container, type = "pre") {
           </div>
 
           <!-- Bottom Navigation Controls -->
-          <div class="pt-4 border-t border-outline-variant flex items-center justify-between">
+          <div class="pt-4 border-t border-slate-100 flex items-center justify-between">
             <button 
-              class="h-9 px-4 bg-surface-container-low hover:bg-surface-container text-on-surface font-mono text-xs font-semibold rounded-lg border border-outline-variant flex items-center gap-1 transition-colors cursor-pointer ${ts.currentIndex === 0 ? "opacity-40 pointer-events-none" : ""}"
+              class="h-9 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-mono text-xs font-semibold rounded-lg border border-slate-200 flex items-center gap-1 transition-colors cursor-pointer ${ts.currentIndex === 0 ? "opacity-40 pointer-events-none" : ""}"
               id="btn-prev-question"
             >
               <span class="material-symbols-outlined text-[16px]">chevron_left</span>
-              <span>${t("btnPrevQuestion")}</span>
+              <span>${isId ? "Soal Sebelumnya" : "Previous"}</span>
             </button>
 
             <button 
-              class="h-9 px-5 bg-primary hover:bg-primary-container text-on-primary font-mono text-xs font-bold rounded-lg shadow-xs flex items-center gap-1 transition-colors cursor-pointer"
+              class="h-9 px-5 bg-indigo-600 hover:bg-indigo-700 text-white font-mono text-xs font-bold rounded-lg shadow-sm flex items-center gap-1 transition-colors cursor-pointer"
               id="btn-next-question"
             >
-              <span>${ts.currentIndex === HOTS_QUESTIONS.length - 1 ? (isId ? "Kirim Jawaban Akhir" : "Review & Submit") : t("btnNextQuestion")}</span>
-              <span class="material-symbols-outlined text-[16px]">chevron_right</span>
+              <span>${ts.currentIndex === questionsList.length - 1 ? (isId ? "Kumpulkan Jawaban" : "Review & Submit") : (isId ? "Soal Berikutnya" : "Next Question")}</span>
+              <span class="material-symbols-outlined text-[16px]">${ts.currentIndex === questionsList.length - 1 ? "check_circle" : "chevron_right"}</span>
             </button>
           </div>
         </div>
 
-        <!-- Right 4 Cols: Question Navigator Palette Grid (1-25) -->
-        <div class="lg:col-span-4 bg-surface-container-lowest p-5 rounded-xl border border-outline-variant shadow-xs space-y-4">
-          <div class="flex items-center justify-between border-b border-outline-variant pb-2">
-            <h3 class="text-xs font-mono uppercase tracking-wider text-outline font-bold">${isId ? "Nomor Soal (1-25)" : "Question Palette (25)"}</h3>
-            <span class="text-[11px] font-mono text-secondary font-bold">
-              ${ts.answers.filter(a => a !== null).length} / 25 ${isId ? "Terjawab" : "Answered"}
+        <!-- Right 4 Cols: Question Navigator Palette Grid -->
+        <div class="lg:col-span-4 bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+            <h3 class="text-xs font-mono uppercase tracking-wider text-slate-500 font-bold">${isId ? `Daftar Soal (1-${questionsList.length})` : `Palette (${questionsList.length})`}</h3>
+            <span class="text-[11px] font-mono text-indigo-700 font-bold">
+              ${ts.answers.filter(a => a !== null).length} / ${questionsList.length} ${isId ? "Terjawab" : "Answered"}
             </span>
           </div>
 
-          <!-- Grid of 25 Buttons -->
+          <!-- Grid of Buttons -->
           <div class="grid grid-cols-5 gap-2">
-            ${HOTS_QUESTIONS.map((_, idx) => {
+            ${questionsList.map((_, idx) => {
               const isAnswered = ts.answers[idx] !== null;
               const isCurrent = idx === ts.currentIndex;
               const isBookmarked = ts.bookmarks.has(idx);
 
-              let classes = "question-palette-btn";
-              if (isCurrent) classes += " active";
-              if (isAnswered) classes += " answered";
-              if (isBookmarked) classes += " bookmarked";
+              let classes = "h-9 rounded-lg font-mono text-xs font-bold border flex items-center justify-center transition-all cursor-pointer ";
+              if (isCurrent) {
+                classes += "border-indigo-600 bg-indigo-600 text-white shadow-sm ";
+              } else if (isBookmarked) {
+                classes += "border-amber-300 bg-amber-50 text-amber-800 ";
+              } else if (isAnswered) {
+                classes += "border-emerald-300 bg-emerald-50 text-emerald-800 ";
+              } else {
+                classes += "border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-400 ";
+              }
 
               return `
                 <button class="${classes}" data-target-index="${idx}">
@@ -2015,18 +2451,18 @@ function renderTestRunner(container, type = "pre") {
           </div>
 
           <!-- Legend -->
-          <div class="pt-3 border-t border-outline-variant text-[11px] font-mono text-outline space-y-1.5">
+          <div class="pt-3 border-t border-slate-100 text-[11px] font-mono text-slate-500 space-y-1.5">
             <div class="flex items-center gap-2">
-              <span class="w-3.5 h-3.5 rounded-xs bg-primary"></span>
-              <span>${isId ? "Soal Telah Dijawab" : "Answered Item"}</span>
+              <span class="w-3.5 h-3.5 rounded-sm bg-emerald-100 border border-emerald-400"></span>
+              <span>${isId ? "Sudah Dijawab" : "Answered"}</span>
             </div>
             <div class="flex items-center gap-2">
-              <span class="w-3.5 h-3.5 rounded-xs bg-amber-400"></span>
-              <span>${isId ? "Ditandai Ragu-ragu" : "Bookmarked for Review"}</span>
+              <span class="w-3.5 h-3.5 rounded-sm bg-amber-100 border border-amber-400"></span>
+              <span>${isId ? "Ditandai Ragu-ragu" : "Bookmarked"}</span>
             </div>
             <div class="flex items-center gap-2">
-              <span class="w-3.5 h-3.5 rounded-xs border border-outline-variant bg-surface-container-lowest"></span>
-              <span>${isId ? "Belum Dijawab" : "Unanswered Item"}</span>
+              <span class="w-3.5 h-3.5 rounded-sm bg-slate-100 border border-slate-300"></span>
+              <span>${isId ? "Belum Dijawab" : "Unanswered"}</span>
             </div>
           </div>
         </div>
@@ -2064,16 +2500,16 @@ function renderTestRunner(container, type = "pre") {
   });
 
   document.getElementById("btn-next-question")?.addEventListener("click", () => {
-    if (ts.currentIndex < HOTS_QUESTIONS.length - 1) {
+    if (ts.currentIndex < questionsList.length - 1) {
       ts.currentIndex++;
       renderTestRunner(container, type);
     } else {
-      finishExam(type);
+      confirmSubmitExam(type);
     }
   });
 
   // Direct palette click
-  container.querySelectorAll(".question-palette-btn").forEach(btn => {
+  container.querySelectorAll("[data-target-index]").forEach(btn => {
     btn.addEventListener("click", () => {
       const target = parseInt(btn.dataset.targetIndex, 10);
       ts.currentIndex = target;
@@ -2082,42 +2518,74 @@ function renderTestRunner(container, type = "pre") {
   });
 
   document.getElementById("btn-submit-exam-early")?.addEventListener("click", () => {
-    finishExam(type);
+    confirmSubmitExam(type);
   });
 }
 
+function confirmSubmitExam(type) {
+  const ts = state.testState;
+  if (!ts) return;
+  const isId = getLang() === "id";
+  const questionsList = getQuestionsForTest(type);
+  const answered = ts.answers.filter(a => a !== null).length;
+  const unanswered = questionsList.length - answered;
+
+  const msg = isId 
+    ? `Apakah Anda yakin ingin mengumpulkan ujian sekarang?\n\n• Terjawab: ${answered} soal\n• Belum dijawab: ${unanswered} soal\n\nNilai akhir dan pembahasan teknis akan langsung ditampilkan setelah dikumpulkan.`
+    : `Are you sure you want to submit your exam now?\n\n• Answered: ${answered} questions\n• Unanswered: ${unanswered} questions\n\nYour score and review will be displayed immediately.`;
+
+  if (confirm(msg)) {
+    finishExam(type);
+  }
+}
+
 function finishExam(type) {
+  stopTestTimer();
   const ts = state.testState;
   if (!ts) return;
 
+  const questionsList = getQuestionsForTest(type);
   const isPre = type === "pre";
+  const isPost = type === "post";
   let correctCount = 0;
-  HOTS_QUESTIONS.forEach((q, idx) => {
+
+  questionsList.forEach((q, idx) => {
     const selected = ts.answers[idx];
     const isCorrect = selected !== null && q.options_id[selected]?.correct === true;
     if (isCorrect) correctCount++;
   });
 
-  const finalScore100 = Math.round((correctCount / HOTS_QUESTIONS.length) * 100);
+  const finalScore100 = Math.round((correctCount / questionsList.length) * 100);
 
   const testResult = {
     id: `result-${Date.now()}`,
     type: type,
     score: correctCount,
-    total_questions: HOTS_QUESTIONS.length,
+    total_questions: questionsList.length,
     score_percentage: finalScore100,
     session_hash: ts.sessionHash,
     completed_at: new Date().toISOString(),
-    answers: ts.answers
+    answers: [...ts.answers]
   };
 
-  // Persist locally & cloud
+  // Persist locally
+  if (!state.userStats.results) state.userStats.results = [];
   state.userStats.results.unshift(testResult);
-  awardXP(isPre ? 150 : 250, isPre ? "Menyelesaikan Pretest" : "Menyelesaikan Posttest");
+
+  const xpEarned = isPost ? 250 : (isPre ? 150 : 80);
+  const xpReason = isPost ? "Menyelesaikan Ujian Posttest" : (isPre ? "Menyelesaikan Pretest Diagnostik" : "Menyelesaikan Kuis Topik");
+  awardXP(xpEarned, xpReason);
   saveUserStats();
 
-  if (state.currentUser) {
-    saveTestResult(state.currentUser.user.id, type, correctCount, HOTS_QUESTIONS.length);
+  if (state.currentUser && state.currentUser.user?.id) {
+    saveTestResult({
+      userId: state.currentUser.user.id,
+      userName: state.currentUser.profile?.name || state.currentUser.user.email,
+      userEmail: state.currentUser.user.email,
+      type,
+      score: correctCount,
+      total: questionsList.length
+    }).catch(err => console.warn("saveTestResult error:", err));
   }
 
   sound.badge();
@@ -2126,56 +2594,91 @@ function finishExam(type) {
 }
 
 // ============================================================================
-// VIEW 6: ASSESSMENT RESULTS & DIAGNOSTICS (Stitch posttest_assessment_results)
+// VIEW 6: ASSESSMENT RESULTS & DIAGNOSTICS (Light Mode)
 // ============================================================================
 function renderResults(container, testResult) {
   const isId = getLang() === "id";
-  const res = testResult || state.userStats.results.find(r => r.type === "post") || {
-    score: 22,
+  const res = testResult || state.userStats.results.find(r => r.type === "post") || state.userStats.results[0] || {
+    type: "post",
+    score: 20,
     total_questions: 25,
-    score_percentage: 88,
-    session_hash: "8f4a-92c1",
-    completed_at: new Date().toISOString()
+    score_percentage: 80,
+    session_hash: "nq-92c1",
+    completed_at: new Date().toISOString(),
+    answers: new Array(25).fill(0)
   };
 
-  const percentage = res.score_percentage || Math.round((res.score / (res.total_questions || 25)) * 100);
+  const meta = getTestMeta(res.type, isId);
+  const questionsToReview = getQuestionsForTest(res.type);
+
+  const percentage = res.score_percentage !== undefined 
+    ? res.score_percentage 
+    : Math.round((res.score / (res.total_questions || questionsToReview.length)) * 100);
+
+  const isPassed = percentage >= 75;
+  const isPre = res.type === "pre";
+  const isPost = res.type === "post";
+  const isTopicQuiz = res.type.startsWith("topic-");
+
+  // Hake Gain calculation for Pre/Post
+  const preResult = state.userStats.results.find(r => r.type === "pre");
+  const postResult = state.userStats.results.find(r => r.type === "post");
+  let hakeLabel = "-";
+  if (preResult && postResult) {
+    const preP = preResult.score_percentage || Math.round((preResult.score / 25) * 100);
+    const postP = postResult.score_percentage || Math.round((postResult.score / 25) * 100);
+    if (preP < 100) {
+      hakeLabel = ((postP - preP) / (100 - preP)).toFixed(2);
+    } else {
+      hakeLabel = "1.00";
+    }
+  }
 
   container.innerHTML = `
     <div class="max-w-6xl mx-auto space-y-6 w-full">
       
       <!-- Header Section -->
-      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-2 border-b border-outline-variant">
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-2 border-b border-slate-200">
         <div>
-          <div class="flex items-center gap-1.5 font-mono text-xs text-outline uppercase tracking-wider">
-            <span>CS302</span>
+          <div class="flex items-center gap-1.5 font-mono text-xs text-slate-500 uppercase tracking-wider">
+            <span>NetLearn</span>
             <span>/</span>
-            <span>${isId ? "Evaluasi" : "Assessments"}</span>
+            <span>${isId ? "Asesmen" : "Assessments"}</span>
             <span>/</span>
-            <span>HOTS Posttest</span>
+            <span>${meta.title}</span>
             <span>/</span>
-            <span class="text-on-surface font-semibold">${isId ? "Ringkasan Hasil" : "Submission Summary"}</span>
+            <span class="text-slate-900 font-semibold">${isId ? "Hasil &amp; Pembahasan" : "Results &amp; Review"}</span>
           </div>
-          <h1 class="text-2xl sm:text-3xl font-extrabold text-on-surface tracking-tight">${isId ? "Hasil Ujian Posttest & Diagnostik Kognitif" : "Posttest Examination Results & Cognitive Diagnostics"}</h1>
-          <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-mono text-outline mt-1">
-            <span class="inline-flex items-center gap-1 text-secondary font-bold">
-              <span class="w-2 h-2 rounded-full bg-secondary"></span>
-              ${isId ? "Ujian Proctored Terverifikasi" : "Proctored Assessment Verified"}
+          <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight font-display">
+            ${isId ? `Hasil ${meta.title}` : `${meta.title} Results`}
+          </h1>
+          <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-mono text-slate-500 mt-1">
+            <span class="inline-flex items-center gap-1 ${isPassed ? 'text-emerald-700' : 'text-amber-700'} font-bold">
+              <span class="w-2 h-2 rounded-full ${isPassed ? 'bg-emerald-500' : 'bg-amber-500'}"></span>
+              ${isPassed ? (isId ? "Tuntas Standar Kompetensi" : "Passed Competency") : (isId ? "Di Bawah KKM (Perlu Penguatan)" : "Needs Remedial")}
             </span>
             <span>•</span>
-            <span>Hash: <strong class="text-on-surface">${res.session_hash || "8f4a-92c1"}</strong></span>
+            <span>Sesi: <strong class="text-slate-800">${res.session_hash || "nq-session"}</strong></span>
             <span>•</span>
-            <span>${isId ? "Selesai dalam 16m 25s / 35m" : "Completed in 16m 25s / 35m"}</span>
+            <span>${new Date(res.completed_at || Date.now()).toLocaleTimeString()}</span>
           </div>
         </div>
 
-        <div class="flex items-center gap-2">
-          <button class="h-9 px-3.5 bg-surface-container-low hover:bg-surface-container text-on-surface font-mono text-xs rounded-lg border border-outline-variant flex items-center gap-1.5 transition-colors cursor-pointer" id="btn-export-pdf-report">
-            <span class="material-symbols-outlined text-[16px]">file_download</span>
-            <span>${isId ? "Ekspor Laporan (.doc)" : "Export Report (.doc)"}</span>
+        <div class="flex items-center gap-2.5 flex-wrap">
+          <!-- REMEDIAL / RETAKE BUTTON -->
+          <button class="h-9 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-mono text-xs font-bold rounded-lg flex items-center gap-1.5 transition-all cursor-pointer shadow-sm" id="btn-results-retake-exam">
+            <span class="material-symbols-outlined text-[17px]">refresh</span>
+            <span>${isId ? "Ulangi (Remedial)" : "Retake (Remedial)"}</span>
           </button>
-          <button class="h-9 px-4 bg-primary hover:bg-primary-container text-on-primary font-mono text-xs font-bold rounded-lg transition-colors cursor-pointer" id="btn-results-back-dash">
-            <span class="material-symbols-outlined text-[16px]">arrow_back</span>
-            <span>${isId ? "Kembali ke Dashboard" : "Back to Dashboard"}</span>
+
+          <button class="h-9 px-3.5 bg-white hover:bg-slate-50 text-slate-700 font-mono text-xs rounded-lg border border-slate-200 flex items-center gap-1.5 transition-colors cursor-pointer" id="btn-export-pdf-report">
+            <span class="material-symbols-outlined text-[16px] text-slate-500">file_download</span>
+            <span>${isId ? "Ekspor (.doc)" : "Export (.doc)"}</span>
+          </button>
+
+          <button class="h-9 px-3.5 bg-white hover:bg-slate-50 text-indigo-700 font-mono text-xs font-bold rounded-lg border border-indigo-200 transition-colors cursor-pointer flex items-center gap-1" id="btn-results-back-dash">
+            <span class="material-symbols-outlined text-[16px]">menu_book</span>
+            <span>${isId ? "Bank Soal & Kuis" : "Quizzes Hub"}</span>
           </button>
         </div>
       </div>
@@ -2184,190 +2687,680 @@ function renderResults(container, testResult) {
       <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
         
         <!-- Final Grade Card -->
-        <div class="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant shadow-xs flex flex-col justify-between">
+        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
           <div class="flex items-center justify-between">
-            <span class="text-xs font-mono uppercase tracking-wider text-outline font-bold">${isId ? "Evaluasi Akhir" : "Final Evaluation"}</span>
-            <span class="text-xs font-mono px-2 py-0.5 rounded bg-secondary-fixed text-on-secondary-fixed font-bold">${isId ? "PREDIKAT A" : "GRADE A"}</span>
+            <span class="text-xs font-mono uppercase tracking-wider text-slate-500 font-bold">${isId ? "Nilai Akhir" : "Final Grade"}</span>
+            <span class="text-xs font-mono px-2 py-0.5 rounded ${isPassed ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-amber-50 text-amber-800 border border-amber-200'} font-bold">
+              ${percentage >= 85 ? "PREDIKAT A" : (percentage >= 75 ? "PREDIKAT B" : "REMEDIAL")}
+            </span>
           </div>
           <div class="my-3 flex items-baseline gap-2">
-            <span class="text-4xl font-extrabold text-on-surface tracking-tight">${percentage}</span>
-            <span class="text-base font-mono text-outline">/ 100</span>
+            <span class="text-4xl font-extrabold text-slate-900 tracking-tight font-mono">${percentage}</span>
+            <span class="text-base font-mono text-slate-500">/ 100</span>
+            <span class="text-xs font-mono text-indigo-700 ml-2">(${res.score} / ${res.total_questions || questionsToReview.length} ${isId ? "Benar" : "Correct"})</span>
           </div>
-          <div class="flex items-center justify-between text-xs font-mono text-outline pt-2 border-t border-outline-variant">
-            <span class="text-on-surface-variant font-medium">${isId ? "Standar: Lulus (Batas 75/100)" : "Benchmark: Passed (75/100 req)"}</span>
-            <span class="text-secondary font-bold">+13 pts margin</span>
-          </div>
-        </div>
-
-        <!-- Normalized Gain Card (Hake Formula) -->
-        <div class="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant shadow-xs flex flex-col justify-between">
-          <div class="flex items-center justify-between">
-            <span class="text-xs font-mono uppercase tracking-wider text-outline font-bold">${isId ? "Gain Ternormalisasi (Hake)" : "Diagnostic Normalized Gain"}</span>
-            <span class="text-xs font-mono px-2 py-0.5 rounded bg-primary-fixed text-primary font-bold">g = 0.58</span>
-          </div>
-          <div class="my-3 flex items-baseline gap-2 font-mono text-sm font-bold text-on-surface">
-            <span class="text-outline">PRE: 68%</span>
-            <span class="material-symbols-outlined text-[16px] text-outline">arrow_forward</span>
-            <span class="text-secondary">POST: ${percentage}%</span>
-          </div>
-          <div class="flex items-center justify-between text-xs font-mono text-outline pt-2 border-t border-outline-variant">
-            <span class="text-on-surface-variant font-medium">${isId ? "Rumus Gain Hake" : "Hake Formula Metric"}</span>
-            <span class="text-primary font-bold">${isId ? "Retensi Menengah-Tinggi" : "Med-High Retention"}</span>
+          <div class="flex items-center justify-between text-xs font-mono text-slate-500 pt-2 border-t border-slate-100">
+            <span>${isId ? "Kriteria KKM: 75/100" : "Benchmark: 75/100"}</span>
+            <span class="${isPassed ? 'text-emerald-700' : 'text-amber-700'} font-bold">
+              ${isPassed ? `+${percentage - 75} poin di atas KKM` : `Kurang ${75 - percentage} poin`}
+            </span>
           </div>
         </div>
 
-        <!-- Integrity Telemetry -->
-        <div class="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant shadow-xs flex flex-col justify-between">
+        <!-- Metric 2: Normalized Gain (Pre/Post) OR Topic Mastery -->
+        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
           <div class="flex items-center justify-between">
-            <span class="text-xs font-mono uppercase tracking-wider text-outline font-bold">${isId ? "Integritas Ujian" : "Integrity Telemetry"}</span>
-            <span class="text-xs font-mono px-2 py-0.5 rounded bg-secondary-container text-on-secondary-container font-bold">99.4%</span>
+            <span class="text-xs font-mono uppercase tracking-wider text-slate-500 font-bold">${isTopicQuiz ? (isId ? "Penguasaan Materi" : "Topic Mastery") : (isId ? "Gain Ternormalisasi (Hake)" : "Normalized Gain")}</span>
+            <span class="text-xs font-mono px-2 py-0.5 rounded bg-sky-50 text-sky-800 border border-sky-200 font-bold">
+              ${isTopicQuiz ? (percentage >= 75 ? "KOMPETEN" : "PEMULA") : `g = ${hakeLabel}`}
+            </span>
           </div>
-          <div class="my-3 text-sm font-mono text-on-surface font-semibold">
-            ${isId ? "0 Pindah Tab • Terkunci Penuh" : "0 Tab Switches • Locked Focus"}
+          <div class="my-3 flex items-baseline gap-2 font-mono text-sm font-bold text-slate-900">
+            ${isTopicQuiz 
+              ? `<span class="text-slate-800">${res.score} dari ${questionsToReview.length} Soal HOTS Terjawab Benar</span>`
+              : `<span class="text-slate-500">PRE: ${preResult ? (preResult.score_percentage || Math.round(preResult.score/25*100)) + '%' : '-'}</span>
+                 <span class="material-symbols-outlined text-[16px] text-indigo-600">arrow_forward</span>
+                 <span class="text-indigo-700">POST: ${postResult ? (postResult.score_percentage || Math.round(postResult.score/25*100)) + '%' : '-'}</span>`
+            }
           </div>
-          <div class="flex items-center justify-between text-xs font-mono text-outline pt-2 border-t border-outline-variant">
-            <span class="text-on-surface-variant font-medium">${isId ? "Status Pengawasan" : "Proctoring Status"}</span>
-            <span class="text-secondary font-bold">${isId ? "Valid" : "Validated"}</span>
+          <div class="flex items-center justify-between text-xs font-mono text-slate-500 pt-2 border-t border-slate-100">
+            <span>${isId ? "Tingkat Retensi:" : "Retention Level:"}</span>
+            <span class="text-indigo-700 font-bold">${percentage >= 80 ? (isId ? "Sangat Kuat" : "Very Strong") : (percentage >= 60 ? (isId ? "Cukup Baik" : "Moderate") : (isId ? "Perlu Baca Ulang" : "Review Needed"))}</span>
           </div>
+        </div>
+
+        <!-- Remedial Status & Retake Card -->
+        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-mono uppercase tracking-wider text-slate-500 font-bold">${isId ? "Status Remedial" : "Retake Option"}</span>
+            <span class="text-xs font-mono px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold">TERBUKA BEBAS</span>
+          </div>
+          <div class="my-2 text-xs text-slate-600 leading-relaxed">
+            ${isId 
+              ? "Anda bebas mengulang kembali kuis/ujian ini kapan saja untuk memperbaiki nilai dan memperdalam pemahaman." 
+              : "You can retake this assessment anytime to boost your score and master key technical concepts."}
+          </div>
+          <button class="w-full py-1.5 bg-slate-50 hover:bg-slate-100 text-indigo-700 border border-slate-200 rounded-lg font-mono text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5" id="btn-results-retake-exam-card">
+            <span class="material-symbols-outlined text-[15px]">refresh</span>
+            <span>${isId ? "Mulai Remedial Sekarang" : "Retake Now"}</span>
+          </button>
         </div>
       </div>
 
-      <!-- Cognitive Diagnostics & Question Breakdown -->
-      <div class="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant shadow-xs space-y-5">
-        <h3 class="text-sm font-bold text-on-surface font-mono">${isId ? "Diagnostik Domain Kognitif (Taksonomi Bloom HOTS)" : "Cognitive Domain Diagnostics (Bloom HOTS Taxonomy)"}</h3>
-        
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div class="p-4 bg-surface-container-low rounded-lg border border-outline-variant space-y-1.5">
-            <div class="flex items-center justify-between text-xs font-mono">
-              <span class="font-bold text-on-surface">C4 Analisis</span>
-              <span class="text-secondary font-bold">92%</span>
-            </div>
-            <p class="text-[11px] text-on-surface-variant">${isId ? "Batas bit subnetting, masking CIDR, dan analisis header paket data." : "Subnet bit boundaries, CIDR masking, packet header analysis."}</p>
+      <!-- Question-by-Question Full Technical Review -->
+      <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-5">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+          <div>
+            <h3 class="text-sm font-bold text-slate-900 font-mono">${isId ? `Pembahasan Teknis Lengkap (${questionsToReview.length} Butir Soal)` : `Question-by-Question Technical Review (${questionsToReview.length} Items)`}</h3>
+            <p class="text-xs text-slate-500 font-mono">${isId ? "Periksa jawaban Anda beserta kunci jawaban dan dasar penalaran teknisnya:" : "Detailed breakdown of questions and answer explanations:"}</p>
           </div>
-
-          <div class="p-4 bg-surface-container-low rounded-lg border border-outline-variant space-y-1.5">
-            <div class="flex items-center justify-between text-xs font-mono">
-              <span class="font-bold text-on-surface">C5 Sintesis</span>
-              <span class="text-primary font-bold">80%</span>
-            </div>
-            <p class="text-[11px] text-on-surface-variant">${isId ? "Routing multi-area OSPF, konfigurasi VLAN trunking dan routing statis." : "Multi-area OSPF routing, VLAN trunking configuration."}</p>
-          </div>
-
-          <div class="p-4 bg-surface-container-low rounded-lg border border-outline-variant space-y-1.5">
-            <div class="flex items-center justify-between text-xs font-mono">
-              <span class="font-bold text-on-surface">C6 Evaluasi</span>
-              <span class="text-secondary font-bold">86%</span>
-            </div>
-            <p class="text-[11px] text-on-surface-variant">${isId ? "Troubleshooting akar masalah, loop prevention, dan tabel ARP macet." : "Root cause troubleshooting, loop prevention, ARP table faults."}</p>
+          <div class="flex items-center gap-2 font-mono text-xs">
+            <span class="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold">${res.score} Benar</span>
+            <span class="px-2 py-0.5 rounded bg-rose-50 text-rose-800 border border-rose-200 font-bold">${questionsToReview.length - res.score} Salah</span>
           </div>
         </div>
 
-        <!-- Question List Accordion -->
-        <div class="pt-4 border-t border-outline-variant space-y-3">
-          <h4 class="text-xs font-mono font-bold text-outline uppercase tracking-wider">${isId ? "Pembahasan Teknis per Butir Soal (25 Butir)" : "Question-by-Question Technical Review (25 Items)"}</h4>
-          <div class="divide-y divide-outline-variant border border-outline-variant rounded-lg overflow-hidden text-xs">
-            ${HOTS_QUESTIONS.slice(0, 5).map((q, i) => `
-              <div class="p-4 bg-surface-container-lowest hover:bg-surface-container-low/50 transition-colors">
-                <div class="flex items-center justify-between font-mono text-[11px] text-outline mb-1">
-                  <span>ITEM #${q.id} • ${isId ? q.topic_id : q.topic_en}</span>
-                  <span class="text-secondary font-bold flex items-center gap-1">
-                    <span class="material-symbols-outlined text-[14px]">check_circle</span> ${isId ? "Jawaban Benar" : "Correct"}
+        <div class="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden text-xs">
+          ${questionsToReview.map((q, idx) => {
+            const userChoice = (res.answers && res.answers[idx] !== undefined) ? res.answers[idx] : null;
+            const correctOptIdx = (isId ? q.options_id : q.options_en).findIndex(opt => opt.correct === true);
+            const isCorrect = userChoice !== null && userChoice === correctOptIdx;
+            const userOptText = userChoice !== null ? (isId ? q.options_id[userChoice]?.text : q.options_en[userChoice]?.text) : (isId ? "Tidak Dijawab" : "Unanswered");
+            const correctOptText = isId ? q.options_id[correctOptIdx]?.text : q.options_en[correctOptIdx]?.text;
+
+            return `
+              <div class="p-4 bg-white hover:bg-slate-50/70 transition-colors space-y-2">
+                <div class="flex items-center justify-between font-mono text-[11px] text-slate-500">
+                  <span class="text-slate-900 font-bold">SOAL #${idx + 1} • ${isId ? q.topic_id : q.topic_en}</span>
+                  <span class="${isCorrect ? 'text-emerald-700 font-bold' : 'text-rose-700 font-bold'} flex items-center gap-1">
+                    <span class="material-symbols-outlined text-[15px]">${isCorrect ? "check_circle" : "cancel"}</span>
+                    ${isCorrect ? (isId ? "Jawaban Anda Benar" : "Correct") : (isId ? "Jawaban Anda Salah" : "Incorrect")}
                   </span>
                 </div>
-                <p class="font-medium text-on-surface leading-relaxed">${isId ? q.question_id : q.question_en}</p>
-                <div class="mt-2 p-2.5 rounded bg-surface-container-low font-mono text-[11px] text-on-surface-variant">
-                  <span class="font-bold text-primary">${isId ? "Penjelasan Teknis:" : "Technical Explanation:"}</span> ${isId ? q.explanation_id : q.explanation_en}
+
+                <p class="font-medium text-slate-800 leading-relaxed">${isId ? q.question_id : q.question_en}</p>
+
+                <!-- Answers Comparison -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 font-mono text-[11px]">
+                  <div class="p-2.5 rounded-lg border ${isCorrect ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-rose-200 bg-rose-50 text-rose-900'}">
+                    <span class="block text-[10px] uppercase font-bold text-slate-500">${isId ? "Jawaban Anda:" : "Your Answer:"}</span>
+                    <span class="font-semibold">${userChoice !== null ? String.fromCharCode(65 + userChoice) + '. ' : ''}${userOptText}</span>
+                  </div>
+                  ${!isCorrect ? `
+                    <div class="p-2.5 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-900">
+                      <span class="block text-[10px] uppercase font-bold text-slate-500">${isId ? "Kunci Jawaban Benar:" : "Correct Key:"}</span>
+                      <span class="font-semibold">${String.fromCharCode(65 + correctOptIdx)}. ${correctOptText}</span>
+                    </div>
+                  ` : ""}
+                </div>
+
+                <!-- Technical Explanation -->
+                <div class="p-2.5 rounded-lg bg-blue-50/60 border border-blue-200 font-mono text-[11px] text-slate-700 leading-relaxed">
+                  <span class="font-bold text-blue-900">${isId ? "Pembahasan Teknis:" : "Explanation:"}</span> ${isId ? q.explanation_id : q.explanation_en}
                 </div>
               </div>
-            `).join("")}
-          </div>
+            `;
+          }).join("")}
         </div>
       </div>
     </div>
   `;
 
-  document.getElementById("btn-results-back-dash")?.addEventListener("click", () => navigateTo("dashboard"));
+  // Remedial retake triggers
+  const triggerRetake = () => {
+    const confirmMsg = isId 
+      ? `Apakah Anda ingin mengulang ${meta.title} dari awal (Remedial)?\n\nWaktu ujian akan diulang dari awal dan skor baru akan otomatis memperbarui capaian Anda.`
+      : `Do you want to retake ${meta.title} from the beginning?\n\nThe timer will reset and your new score will be updated.`;
+
+    if (confirm(confirmMsg)) {
+      state.testState = null;
+      if (res.type === "pre") {
+        navigateTo("pretest");
+      } else if (res.type === "post") {
+        navigateTo("posttest");
+      } else {
+        navigateTo("quiz", { type: res.type });
+      }
+    }
+  };
+
+  document.getElementById("btn-results-retake-exam")?.addEventListener("click", triggerRetake);
+  document.getElementById("btn-results-retake-exam-card")?.addEventListener("click", triggerRetake);
+  document.getElementById("btn-results-back-dash")?.addEventListener("click", () => navigateTo("quizzes"));
 
   document.getElementById("btn-export-pdf-report")?.addEventListener("click", () => {
-    exportToWord("Laporan_Diagnostik_Ujian_CS302", "Laporan Diagnostik HOTS CS302", `
-      <h1>Hasil Ujian Posttest & Diagnostik Kognitif CS302</h1>
-      <p>Peserta: ${state.currentUser?.user?.user_metadata?.full_name || "Aditya Sharma"} (NIM: CS2025-08119)</p>
-      <p>Nilai Akhir: ${percentage}/100 (Predikat A • Lulus Standar Kompetensi)</p>
-      <p>Gain Ternormalisasi: g = 0.58 (Pre: 68% -> Post: 88%)</p>
-      <h2>Pencapaian Domain Kognitif Bloom</h2>
-      <ul>
-        <li>C4 Analisis: 92%</li>
-        <li>C5 Sintesis: 80%</li>
-        <li>C6 Evaluasi: 86%</li>
-      </ul>
+    exportToWord("Laporan_Hasil_" + res.type, "Laporan Evaluasi Asesmen", `
+      <h1>Hasil ${meta.title} &amp; Pembahasan Teknis</h1>
+      <p>Peserta: ${state.currentUser?.name || "Siswa TKJ"} (${state.currentUser?.className || "XI TKJ"})</p>
+      <p>Nilai Akhir: ${percentage}/100 (${isPassed ? "TUNTAS STANDAR KOMPETENSI" : "PERLU REMEDIAL"})</p>
+      <p>Soal Terjawab Benar: ${res.score} dari ${questionsToReview.length}</p>
     `);
-    showToast(isId ? "Laporan Berhasil Diunduh" : "Report Exported", isId ? "Laporan format Word telah disimpan." : "Diagnostic report downloaded.", "file_download");
+    showToast(isId ? "Laporan Berhasil Diunduh" : "Report Exported", isId ? "Laporan format Word (.doc) telah disimpan." : "Diagnostic report downloaded.", "file_download");
   });
 }
 
 // ============================================================================
-// VIEW 7: QUIZZES & ASSESSMENTS HUB (Stitch quizzes_assessments_hub)
 // ============================================================================
-function renderQuizzes(container) {
+// VIEW 6B: 3D MINI GAME QUEST CITY (Kenney Car & City Kit)
+// ============================================================================
+function renderMiniGame(container) {
   const isId = getLang() === "id";
 
   container.innerHTML = `
-    <div class="max-w-6xl mx-auto space-y-6 w-full">
-      <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-2 border-b border-outline-variant">
-        <div>
-          <div class="flex items-center gap-1.5 font-mono text-xs text-outline uppercase tracking-wider">
-            <span>${isId ? "Portal Akademik" : "Academic Portal"}</span>
-            <span class="text-outline-variant">/</span>
-            <span>CS302 Networks</span>
-            <span class="text-outline-variant">/</span>
-            <span class="text-on-surface font-semibold">${isId ? "Pusat Asesmen" : "Assessments Hub"}</span>
+    <div class="max-w-6xl mx-auto space-y-4 w-full">
+      <!-- Top Control Bar -->
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+          <button class="h-9 px-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-mono text-xs font-bold rounded-lg border border-slate-200 flex items-center gap-1.5 transition-colors cursor-pointer" id="btn-game-back-to-quizzes">
+            <span class="material-symbols-outlined text-[17px]">arrow_back</span>
+            <span>${isId ? "Kembali ke Asesmen" : "Back to Assessments"}</span>
+          </button>
+          <div>
+            <h1 class="text-base sm:text-lg font-bold text-slate-900 font-display flex items-center gap-2">
+              <span>NetDrive 3D: Network Quest City</span>
+              <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold">METROPOLITAN QUEST</span>
+            </h1>
+            <p class="text-[11px] text-slate-500 font-mono">
+              ${isId ? "Kendalikan kendaraan jaringan, antar paket data TCP/UDP ke server tujuan, kumpulkan token protokol, dan pecahkan kuis HOTS!" : "Drive your network vehicle, deliver TCP/UDP data packets, collect protocol tokens, and solve HOTS challenges across districts!"}
+            </p>
           </div>
-          <h1 class="text-2xl sm:text-3xl font-extrabold text-on-surface tracking-tight">${t("navQuizzes")}</h1>
-          <p class="text-xs sm:text-sm text-on-surface-variant">${isId ? "Kuis latihan formatif, asesmen mandiri, dan bank 25 soal cerita berbasis studi kasus HOTS." : "Practice quizzes, formative evaluations, and bank of 25 HOTS scenario questions."}</p>
+        </div>
+
+        <!-- HUD Quick Stats & Actions -->
+        <div class="flex items-center gap-3 flex-wrap">
+          <div class="flex items-center gap-2 font-mono text-xs">
+            <div class="px-3 py-1.5 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold flex items-center gap-1.5">
+              <span class="material-symbols-outlined text-[16px]">stars</span>
+              <span>Skor: <strong id="hud-game-score">0</strong></span>
+            </div>
+            <div class="px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold flex items-center gap-1.5">
+              <span class="material-symbols-outlined text-[16px]">verified</span>
+              <span>Pos Tuntas: <strong id="hud-game-progress">0 / 6</strong></span>
+            </div>
+            <div class="px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 font-bold flex items-center gap-1.5">
+              <span class="material-symbols-outlined text-[16px]">local_shipping</span>
+              <span>Kurir Paket: <strong id="hud-courier-progress">0</strong></span>
+            </div>
+          </div>
+
+          <!-- Car Model Selector -->
+          <div class="flex items-center gap-1.5">
+            <label class="text-[11px] font-mono text-slate-500 font-bold">${isId ? "Mobil:" : "Car:"}</label>
+            <select id="select-game-car-model" class="h-8 px-2.5 rounded-lg bg-slate-50 border border-slate-200 font-mono text-xs text-slate-800 focus:outline-none focus:border-indigo-500 cursor-pointer font-bold">
+              <option value="delivery">📦 Mobil Kurir Paket Data</option>
+              <option value="race-future">🏎️ Cyber Future Supercar</option>
+              <option value="sedan-sports">🏎️ Sports Sedan Turbo</option>
+              <option value="suv-luxury">🚙 Luxury Cyber SUV</option>
+              <option value="police">🚓 Mobil Polisi Siber</option>
+              <option value="race">🏎️ Formula Super Racer</option>
+              <option value="taxi">🚕 Taksi Jaringan Kota</option>
+              <option value="ambulance">🚑 Ambulans Respons Cepat</option>
+              <option value="firetruck">🚒 Truk Penyelamat Siber</option>
+              <option value="sedan">🚗 Sedan Klasik</option>
+            </select>
+          </div>
+
+          <button class="h-8 px-2.5 bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 rounded-lg text-xs font-mono font-medium flex items-center gap-1 cursor-pointer transition-colors" id="btn-game-reset-pos" title="Kembalikan mobil ke titik awal (R)">
+            <span class="material-symbols-outlined text-[15px]">restart_alt</span>
+            <span>Reset (R)</span>
+          </button>
         </div>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <!-- Diagnostic Pretest Card -->
-        <div class="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant shadow-xs flex flex-col justify-between">
-          <div>
-            <div class="flex items-center justify-between mb-3">
-              <span class="px-2 py-0.5 rounded font-mono text-xs bg-primary-fixed text-primary font-bold">BENCHMARK</span>
-              <span class="font-mono text-xs text-outline">25 Soal • 35 menit</span>
-            </div>
-            <h3 class="text-lg font-bold text-on-surface mb-2">${isId ? "Pretest Diagnostik Awal" : "Diagnostic Baseline Pretest"}</h3>
-            <p class="text-xs text-on-surface-variant leading-relaxed mb-4">
-              ${isId ? "Mengukur garis dasar pemahaman awal siswa untuk kalkulasi normalized gain Hake. Mencakup konsep fundamental jaringan dan CIDR." : "Establishes initial cognitive baseline for Hake normalized gain calculation. Covers foundational networking and CIDR concepts."}
-            </p>
+      <!-- 3D Canvas Stage & Floating HUD -->
+      <div class="relative w-full rounded-2xl overflow-hidden border border-slate-300 shadow-md bg-slate-900 select-none" style="height: 600px;" id="netgame-viewport">
+        <!-- Three.js Canvas Container -->
+        <div id="netgame-canvas-mount" class="w-full h-full"></div>
+
+        <!-- Floating Top-Left: Active Data Courier Mission HUD -->
+        <div id="netgame-courier-card" class="absolute top-4 left-4 bg-slate-900/90 backdrop-blur-md border border-amber-500/50 rounded-xl p-3 shadow-xl max-w-sm pointer-events-none flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/40 flex items-center justify-center shrink-0">
+            <span class="material-symbols-outlined text-[22px]">local_shipping</span>
           </div>
-          <button class="h-9 px-4 bg-primary hover:bg-primary-container text-on-primary font-mono text-xs font-bold rounded-lg transition-colors cursor-pointer" id="btn-quiz-pretest">
-            ${isId ? "Mulai Pretest Sekarang" : "Launch Pretest"}
-          </button>
+          <div class="font-mono text-left">
+            <div class="flex items-center gap-2">
+              <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/30 text-amber-300 border border-amber-400/50 uppercase">KURIR DATA</span>
+              <span id="courier-target-type" class="text-[10px] text-cyan-300 font-bold">[TCP HTTPS:443]</span>
+            </div>
+            <div id="courier-target-name" class="text-xs font-bold text-white mt-0.5 truncate max-w-[210px]">Tujuan: Bank Sentral Siber</div>
+            <div class="flex items-center gap-3 text-[10px] text-slate-300 mt-0.5">
+              <span id="courier-target-dist">Jarak: -- m</span>
+              <span id="courier-ping" class="text-emerald-400 font-bold">Ping: 18 ms</span>
+            </div>
+          </div>
         </div>
 
-        <!-- HOTS Posttest Card -->
-        <div class="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant shadow-xs flex flex-col justify-between">
-          <div>
-            <div class="flex items-center justify-between mb-3">
-              <span class="px-2 py-0.5 rounded font-mono text-xs bg-secondary-fixed text-on-secondary-fixed font-bold">SUMMATIF</span>
-              <span class="font-mono text-xs text-outline">25 Soal • 35 menit</span>
+        <!-- Floating Top-Center: Token Collection Toast Banner -->
+        <div id="netgame-token-toast" class="absolute top-4 left-1/2 -translate-x-1/2 bg-slate-900/95 backdrop-blur-md border border-emerald-500/60 text-white rounded-xl px-4 py-2 shadow-2xl flex items-center gap-2 font-mono text-xs pointer-events-none transition-all duration-300 opacity-0 -translate-y-2 z-30">
+          <span class="material-symbols-outlined text-emerald-400 text-[18px]">bolt</span>
+          <span id="netgame-token-text">+30 XP! Token Protokol Ditemukan</span>
+        </div>
+
+        <!-- Floating Top-Right: Minimap Radar -->
+        <div class="absolute top-4 right-4 bg-slate-900/85 backdrop-blur-md border border-sky-500/40 rounded-xl p-2.5 shadow-xl flex flex-col items-center pointer-events-none">
+          <div class="flex items-center justify-between w-full pb-1 border-b border-sky-500/20 text-[10px] font-mono text-sky-300 font-bold uppercase tracking-wider">
+            <span>Radar Kota 3D</span>
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          </div>
+          <canvas id="netgame-radar-canvas" width="110" height="110" class="mt-1"></canvas>
+          <div class="flex items-center gap-2 pt-1 text-[9px] font-mono text-slate-300">
+            <span class="flex items-center gap-0.5"><span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> Pos</span>
+            <span class="flex items-center gap-0.5"><span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span> Kurir</span>
+            <span class="flex items-center gap-0.5"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Tuntas</span>
+          </div>
+        </div>
+
+        <!-- Floating Bottom-Right: Speedometer, Nitro & Controls Hint -->
+        <div class="absolute bottom-4 right-4 bg-slate-900/85 backdrop-blur-md border border-slate-700/80 rounded-xl p-3 shadow-xl text-right pointer-events-none space-y-1.5 min-w-[210px]">
+          <div class="flex items-center justify-between">
+            <div class="text-[10px] font-mono text-slate-400 uppercase tracking-wider text-left">Kecepatan</div>
+            <div class="text-2xl font-black font-mono text-emerald-400" id="netgame-speed-gauge">0 km/h</div>
+          </div>
+          
+          <!-- Nitro Gauge -->
+          <div class="space-y-0.5">
+            <div class="flex items-center justify-between text-[9px] font-mono text-slate-400">
+              <span class="flex items-center gap-1 text-cyan-300"><span class="material-symbols-outlined text-[13px]">bolt</span> NITRO BOOST</span>
+              <span id="netgame-nitro-text" class="text-cyan-300 font-bold">100%</span>
             </div>
-            <h3 class="text-lg font-bold text-on-surface mb-2">${isId ? "Ujian Akhir HOTS Posttest" : "HOTS Posttest Examination"}</h3>
-            <p class="text-xs text-on-surface-variant leading-relaxed mb-4">
-              ${isId ? "Evaluasi proctored akhir untuk mengukur ketuntasan belajar domain C4 Analisis, C5 Sintesis, dan C6 Evaluasi pemecahan masalah." : "Final proctored evaluation measuring C4 Analysis, C5 Synthesis, and C6 Evaluation mastery."}
+            <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+              <div id="netgame-nitro-bar" class="h-full bg-gradient-to-r from-cyan-400 to-indigo-500 rounded-full transition-all duration-75" style="width: 100%;"></div>
+            </div>
+          </div>
+
+          <div class="pt-1 border-t border-slate-800 text-[9.5px] font-mono text-slate-300 space-y-0.5 text-left">
+            <div><strong class="text-indigo-400">W/↑</strong> Gas &bull; <strong class="text-indigo-400">S/↓</strong> Rem/Mundur &bull; <strong class="text-cyan-400">Shift</strong> Nitro</div>
+            <div><strong class="text-indigo-400">A/D</strong> Belok &bull; <strong class="text-indigo-400">Spasi</strong> Drift &bull; <strong class="text-indigo-400">E</strong> Interaksi</div>
+          </div>
+        </div>
+
+        <!-- Floating Bottom-Left: On-Screen Touch Controls (Mobile / Tablet / Mouse) -->
+        <div class="absolute bottom-4 left-4 flex items-end gap-2.5 pointer-events-auto">
+          <!-- Steering Buttons -->
+          <div class="grid grid-cols-2 gap-1.5">
+            <button class="w-11 h-11 rounded-xl bg-slate-900/80 hover:bg-slate-800 active:bg-indigo-600 text-white border border-slate-700 flex items-center justify-center font-bold text-sm shadow cursor-pointer transition-all" id="btn-touch-left">
+              <span class="material-symbols-outlined">arrow_back</span>
+            </button>
+            <button class="w-11 h-11 rounded-xl bg-slate-900/80 hover:bg-slate-800 active:bg-indigo-600 text-white border border-slate-700 flex items-center justify-center font-bold text-sm shadow cursor-pointer transition-all" id="btn-touch-right">
+              <span class="material-symbols-outlined">arrow_forward</span>
+            </button>
+          </div>
+
+          <!-- Gas / Brake / Nitro Buttons -->
+          <div class="flex flex-col gap-1.5">
+            <div class="flex items-center gap-1.5">
+              <button class="w-12 h-11 rounded-xl bg-emerald-600/90 hover:bg-emerald-500 active:bg-emerald-400 text-white border border-emerald-400 font-mono text-xs font-bold flex items-center justify-center gap-1 shadow cursor-pointer transition-all" id="btn-touch-gas">
+                <span class="material-symbols-outlined text-[18px]">keyboard_arrow_up</span>
+                <span>GAS</span>
+              </button>
+              <button class="w-12 h-11 rounded-xl bg-cyan-600/90 hover:bg-cyan-500 active:bg-cyan-400 text-white border border-cyan-400 font-mono text-[10px] font-bold flex items-center justify-center gap-0.5 shadow cursor-pointer transition-all" id="btn-touch-nitro">
+                <span class="material-symbols-outlined text-[14px]">bolt</span>
+                <span>NITRO</span>
+              </button>
+            </div>
+            <button class="w-full h-8 rounded-xl bg-rose-600/90 hover:bg-rose-500 active:bg-rose-400 text-white border border-rose-400 font-mono text-xs font-bold flex items-center justify-center gap-1 shadow cursor-pointer transition-all" id="btn-touch-brake">
+              <span class="material-symbols-outlined text-[15px]">pause</span>
+              <span>REM</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Floating Center Bottom: Proximity Prompt -->
+        <div id="netgame-prompt-container" class="hidden absolute bottom-5 left-1/2 -translate-x-1/2 z-20 pointer-events-auto">
+        </div>
+
+        <!-- Floating Boundary Warning Notification -->
+        <div id="netgame-boundary-alert" class="hidden absolute top-4 left-1/2 -translate-x-1/2 z-30 pointer-events-none transition-all">
+          <div class="px-4 py-2.5 rounded-xl bg-slate-900/95 border border-rose-500/80 text-white font-mono text-xs font-bold shadow-2xl flex items-center gap-2.5 backdrop-blur-md animate-bounce">
+            <span class="material-symbols-outlined text-amber-400 text-[20px]">fmd_bad</span>
+            <span class="tracking-wide text-rose-200">BATAS KOTA: Area Terlarang! Silakan Putar Balik</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- In-Game Question Modal Overlay Mount (Managed by game3d.js) -->
+      <div id="netgame-modal-overlay" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+      </div>
+
+      <!-- Victory Celebration Modal (All 6 Stations Completed) -->
+      <div id="netgame-victory-modal" class="hidden fixed inset-0 z-50 bg-slate-900/75 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl border border-slate-200 max-w-md w-full p-6 sm:p-8 shadow-2xl text-center space-y-5 animate-scale-up">
+          <div class="w-20 h-20 rounded-2xl bg-amber-50 border border-amber-200 text-amber-500 flex items-center justify-center mx-auto shadow-md">
+            <span class="material-symbols-outlined text-[44px]">emoji_events</span>
+          </div>
+
+          <div class="space-y-1.5">
+            <span class="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono text-xs font-bold uppercase tracking-wider">MISI 100% TUNTAS</span>
+            <h2 class="text-2xl font-bold font-display text-slate-900">Grand Champion NetDrive!</h2>
+            <p class="text-xs text-slate-600 leading-relaxed">
+              Selamat! Anda telah berhasil menuntaskan seluruh 6 pos misi studi kasus jaringan di kota 3D dengan hasil memuaskan!
             </p>
           </div>
-          <button class="h-9 px-4 bg-secondary hover:bg-secondary/90 text-on-secondary font-mono text-xs font-bold rounded-lg transition-colors cursor-pointer" id="btn-quiz-posttest">
-            ${isId ? "Ikuti Ujian Posttest" : "Take Posttest Exam"}
-          </button>
+
+          <div class="p-4 bg-slate-50 rounded-xl border border-slate-200 grid grid-cols-2 gap-3 text-center font-mono text-xs">
+            <div>
+              <span class="text-slate-400 block text-[10px] uppercase font-bold">Total Skor</span>
+              <span class="text-2xl font-black text-indigo-700" id="victory-score-display">600</span>
+            </div>
+            <div>
+              <span class="text-slate-400 block text-[10px] uppercase font-bold">Bonus XP</span>
+              <span class="text-2xl font-black text-emerald-700">+300 XP</span>
+            </div>
+          </div>
+
+          <div class="pt-2">
+            <button class="w-full h-11 bg-indigo-600 hover:bg-indigo-700 text-white font-mono text-xs font-bold rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-sm" id="btn-victory-claim-back">
+              <span class="material-symbols-outlined text-[18px]">verified</span>
+              <span>Klaim Hadiah &amp; Kembali</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
   `;
 
-  document.getElementById("btn-quiz-pretest")?.addEventListener("click", () => navigateTo("pretest"));
-  document.getElementById("btn-quiz-posttest")?.addEventListener("click", () => navigateTo("posttest"));
+  // Attach Back Button
+  document.getElementById("btn-game-back-to-quizzes")?.addEventListener("click", () => {
+    cleanupNetQuestCityGame();
+    navigateTo("quizzes");
+  });
+
+  // Attach Model Selector
+  const carSelect = document.getElementById("select-game-car-model");
+  carSelect?.addEventListener("change", (e) => {
+    if (activeGameInstance) {
+      activeGameInstance.setCar(e.target.value);
+    }
+  });
+
+  // Attach Reset Button
+  document.getElementById("btn-game-reset-pos")?.addEventListener("click", () => {
+    if (activeGameInstance) activeGameInstance.reset();
+  });
+
+  // Touch Screen Buttons Support
+  const simulateKey = (code, isDown) => {
+    window.dispatchEvent(new KeyboardEvent(isDown ? "keydown" : "keyup", { code, bubbles: true }));
+  };
+
+  const bindTouch = (id, code) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener("mousedown", () => simulateKey(code, true));
+    el.addEventListener("mouseup", () => simulateKey(code, false));
+    el.addEventListener("touchstart", (e) => { e.preventDefault(); simulateKey(code, true); }, { passive: false });
+    el.addEventListener("touchend", (e) => { e.preventDefault(); simulateKey(code, false); }, { passive: false });
+  };
+
+  bindTouch("btn-touch-left", "KeyA");
+  bindTouch("btn-touch-right", "KeyD");
+  bindTouch("btn-touch-gas", "KeyW");
+  bindTouch("btn-touch-brake", "Space");
+  bindTouch("btn-touch-nitro", "ShiftLeft");
+
+  // Initialize the 3D Game Engine
+  const mountEl = document.getElementById("netgame-canvas-mount");
+  let activeGameInstance = null;
+
+  if (mountEl) {
+    activeGameInstance = initNetQuestCityGame(mountEl, {
+      lang: isId ? "id" : "en",
+      onScoreUpdate: (score, solvedCount, totalStations) => {
+        const scoreEl = document.getElementById("hud-game-score");
+        const progEl = document.getElementById("hud-game-progress");
+        if (scoreEl) scoreEl.textContent = score;
+        if (progEl) progEl.textContent = `${solvedCount} / ${totalStations}`;
+      },
+      onCourierComplete: (mission, totalCompleted) => {
+        const cEl = document.getElementById("hud-courier-progress");
+        if (cEl) cEl.textContent = totalCompleted;
+        awardXP(150, `Misi Kurir Data: ${mission.name}`);
+        saveUserStats();
+        showToast("Pengiriman Sukses!", `${mission.title} (${mission.type})`, "local_shipping");
+      },
+      onTokenCollect: (token) => {
+        awardXP(30, `Token Protokol: ${token.name}`);
+        saveUserStats();
+      },
+      onStationComplete: (stationConfig, score) => {
+        awardXP(50, `Tuntas Pos ${stationConfig.id}: ${stationConfig.title}`);
+        saveUserStats();
+        showToast("Pos Misi Selesai!", `${stationConfig.title} (${score}/5 Benar)`, "verified");
+      },
+      onGameComplete: (totalScore) => {
+        const victoryModal = document.getElementById("netgame-victory-modal");
+        const scoreDisp = document.getElementById("victory-score-display");
+        if (scoreDisp) scoreDisp.textContent = totalScore;
+        awardXP(300, "Menyelesaikan Seluruh Misi NetDrive 3D Quest City");
+        saveUserStats();
+        sound.badge();
+        victoryModal?.classList.remove("hidden");
+
+        document.getElementById("btn-victory-claim-back")?.addEventListener("click", () => {
+          victoryModal?.classList.add("hidden");
+          cleanupNetQuestCityGame();
+          navigateTo("quizzes");
+        });
+      }
+    });
+  }
 }
+
+// ============================================================================
+// VIEW 7: PORTAL ASESMEN & ARENA 3D QUEST (Light Mode)
+// ============================================================================
+function renderQuizzes(container) {
+  const isId = getLang() === "id";
+
+  const preResult = (state.userStats?.results || []).find(r => r.type === "pre");
+  const postResult = (state.userStats?.results || []).find(r => r.type === "post");
+  const preScore = preResult ? (preResult.score_percentage !== undefined ? preResult.score_percentage : Math.round((preResult.score / 25) * 100)) : null;
+  const postScore = postResult ? (postResult.score_percentage !== undefined ? postResult.score_percentage : Math.round((postResult.score / 25) * 100)) : null;
+
+  container.innerHTML = `
+    <div class="max-w-6xl mx-auto space-y-6 w-full">
+      
+      <!-- Top Title & Stats Banner -->
+      <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-2 border-b border-slate-200">
+        <div>
+          <div class="flex items-center gap-1.5 font-mono text-xs text-slate-500 uppercase tracking-wider">
+            <span>NetLearn</span>
+            <span>/</span>
+            <span>${isId ? "Asesmen" : "Assessments"}</span>
+            <span>/</span>
+            <span class="text-slate-900 font-semibold">${isId ? "Pusat Evaluasi & Mini Game 3D" : "Evaluation & 3D Quest"}</span>
+          </div>
+          <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight font-display">
+            ${isId ? "Pusat Asesmen & Arena Penjelajahan 3D" : "Assessment & 3D Quest Hub"}
+          </h1>
+          <p class="text-xs sm:text-sm text-slate-600 mt-1">
+            ${isId ? "Uji kompetensi Anda melalui mini game 3D kota metropolitan dan evaluasi kurikulum resmi (Pretest & Posttest HOTS)." : "Test your skills in the 3D city mini game and curriculum evaluation assessments."}
+          </p>
+        </div>
+
+        <!-- Quick Summary Stats -->
+        <div class="flex items-center gap-2 font-mono text-xs">
+          <span class="px-2.5 py-1 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold">Mini Game 3D</span>
+          <span class="px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 font-bold">2 Evaluasi Kurikulum</span>
+          <span class="px-2.5 py-1 rounded-lg bg-sky-50 border border-sky-200 text-sky-700 font-bold">30 Soal HOTS</span>
+        </div>
+      </div>
+
+      <!-- MAIN FEATURE 1: 3D Mini-Game Hero Showcase (Kenney 3D City & Car Kit) -->
+      <div class="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white rounded-2xl border border-indigo-500/40 p-6 sm:p-8 shadow-xl relative overflow-hidden space-y-6">
+        
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
+          <div class="space-y-3 max-w-2xl">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="px-3 py-1 rounded-full text-[11px] font-mono bg-indigo-500/30 text-indigo-300 border border-indigo-400/50 font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-sm">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span>MINI GAME 3D INTERAKTIF</span>
+              </span>
+              <span class="text-xs font-mono text-slate-300">• Eksplorasi Kota &amp; Ekspedisi Kurir Jaringan 3D</span>
+            </div>
+
+            <h2 class="text-2xl sm:text-3xl font-extrabold font-display text-white tracking-tight">
+              NetDrive 3D: Network Quest City
+            </h2>
+
+            <p class="text-xs sm:text-sm text-slate-300 leading-relaxed">
+              ${isId 
+                ? "Kendarai supercar pilihan Anda menjelajahi jalanan aspal kota metropolitan 3D. Temukan <strong>6 Pos Menara Sinyal</strong> di persimpangan jalan tematik dan selesaikan <strong>5 soal tantangan HOTS per pos</strong> untuk menguasai seluruh kurikulum jaringan!" 
+                : "Drive your 3D car through city avenues, locate 6 thematic data towers, and solve 5 scenario questions per station to master networking!"}
+            </p>
+
+            <!-- 4 Key Game Features Pills -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-2 text-xs font-mono">
+              <div class="p-2.5 rounded-xl bg-white/5 border border-white/10 flex items-center gap-2">
+                <span class="material-symbols-outlined text-indigo-400 text-[18px]">directions_car</span>
+                <span>8 Armada Mobil</span>
+              </div>
+              <div class="p-2.5 rounded-xl bg-white/5 border border-white/10 flex items-center gap-2">
+                <span class="material-symbols-outlined text-sky-400 text-[18px]">apartment</span>
+                <span>Peta Kota 3D Luas</span>
+              </div>
+              <div class="p-2.5 rounded-xl bg-white/5 border border-white/10 flex items-center gap-2">
+                <span class="material-symbols-outlined text-emerald-400 text-[18px]">quiz</span>
+                <span>5 Soal per Pos</span>
+              </div>
+              <div class="p-2.5 rounded-xl bg-white/5 border border-white/10 flex items-center gap-2">
+                <span class="material-symbols-outlined text-amber-400 text-[18px]">radar</span>
+                <span>Minimap Radar</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Launch CTA Button -->
+          <div class="flex flex-col sm:flex-row lg:flex-col items-stretch gap-3 shrink-0 relative z-10">
+            <button class="h-12 px-7 bg-indigo-500 hover:bg-indigo-400 active:scale-95 text-white font-mono text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2.5 shadow-lg shadow-indigo-500/30" id="btn-launch-minigame-hero">
+              <span class="material-symbols-outlined text-[22px]">sports_esports</span>
+              <span class="text-sm">${isId ? "Mainkan Mini Game 3D Sekarang" : "Launch 3D Game"}</span>
+            </button>
+            <div class="text-center font-mono text-[11px] text-slate-400">
+              Kontrol: W/A/S/D • Spasi • Sentuh HP
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- MAIN FEATURE 2: Evaluasi Kurikulum Resmi (Pretest & Posttest) -->
+      <div class="space-y-4">
+        <div class="border-b border-slate-200 pb-2">
+          <h3 class="text-base font-bold text-slate-900 font-display flex items-center gap-2">
+            <span class="material-symbols-outlined text-indigo-600 text-[20px]">verified</span>
+            <span>${isId ? "Ujian Evaluasi Kurikulum Resmi" : "Curriculum Formal Evaluations"}</span>
+          </h3>
+          <p class="text-xs text-slate-500">${isId ? "Ujian formal untuk mengukur baseline kognitif Hake dan evaluasi sumatif akhir." : "Diagnostic and summative examinations."}</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          
+          <!-- Pretest Card -->
+          <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between space-y-5 hover:border-indigo-300 transition-colors">
+            <div class="space-y-3">
+              <div class="flex items-center justify-between">
+                <span class="px-2.5 py-0.5 rounded font-mono text-xs bg-indigo-50 text-indigo-700 border border-indigo-200 font-bold">BENCHMARK AWAL</span>
+                <span class="font-mono text-xs text-slate-500">25 Soal • 35 Menit</span>
+              </div>
+              <h3 class="text-lg font-bold text-slate-900 font-display">${isId ? "Pretest Diagnostik Jaringan" : "Diagnostic Baseline Pretest"}</h3>
+              <p class="text-xs text-slate-600 leading-relaxed">
+                ${isId ? "Mengukur garis dasar pemahaman awal siswa untuk kalkulasi normalized gain Hake. Mencakup konsep fundamental arsitektur jaringan, subnetting, dan protokol komunikasi." : "Establishes initial cognitive baseline for Hake normalized gain calculation."}
+              </p>
+
+              ${preResult ? `
+                <div class="p-3 bg-slate-50 rounded-lg border border-slate-200 flex items-center justify-between font-mono text-xs">
+                  <div>
+                    <span class="text-slate-500 block text-[10px] uppercase font-bold">${isId ? "Nilai Terakhir:" : "Last Score:"}</span>
+                    <span class="text-slate-900 font-bold text-sm">${preScore} / 100 (${preResult.score}/25 Benar)</span>
+                  </div>
+                  <button class="h-7 px-2.5 bg-white hover:bg-slate-100 text-indigo-600 border border-slate-200 rounded text-[11px] cursor-pointer font-bold" id="btn-pretest-view-score">
+                    Lihat Hasil
+                  </button>
+                </div>
+              ` : `
+                <div class="p-3 bg-slate-50 rounded-lg border border-dashed border-slate-200 text-center font-mono text-xs text-slate-400">
+                  ${isId ? "Belum ada riwayat pretest" : "No pretest attempts yet"}
+                </div>
+              `}
+            </div>
+
+            <div class="pt-2">
+              <button class="w-full h-10 ${preResult ? 'bg-white hover:bg-slate-50 text-indigo-600 border border-indigo-200' : 'bg-indigo-600 hover:bg-indigo-700 text-white'} font-mono text-xs font-bold rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-2 shadow-sm" id="btn-quiz-pretest">
+                <span class="material-symbols-outlined text-[17px]">${preResult ? "refresh" : "play_arrow"}</span>
+                <span>${preResult ? (isId ? "Ulangi Pretest (Remedial)" : "Retake Pretest (Remedial)") : (isId ? "Mulai Pretest Sekarang" : "Launch Pretest")}</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Posttest Card -->
+          <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between space-y-5 hover:border-indigo-300 transition-colors">
+            <div class="space-y-3">
+              <div class="flex items-center justify-between">
+                <span class="px-2.5 py-0.5 rounded font-mono text-xs bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold">SUMATIF FINAL</span>
+                <span class="font-mono text-xs text-slate-500">25 Soal • 35 Menit</span>
+              </div>
+              <h3 class="text-lg font-bold text-slate-900 font-display">${isId ? "Ujian Akhir HOTS Posttest" : "HOTS Posttest Examination"}</h3>
+              <p class="text-xs text-slate-600 leading-relaxed">
+                ${isId ? "Evaluasi sumatif akhir untuk mengukur ketuntasan belajar domain C4 Analisis, C5 Sintesis, dan C6 Pemecahan Masalah troubleshooting jaringan." : "Final evaluation measuring C4 Analysis, C5 Synthesis, and C6 Evaluation mastery."}
+              </p>
+
+              ${postResult ? `
+                <div class="p-3 bg-slate-50 rounded-lg border border-slate-200 flex items-center justify-between font-mono text-xs">
+                  <div>
+                    <span class="text-slate-500 block text-[10px] uppercase font-bold">${isId ? "Nilai Terakhir:" : "Last Score:"}</span>
+                    <span class="text-slate-900 font-bold text-sm">${postScore} / 100 (${postResult.score}/25 Benar)</span>
+                  </div>
+                  <button class="h-7 px-2.5 bg-white hover:bg-slate-100 text-indigo-600 border border-slate-200 rounded text-[11px] cursor-pointer font-bold" id="btn-posttest-view-score">
+                    Lihat Hasil
+                  </button>
+                </div>
+              ` : `
+                <div class="p-3 bg-slate-50 rounded-lg border border-dashed border-slate-200 text-center font-mono text-xs text-slate-400">
+                  ${isId ? "Belum ada riwayat posttest" : "No posttest attempts yet"}
+                </div>
+              `}
+            </div>
+
+            <div class="pt-2">
+              <button class="w-full h-10 ${postResult ? 'bg-white hover:bg-slate-50 text-indigo-600 border border-indigo-200' : 'bg-emerald-600 hover:bg-emerald-700 text-white'} font-mono text-xs font-bold rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-2 shadow-sm" id="btn-quiz-posttest">
+                <span class="material-symbols-outlined text-[17px]">${postResult ? "refresh" : "play_arrow"}</span>
+                <span>${postResult ? (isId ? "Ulangi Posttest (Remedial)" : "Retake Posttest (Remedial)") : (isId ? "Ikuti Ujian Posttest" : "Take Posttest Exam")}</span>
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  `;
+
+  // Attach event handlers
+  document.getElementById("btn-launch-minigame-hero")?.addEventListener("click", () => {
+    navigateTo("minigame");
+  });
+
+  document.getElementById("btn-quiz-pretest")?.addEventListener("click", () => {
+    state.testState = null;
+    navigateTo("pretest");
+  });
+
+  document.getElementById("btn-quiz-posttest")?.addEventListener("click", () => {
+    state.testState = null;
+    navigateTo("posttest");
+  });
+
+  document.getElementById("btn-pretest-view-score")?.addEventListener("click", () => {
+    if (preResult) navigateTo("posttest-results", { result: preResult });
+  });
+
+  document.getElementById("btn-posttest-view-score")?.addEventListener("click", () => {
+    if (postResult) navigateTo("posttest-results", { result: postResult });
+  });
+}
+
+
 
 // ============================================================================
 // VIEW 8: TEACHER CONSOLE & REVIEWS (Stitch teacher_dashboard_computer_networks)
@@ -2401,7 +3394,7 @@ async function renderAdmin(container) {
           <div class="flex items-center gap-1.5 font-mono text-xs text-outline uppercase tracking-wider">
             <span>${isId ? "Panel Manajemen Guru" : "Teacher Console"}</span>
             <span class="text-outline-variant">/</span>
-            <span>CS302 Cohort Analytics</span>
+            <span>Cohort Analytics</span>
           </div>
           <h1 class="text-2xl sm:text-3xl font-extrabold text-on-surface tracking-tight">${t("adminTitle")}</h1>
           <p class="text-xs sm:text-sm text-on-surface-variant">${t("adminSubtitle")}</p>
@@ -2526,7 +3519,7 @@ async function renderAdmin(container) {
   `;
 
   document.getElementById("btn-export-cohort-csv")?.addEventListener("click", () => {
-    exportToCsv("Rekapitulasi_Nilai_Siswa_CS302", studentResults);
+    exportToCsv("Rekapitulasi_Nilai_Siswa", studentResults);
     showToast(isId ? "Nilai Berhasil Diekspor" : "Gradebook Exported", isId ? "File CSV rekapitulasi telah diunduh." : "CSV gradebook downloaded.", "table_chart");
   });
 }
@@ -2546,10 +3539,10 @@ function renderManual(container) {
           <div class="flex items-center gap-1.5 font-mono text-xs text-outline uppercase tracking-wider">
             <span>${isId ? "Portal Pembelajaran" : "Learning Portal"}</span>
             <span>/</span>
-            <span>${isId ? "Buku Panduan & Petunjuk" : "User Guide & Handbook"}</span>
+            <span>${isId ? "Panduan Pengguna" : "User Guide"}</span>
           </div>
-          <h1 class="text-2xl sm:text-3xl font-extrabold text-on-surface tracking-tight">${book?.title || (isId ? "Buku Panduan Tata Cara Penggunaan Aplikasi" : "NetLearn Application User Guide")}</h1>
-          <p class="text-xs sm:text-sm text-on-surface-variant mt-1">${book?.subtitle || (isId ? "Petunjuk lengkap langkah demi langkah pengoperasian fitur pembelajaran mandiri NetLearn." : "Complete step-by-step user manual.")}</p>
+          <h1 class="text-2xl sm:text-3xl font-extrabold text-on-surface tracking-tight">${book?.title || (isId ? "Panduan Pengguna Aplikasi NetLearn" : "NetLearn Application User Guide")}</h1>
+          <p class="text-xs sm:text-sm text-on-surface-variant mt-1">${book?.subtitle || (isId ? "Petunjuk lengkap tata cara penggunaan aplikasi dan laboratorium virtual NetLearn." : "Complete step-by-step user manual.")}</p>
         </div>
         <button class="h-9 px-3.5 bg-primary hover:bg-primary-container text-on-primary font-mono text-xs font-bold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 shadow-xs" id="btn-export-handbook">
           <span class="material-symbols-outlined text-[16px]">file_download</span>
@@ -2606,11 +3599,11 @@ function renderManual(container) {
   `;
 
   document.getElementById("btn-export-handbook")?.addEventListener("click", () => {
-    let docHtml = `<h1>${book?.title || "Buku Panduan NetLearn"}</h1><p><em>${book?.subtitle || ""}</em></p><hr/>`;
+    let docHtml = `<h1>${book?.title || "Panduan Pengguna NetLearn"}</h1><p><em>${book?.subtitle || ""}</em></p><hr/>`;
     sections.forEach(s => {
       docHtml += `<h2>${s.title}</h2><div>${s.content}</div><hr/>`;
     });
-    exportToWord("Buku_Panduan_NetLearn", "Buku Panduan NetLearn", docHtml);
+    exportToWord("Panduan_Pengguna_NetLearn", "Panduan Pengguna NetLearn", docHtml);
     showToast(isId ? "Panduan Diunduh" : "Handbook Downloaded", isId ? "File panduan format Word berhasil diunduh." : "Exported successfully to Word format.", "file_download");
   });
 }
@@ -3074,8 +4067,21 @@ function openVideoModal(materialId) {
       </div>
 
       <div class="p-4 border-t border-outline-variant flex items-center justify-between gap-3 bg-surface-container-lowest shrink-0 flex-wrap sm:flex-nowrap">
-        <span class="text-xs font-mono text-outline">${isWatched ? (isId ? "Status: Sudah Ditonton" : "Status: Watched") : (isId ? "Belum dicatat selesai" : "Not yet watched")}</span>
-        <button class="h-8 px-4 bg-primary hover:bg-primary-container text-on-primary font-mono text-xs font-bold rounded flex items-center gap-1.5 cursor-pointer transition-colors shrink-0 whitespace-nowrap" id="modal-mark-watched">
+        <div class="flex items-center gap-2">
+          <a 
+            href="${m.video.url}" 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            class="h-8 px-3 bg-surface-container-low hover:bg-surface-container text-on-surface font-mono text-xs rounded border border-outline-variant flex items-center gap-1.5 transition-colors cursor-pointer"
+            title="Buka langsung di tab baru YouTube"
+          >
+            <span class="material-symbols-outlined text-[16px] text-red-500">smart_display</span>
+            <span>${isId ? "Buka di YouTube" : "Open in YouTube"}</span>
+            <span class="material-symbols-outlined text-[14px] text-outline">open_in_new</span>
+          </a>
+          <span class="text-xs font-mono text-outline hidden sm:inline">• ${isWatched ? (isId ? "Sudah Ditonton" : "Watched") : (isId ? "Belum dicatat" : "Not yet watched")}</span>
+        </div>
+        <button class="h-8 px-4 bg-primary hover:bg-primary-container text-on-primary font-mono text-xs font-bold rounded flex items-center gap-1.5 cursor-pointer transition-colors shrink-0 whitespace-nowrap ml-auto" id="modal-mark-watched">
           <span class="material-symbols-outlined text-[16px]">${isWatched ? "check_circle" : "done"}</span>
           <span>${isWatched ? (isId ? "Sudah Ditonton" : "Watched") : (isId ? "Tandai Selesai" : "Mark Watched")}</span>
         </button>

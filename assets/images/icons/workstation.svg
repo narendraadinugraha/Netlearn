@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="pcGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#1d4ed8"/>
+    </linearGradient>
+    <linearGradient id="screenGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#1e293b"/>
+    </linearGradient>
+  </defs>
+  <!-- Monitor Body -->
+  <rect x="6" y="8" width="52" height="36" rx="5" fill="#334155" stroke="#1e293b" stroke-width="2"/>
+  <rect x="10" y="12" width="44" height="28" rx="3" fill="url(#screenGrad)"/>
+  <!-- Status Lights -->
+  <circle cx="15" cy="17" r="2" fill="#ef4444"/>
+  <circle cx="21" cy="17" r="2" fill="#f59e0b"/>
+  <circle cx="27" cy="17" r="2" fill="#10b981"/>
+  <!-- Terminal Prompt -->
+  <path d="M15 25 L21 28 L15 31" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <line x1="25" y1="31" x2="38" y2="31" stroke="#38bdf8" stroke-width="2" stroke-linecap="round"/>
+  <!-- Stand & Base -->
+  <path d="M26 44 L38 44 L36 52 L28 52 Z" fill="#475569"/>
+  <rect x="20" y="52" width="24" height="4" rx="2" fill="#64748b"/>
+</svg>

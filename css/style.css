@@ -5,77 +5,83 @@
    ========================================================================== */
 
 :root {
-  --color-primary: #1E90FF;
-  --color-primary-container: #1565C0;
+  /* ========================================================================
+     NetLearn Technical Light Palette (Inspired by Stripe & Vercel Docs)
+     Crisp porcelain canvas, high-contrast slate-900 typography, emerald & cyan accents
+     ======================================================================== */
+  --color-primary: #15803d;
+  --color-primary-container: #dcfce7;
   --color-on-primary: #ffffff;
-  --color-on-primary-container: #E6F3FF;
-  --color-primary-fixed: #E6F3FF;
-  --color-on-primary-fixed: #1565C0;
+  --color-on-primary-container: #14532d;
+  --color-primary-fixed: #dcfce7;
+  --color-on-primary-fixed: #15803d;
   
-  --color-secondary: #10B981;
-  --color-secondary-container: #D1FAE5;
+  --color-secondary: #0284c7;
+  --color-secondary-container: #e0f2fe;
   --color-on-secondary: #ffffff;
-  --color-on-secondary-container: #065F46;
-  --color-secondary-fixed: #D1FAE5;
-  --color-on-secondary-fixed: #065F46;
+  --color-on-secondary-container: #0369a1;
+  --color-secondary-fixed: #e0f2fe;
+  --color-on-secondary-fixed: #0284c7;
 
-  --color-tertiary: #F59E0B;
-  --color-tertiary-container: #FEF3C7;
+  --color-tertiary: #d97706;
+  --color-tertiary-container: #fef3c7;
   --color-on-tertiary: #ffffff;
-  --color-on-tertiary-container: #92400E;
-  --color-tertiary-fixed: #FEF3C7;
-  --color-on-tertiary-fixed: #92400E;
+  --color-on-tertiary-container: #92400e;
+  --color-tertiary-fixed: #fef3c7;
+  --color-on-tertiary-fixed: #92400e;
 
-  --color-surface: #F8FAFC;
-  --color-surface-dim: #F1F5F9;
-  --color-surface-container-lowest: #ffffff;
-  --color-surface-container-low: #F8FAFC;
-  --color-surface-container: #F1F5F9;
-  --color-surface-container-high: #E2E8F0;
-  --color-surface-container-highest: #CBD5E1;
-  --color-on-surface: #0F172A;
-  --color-on-surface-variant: #475569;
-  --color-outline: #94A3B8;
-  --color-outline-variant: #E2E8F0;
-  --color-error: #EF4444;
-  --color-error-container: #FEE2E2;
+  /* Surfaces & Containers */
+  --color-surface: #f8fafc;                  /* Slate-50 Crisp Off-White */
+  --color-surface-dim: #f1f5f9;              /* Slate-100 */
+  --color-surface-container-lowest: #ffffff; /* Pure White Card Surfaces */
+  --color-surface-container-low: #ffffff;    /* Elevated Surfaces */
+  --color-surface-container: #f1f5f9;        /* Input and Button Surfaces */
+  --color-surface-container-high: #e2e8f0;   /* Hover Surface */
+  --color-surface-container-highest: #cbd5e1;/* Dividers */
+  --color-on-surface: #0f172a;               /* Slate-900 High Contrast Text */
+  --color-on-surface-variant: #475569;       /* Slate-600 Secondary Text */
+  --color-outline: #94a3b8;                  /* Slate-400 Outline */
+  --color-outline-variant: #e2e8f0;          /* Slate-200 Crisp 1px Borders */
+  --color-error: #ef4444;
+  --color-error-container: #fee2e2;
 }
 
 .dark {
-  --color-primary: #60A5FA;
-  --color-primary-container: #1D4ED8;
-  --color-on-primary: #0B132B;
-  --color-on-primary-container: #DBEAFE;
-  --color-primary-fixed: rgba(96, 165, 250, 0.16);
-  --color-on-primary-fixed: #93C5FD;
+  /* Forced Light Mode: Neutralized to ensure consistent light rendering */
+  --color-primary: #15803d;
+  --color-primary-container: #dcfce7;
+  --color-on-primary: #ffffff;
+  --color-on-primary-container: #14532d;
+  --color-primary-fixed: #dcfce7;
+  --color-on-primary-fixed: #15803d;
 
-  --color-secondary: #34D399;
-  --color-secondary-container: #064E3B;
-  --color-on-secondary: #022C22;
-  --color-on-secondary-container: #A7F3D0;
-  --color-secondary-fixed: rgba(52, 211, 153, 0.16);
-  --color-on-secondary-fixed: #6EE7B7;
+  --color-secondary: #0284c7;
+  --color-secondary-container: #e0f2fe;
+  --color-on-secondary: #ffffff;
+  --color-on-secondary-container: #0369a1;
+  --color-secondary-fixed: #e0f2fe;
+  --color-on-secondary-fixed: #0284c7;
 
-  --color-tertiary: #FBBF24;
-  --color-tertiary-container: #78350F;
-  --color-on-tertiary: #451A03;
-  --color-on-tertiary-container: #FDE68A;
-  --color-tertiary-fixed: rgba(251, 191, 36, 0.16);
-  --color-on-tertiary-fixed: #FCD34D;
+  --color-tertiary: #d97706;
+  --color-tertiary-container: #fef3c7;
+  --color-on-tertiary: #ffffff;
+  --color-on-tertiary-container: #92400e;
+  --color-tertiary-fixed: #fef3c7;
+  --color-on-tertiary-fixed: #92400e;
 
-  --color-surface: #0B132B;
-  --color-surface-dim: #070D1F;
-  --color-surface-container-lowest: #111D3D;
-  --color-surface-container-low: #16244A;
-  --color-surface-container: #1C2D5A;
-  --color-surface-container-high: #24386D;
-  --color-surface-container-highest: #2E4582;
-  --color-on-surface: #F1F5F9;
-  --color-on-surface-variant: #94A3B8;
-  --color-outline: #64748B;
-  --color-outline-variant: #24386D;
-  --color-error: #F87171;
-  --color-error-container: #7F1D1D;
+  --color-surface: #f8fafc;
+  --color-surface-dim: #f1f5f9;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #ffffff;
+  --color-surface-container: #f1f5f9;
+  --color-surface-container-high: #e2e8f0;
+  --color-surface-container-highest: #cbd5e1;
+  --color-on-surface: #0f172a;
+  --color-on-surface-variant: #475569;
+  --color-outline: #94a3b8;
+  --color-outline-variant: #e2e8f0;
+  --color-error: #ef4444;
+  --color-error-container: #fee2e2;
 }
 
 /* Base resets & typography */
@@ -86,6 +92,206 @@ html, body {
   background-color: var(--color-surface);
   color: var(--color-on-surface);
   min-height: 100vh;
+  position: relative;
+  overflow-x: hidden;
+  max-width: 100%;
+}
+
+h1, h2, h3, h4, .font-display, .font-headline {
+  font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, sans-serif;
+  letter-spacing: -0.02em;
+}
+
+/* ==========================================================================
+   AUTHENTIC NETWORKING BLUEPRINT TEXTURE & SURFACE UTILITIES
+   ========================================================================== */
+
+/* Authentic Engineering Grid Pattern for Dashboard & Canvas */
+.net-grid-canvas {
+  background-color: #f8fafc;
+  background-image: 
+    radial-gradient(1200px 500px at 50% -40px, rgba(99, 102, 241, 0.07), rgba(2, 132, 199, 0.04), transparent 75%),
+    linear-gradient(to right, rgba(226, 232, 240, 0.65) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(226, 232, 240, 0.65) 1px, transparent 1px);
+  background-size: 100% 100%, 32px 32px, 32px 32px;
+}
+
+/* Authentic Engineering & Network Mesh Textures */
+.net-blueprint-bg {
+  background-image: 
+    radial-gradient(rgba(99, 102, 241, 0.08) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.net-hero-banner {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, rgba(118, 190, 0, 0.05) 0%, rgba(15, 23, 42, 0.02) 100%);
+  border: 1px solid var(--color-outline-variant);
+}
+
+.dark .net-hero-banner {
+  background: linear-gradient(135deg, #141d2b 0%, #1a2332 100%);
+  border: 1px solid #223348;
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+}
+
+/* Professional Surface Card */
+.dev-surface-card {
+  background: var(--color-surface-container-lowest);
+  border: 1px solid var(--color-outline-variant);
+  border-radius: 12px;
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dark .dev-surface-card {
+  background: #1a2332;
+  border: 1px solid #223348;
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.03);
+}
+
+.dark .dev-surface-card:hover {
+  border-color: rgba(159, 239, 0, 0.45);
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.5), 0 0 15px rgba(159, 239, 0, 0.1);
+}
+
+/* Taste Skill 2.5 Micro-interactions (House Rule 5) */
+.taste-card {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.taste-card:hover {
+  transform: translateY(-2px);
+}
+.taste-btn {
+  transition: transform 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+.taste-btn:hover {
+  transform: translateY(-1px);
+}
+.taste-btn:active {
+  transform: scale(0.98);
+}
+.taste-photo-frame {
+  overflow: hidden;
+  position: relative;
+}
+.taste-photo-frame img {
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.taste-photo-frame:hover img {
+  transform: scale(1.03);
+}
+
+.dev-kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--color-on-surface-variant);
+  background: var(--color-surface-container-high);
+  border: 1px solid var(--color-outline-variant);
+  border-radius: 4px;
+  user-select: none;
+}
+
+/* ==========================================================================
+   ENTERPRISE NOC WORKSTATION (DESIGN DIRECTION 1) UTILITIES
+   ========================================================================= */
+
+/* NOC Ticker Status Bar */
+.noc-ticker-bar {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 0.5rem 1rem;
+  background: var(--color-surface-container-lowest);
+  border: 1px solid var(--color-outline-variant);
+  border-radius: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  color: var(--color-on-surface-variant);
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.dark .noc-ticker-bar {
+  background: #0e1522;
+  border-color: #223348;
+  box-shadow: inset 0 1px 0 0 rgba(159, 239, 0, 0.08);
+}
+  box-shadow: inset 0 1px 0 0 rgba(56, 189, 248, 0.1);
+}
+
+/* Blinking NOC Status LED */
+.noc-led {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.noc-led.green {
+  background-color: #10b981;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+  animation: ledPulse 2s infinite ease-in-out;
+}
+
+.noc-led.amber {
+  background-color: #f59e0b;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.6);
+}
+
+.noc-led.blue {
+  background-color: #38bdf8;
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.6);
+}
+
+@keyframes ledPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+
+/* NOC Switch Port Rack Unit Preview */
+.noc-port-rack {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #060b16;
+  border: 1px solid #1c2b44;
+  padding: 3px 6px;
+  border-radius: 6px;
+}
+
+.noc-port-slot {
+  width: 14px;
+  height: 18px;
+  background: #0f1a2e;
+  border: 1px solid #233554;
+  border-radius: 2px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 0;
+}
+
+.noc-port-slot.active .noc-port-dot {
+  background: #10b981;
+  box-shadow: 0 0 4px #10b981;
+}
+
+.noc-port-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #334d6e;
 }
 
 /* Material Symbols Outlined sizing & vertical alignment */
@@ -138,64 +344,98 @@ html, body {
   }
 }
 
-/* SkillUp-style Active navigation item */
+/* Sidebar & Topbar Navigation Button Styles (HTB Academy Style) */
 .nav-item-btn {
-  border-left: 3px solid transparent;
-  transition: all 0.15s ease-in-out;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: 2.25rem;
+  padding: 0 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-on-surface-variant);
+  transition: all 0.15s ease;
+  user-select: none;
+  cursor: pointer;
+  text-align: left;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+aside .nav-item-btn {
+  width: 100%;
 }
 
 .nav-item-btn:hover {
-  background-color: rgba(30, 144, 255, 0.06);
-  color: #1E90FF;
+  background-color: var(--color-surface-container);
+  color: var(--color-on-surface);
 }
 
 .nav-item-btn.active {
-  background-color: #E6F3FF !important;
-  color: #1565C0 !important;
-  font-weight: 600 !important;
-  border-left-color: #1E90FF !important;
-}
-
-.nav-item-btn.active .material-symbols-outlined {
-  color: #1E90FF !important;
-  font-variation-settings: 'FILL' 1, 'wght' 500;
-}
-
-.dark .nav-item-btn:hover {
-  background-color: rgba(96, 165, 250, 0.1);
-  color: #60A5FA;
+  background-color: var(--color-primary-container) !important;
+  color: var(--color-on-primary-container) !important;
+  font-weight: 700 !important;
 }
 
 .dark .nav-item-btn.active {
-  background-color: rgba(30, 144, 255, 0.18) !important;
-  color: #93C5FD !important;
-  border-left-color: #60A5FA !important;
+  background: rgba(159, 239, 0, 0.12) !important;
+  color: #9FEF00 !important;
+  font-weight: 700 !important;
+  border-color: rgba(159, 239, 0, 0.3) !important;
+  box-shadow: 0 0 12px rgba(159, 239, 0, 0.12) !important;
+}
+
+header .dark .nav-item-btn.active {
+  border-bottom: 2px solid #9FEF00 !important;
+  border-radius: 0.5rem 0.5rem 0.25rem 0.25rem;
+}
+
+aside .dark .nav-item-btn.active {
+  border-left: 3px solid #9FEF00 !important;
+}
+
+:root:not(.dark) .nav-item-btn.active {
+  background-color: #eefad4 !important;
+  color: #264200 !important;
+  border-bottom: 2px solid #76be00 !important;
+}
+
+aside :root:not(.dark) .nav-item-btn.active {
+  border-left: 3px solid #76be00 !important;
+  border-bottom: 1px solid transparent !important;
 }
 
 .dark .nav-item-btn.active .material-symbols-outlined {
-  color: #60A5FA !important;
+  color: #9FEF00 !important;
+  font-variation-settings: 'FILL' 1, 'wght' 600;
+}
+
+:root:not(.dark) .nav-item-btn.active .material-symbols-outlined {
+  color: #264200 !important;
+  font-variation-settings: 'FILL' 1, 'wght' 600;
 }
 
 /* VT-100 Terminal Emulation Component */
 .terminal-window {
-  background-color: #0b111a;
-  color: #38bdf8;
+  background-color: #0b101b;
+  color: #a4b1cd;
   font-family: 'JetBrains Mono', monospace;
   border-radius: 0.5rem;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  border: 1px solid #223348;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 
 .terminal-header {
-  background-color: #162438;
+  background-color: #141d2b;
   padding: 0.5rem 0.75rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid #223348;
   font-size: 0.75rem;
-  color: #94a3b8;
+  color: #a4b1cd;
 }
 
 .terminal-dots {
@@ -208,9 +448,9 @@ html, body {
   height: 0.65rem;
   border-radius: 50%;
 }
-.terminal-dot.red { background-color: #ef4444; }
-.terminal-dot.yellow { background-color: #f59e0b; }
-.terminal-dot.green { background-color: #10b981; }
+.terminal-dot.red { background-color: #ff3e3e; }
+.terminal-dot.yellow { background-color: #ffaf00; }
+.terminal-dot.green { background-color: #9fef00; }
 
 .terminal-body {
   padding: 1rem;
@@ -221,15 +461,15 @@ html, body {
 }
 
 .terminal-prompt {
-  color: #4ade80;
-  font-weight: 600;
+  color: #9fef00;
+  font-weight: 700;
 }
 
 .terminal-cursor {
   display: inline-block;
   width: 0.45rem;
   height: 0.95rem;
-  background-color: #38bdf8;
+  background-color: #9fef00;
   vertical-align: middle;
   animation: blink 1s infinite;
 }
@@ -351,6 +591,14 @@ html, body {
 @keyframes slideUp {
   from { opacity: 0; transform: translateY(12px) scale(0.98); }
   to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.animate-scale-up {
+  animation: slideUp 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.15s ease-out;
 }
 
 /* Reading Module Typography & Academic Formatting */
@@ -483,4 +731,153 @@ html, body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-outline);
+}
+
+/* ==========================================================================
+   Simulation Labs Design System Compatibility
+   ========================================================================== */
+.sim-wrapper {
+  width: 100%;
+}
+
+.sim-controls-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem 1.25rem;
+  background: #141d2b;
+  border: 1px solid #223348;
+  border-radius: 12px;
+  margin-bottom: 1rem;
+}
+
+.btn-group-toggle {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  background: #111927;
+  padding: 4px;
+  border-radius: 8px;
+  border: 1px solid #223348;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.45rem 0.85rem;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.btn-sm {
+  padding: 0.35rem 0.7rem;
+  font-size: 0.75rem;
+}
+
+.btn-outline {
+  background: transparent;
+  color: #a4b1cd;
+  border-color: transparent;
+}
+
+.btn-outline:hover {
+  background: #1a2332;
+  color: #ffffff;
+}
+
+.btn-outline.active {
+  background: rgba(159, 239, 0, 0.15);
+  color: #9fef00;
+  border-color: #9fef00;
+  box-shadow: 0 0 12px rgba(159, 239, 0, 0.25);
+}
+
+.btn-primary {
+  background: #9fef00;
+  color: #111927;
+  font-weight: 700;
+  border-color: #9fef00;
+  box-shadow: 0 0 15px rgba(159, 239, 0, 0.25);
+}
+
+.btn-primary:hover {
+  background: #c5f467;
+  border-color: #c5f467;
+  box-shadow: 0 0 25px rgba(159, 239, 0, 0.45);
+}
+
+.btn-secondary {
+  background: #1a2332;
+  color: #ffffff;
+  border: 1px solid #223348;
+}
+
+.btn-secondary:hover {
+  background: #202b3d;
+  border-color: rgba(159, 239, 0, 0.35);
+}
+
+.form-label {
+  display: block;
+  font-size: 0.75rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+  color: #cbd5e1;
+  margin-bottom: 0.35rem;
+}
+
+.form-input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  background: #111927;
+  border: 1px solid #223348;
+  border-radius: 6px;
+  color: #ffffff;
+  font-size: 0.85rem;
+  font-family: 'JetBrains Mono', monospace;
+  outline: none;
+}
+
+.form-input:focus {
+  border-color: #9fef00;
+  box-shadow: 0 0 0 1px #9fef00;
+}
+
+.hero-stats-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.stat-box {
+  background: #141d2b;
+  border: 1px solid #223348;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-label {
+  font-size: 0.7rem;
+  font-family: 'JetBrains Mono', monospace;
+  color: #94a3b8;
+  text-transform: uppercase;
+}
+
+.stat-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  font-size: 1.1rem;
+  margin-top: 0.25rem;
 }

@@ -5,7 +5,7 @@ export const translations = {
   id: {
     // Branding & Header
     appTitle: "NetLearn",
-    appSubtitle: "Akademi Jaringan Komputer CS302",
+    appSubtitle: "Akademi Jaringan Komputer",
     tagline: "Platform Media Belajar Interaktif & Laboratorium Jaringan Komputer Akademik",
     roleStudent: "Siswa",
     roleTeacher: "Guru (Admin)",
@@ -15,7 +15,7 @@ export const translations = {
     navSimulation: "Lab Simulasi & VLSM",
     navPosttest: "Posttest HOTS",
     navQuizzes: "Kuis & Bank Soal",
-    navManual: "Buku Panduan & RFC",
+    navManual: "Panduan Pengguna",
     navAdmin: "Panel Guru",
     navSettings: "Profil & Pengaturan",
     navLogout: "Keluar Akun",
@@ -25,7 +25,7 @@ export const translations = {
     
     // Auth
     loginTitle: "Masuk ke NetLearn",
-    loginDesc: "Akses portal pembelajaran CS302 untuk melanjutkan modul teori dan praktikum simulasi",
+    loginDesc: "Akses portal pembelajaran untuk melanjutkan modul teori dan praktikum simulasi",
     registerTitle: "Pendaftaran Akun Baru",
     registerDesc: "Daftar untuk terhubung dengan kelas Jaringan Komputer dan laboratorium virtual",
     googleSignIn: "Masuk dengan Akun Google",
@@ -58,7 +58,7 @@ export const translations = {
     rankMaster: "NetLearn Grandmaster",
     
     // Dashboard
-    dashWelcome: "Portal Akademik CS302",
+    dashWelcome: "Portal Pembelajaran Jaringan Komputer",
     dashSummary: "Jaringan Komputer • Semester Genap 2025/2026",
     statPreScore: "Skor Pretest",
     statPostScore: "Skor Posttest",
@@ -103,7 +103,7 @@ export const translations = {
     markAsRead: "Tandai Modul Selesai (+50 XP)",
     topicReadStatus: "Selesai Dipelajari",
     topicNotReadStatus: "Belum Selesai",
-    tabVideoLesson: "🎬 Video Kuliah",
+    tabVideoLesson: "🎬 Vidio Pembelajaran",
     tabTheoryDoc: "📖 Modul Teori & Standar RFC",
     tabInteractiveLab: "🔬 Lab Interaktif & Simulator",
     videoKeyTakeaways: "Poin-Poin Penting Video",
@@ -114,7 +114,7 @@ export const translations = {
     btnWatchTopicVideo: "Tonton Video Materi",
 
     // Manual Book
-    manualTitle: "Buku Panduan Platform & Spesifikasi RFC",
+    manualTitle: "Panduan Pengguna NetLearn",
     manualSubtitle: "Buku pegangan kurikulum resmi, panduan simulator terminal, dan referensi protokol standar.",
     btnDownloadManual: "Unduh Panduan (.doc)",
 
@@ -122,7 +122,7 @@ export const translations = {
     adminTitle: "Panel Guru & Evaluasi Nilai Kohort",
     adminSubtitle: "Distribusi histogram nilai siswa, analisis gain psikometrik Hake, dan rekapitulasi nilai.",
     tabStudents: "Rekapitulasi Nilai Siswa",
-    tabVideos: "Kelola Video Pembelajaran",
+    tabVideos: "Kelola Vidio Pembelajaran",
     tabSql: "Skrip Database Supabase",
     studentName: "Nama Siswa",
     studentEmail: "Email Siswa",
@@ -132,7 +132,7 @@ export const translations = {
     completionDate: "Waktu Penyelesaian",
     btnExportCsv: "Ekspor Nilai ke CSV / Excel",
     btnAddVideo: "Tambah Video Baru",
-    videoTitleField: "Judul Video Kuliah",
+    videoTitleField: "Judul Vidio Pembelajaran",
     videoUrlField: "URL YouTube",
     videoTopicField: "Topik Modul",
     btnSaveVideo: "Simpan Video",
@@ -161,7 +161,7 @@ export const translations = {
   en: {
     // Branding & Header
     appTitle: "NetLearn",
-    appSubtitle: "Networks Academy CS302",
+    appSubtitle: "Networks Academy",
     tagline: "Academic Computer Networks Learning Platform & Virtual Laboratory",
     roleStudent: "Student",
     roleTeacher: "Instructor (Admin)",
@@ -171,7 +171,7 @@ export const translations = {
     navSimulation: "Simulation Lab & VLSM",
     navPosttest: "HOTS Posttest",
     navQuizzes: "Quizzes & Bank",
-    navManual: "RFC Docs & Specs",
+    navManual: "User Guide",
     navAdmin: "Teacher Panel",
     navSettings: "Settings & Profile",
     navLogout: "Sign Out",
@@ -181,7 +181,7 @@ export const translations = {
 
     // Auth
     loginTitle: "Sign In to NetLearn",
-    loginDesc: "Access the CS302 student portal to continue coursework and sandbox sessions",
+    loginDesc: "Access the student portal to continue coursework and sandbox sessions",
     registerTitle: "Create NetLearn Account",
     registerDesc: "Join your university Computer Networks cohort and virtual topology lab",
     googleSignIn: "Sign in with Google",
@@ -214,7 +214,7 @@ export const translations = {
     rankMaster: "NetLearn Grandmaster",
 
     // Dashboard
-    dashWelcome: "Academic Portal CS302",
+    dashWelcome: "Computer Networks Learning Portal",
     dashSummary: "Computer Networks • Cohort Spring 2025",
     statPreScore: "Pretest Benchmark",
     statPostScore: "Posttest Score",
@@ -253,7 +253,7 @@ export const translations = {
 
     // Materials & Embedded Videos
     materialsTitle: "Course Materials & Technical Modules",
-    materialsSubtitle: "Comprehensive CS302 curriculum aligned with IETF RFC standards and Cisco Packet Tracer.",
+    materialsSubtitle: "Comprehensive Computer Networks curriculum aligned with IETF standards and Cisco Packet Tracer.",
     btnDownloadDoc: "Export Module (.doc Word)",
     btnDownloadAllDocs: "Export Full Syllabus (6 Modules)",
     markAsRead: "Mark Module Complete (+50 XP)",

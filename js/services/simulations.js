@@ -1,6 +1,8 @@
 // NetQuest - Interactive Network Simulations & 3D Visualizer Lab
 // Rich animated simulations, 3D WebGL topology renderings, and interactive labs for all 6 topics.
 
+import { sound } from "./gamification.js";
+
 export function renderTopicSimulation(topicId, container) {
   switch (topicId) {
     case 1:
@@ -228,93 +230,212 @@ function renderSimulationScope(container) {
 // ============================================================================
 function renderSimulationTopology(container) {
   container.innerHTML = `
-    <div class="sim-wrapper">
-      <div class="sim-controls-bar">
-        <span style="font-weight: 700; font-size: 0.9rem; color: var(--primary);">🕸️ Bentuk Topologi:</span>
-        <div class="btn-group-toggle">
-          <button class="btn btn-sm btn-outline active topo-btn" data-topo="bus">Bus</button>
-          <button class="btn btn-sm btn-outline topo-btn" data-topo="star">Star</button>
-          <button class="btn btn-sm btn-outline topo-btn" data-topo="ring">Ring</button>
-          <button class="btn btn-sm btn-outline topo-btn" data-topo="mesh">Mesh</button>
-          <button class="btn btn-sm btn-outline topo-btn" data-topo="tree">Tree</button>
+    <div class="sim-wrapper space-y-4">
+      <!-- Controls Bar -->
+      <div class="p-4 bg-surface-container-lowest rounded-2xl border border-outline-variant shadow-xs flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="font-bold text-xs text-on-surface flex items-center gap-1.5 font-mono">
+            <span class="material-symbols-outlined text-primary text-[18px]">hub</span>
+            <span>Bentuk Topologi:</span>
+          </span>
+          <div class="inline-flex rounded-xl p-1 bg-surface-container border border-outline-variant gap-1">
+            <button class="px-3 py-1.5 text-xs font-mono font-bold rounded-lg transition-all topo-btn active cursor-pointer bg-primary text-on-primary shadow-xs" data-topo="bus">Bus</button>
+            <button class="px-3 py-1.5 text-xs font-mono font-bold rounded-lg transition-all topo-btn cursor-pointer text-on-surface-variant hover:text-on-surface" data-topo="star">Star</button>
+            <button class="px-3 py-1.5 text-xs font-mono font-bold rounded-lg transition-all topo-btn cursor-pointer text-on-surface-variant hover:text-on-surface" data-topo="ring">Ring</button>
+            <button class="px-3 py-1.5 text-xs font-mono font-bold rounded-lg transition-all topo-btn cursor-pointer text-on-surface-variant hover:text-on-surface" data-topo="mesh">Full Mesh</button>
+            <button class="px-3 py-1.5 text-xs font-mono font-bold rounded-lg transition-all topo-btn cursor-pointer text-on-surface-variant hover:text-on-surface" data-topo="tree">Tree</button>
+          </div>
         </div>
-        <div style="display: flex; gap: 0.5rem;">
-          <button class="btn btn-primary btn-sm" id="btn-topo-send">🚀 Kirim Paket</button>
-          <button class="btn btn-secondary btn-sm" id="btn-topo-break" style="color: var(--accent-rose);">⚠️ Simulasi Rusak</button>
+
+        <div class="flex items-center gap-2">
+          <button class="px-3.5 py-2 bg-primary hover:bg-primary-container text-on-primary font-mono text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer" id="btn-topo-send">
+            <span class="material-symbols-outlined text-[16px]">send</span>
+            <span>Kirim Paket</span>
+          </button>
+          <button class="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-mono text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer" id="btn-topo-break">
+            <span class="material-symbols-outlined text-[16px]">content_cut</span>
+            <span>Simulasi Putus Kabel</span>
+          </button>
         </div>
       </div>
 
-      <div class="sim-canvas-container" style="position: relative; height: 350px; background: #070b12; border-radius: var(--radius-md); overflow: hidden; border: 1px solid var(--border-subtle);">
-        <canvas id="topo-canvas" style="width: 100%; height: 100%; display: block;"></canvas>
-        <div id="topo-alert-overlay" style="display: none; position: absolute; top: 12px; right: 12px; background: rgba(244, 63, 94, 0.9); color: white; padding: 6px 12px; border-radius: var(--radius-sm); font-size: 0.78rem; font-weight: 700; box-shadow: 0 0 15px rgba(244,63,94,0.5);">
-          🚨 SIGNAL BOUNCE / LINK DOWN
+      <!-- Canvas Stage -->
+      <div class="relative w-full rounded-2xl overflow-hidden border border-outline-variant shadow-sm bg-slate-950" style="height: 380px;">
+        <canvas id="topo-canvas" class="w-full h-full block"></canvas>
+        
+        <!-- Live Status Overlay -->
+        <div id="topo-alert-overlay" class="hidden absolute top-3 right-3 px-3 py-1.5 rounded-xl bg-rose-600/95 text-white border border-rose-400 font-mono text-xs font-bold shadow-xl backdrop-blur-md flex items-center gap-1.5 animate-bounce">
+          <span class="material-symbols-outlined text-[16px]">error</span>
+          <span id="topo-alert-text">KABEL TERPUTUS</span>
+        </div>
+
+        <!-- Selected Node Inspector Tooltip -->
+        <div id="topo-node-inspector" class="absolute bottom-3 left-3 bg-slate-900/90 text-white border border-slate-700 px-3 py-2 rounded-xl text-xs font-mono backdrop-blur-md pointer-events-none flex items-center gap-2 shadow-lg">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span id="topo-inspector-text">Status: Jaringan Normal • Klik perangkat untuk melihat info</span>
         </div>
       </div>
 
-      <div class="sim-info-box" id="topo-info-box" style="margin-top: 1rem; padding: 1rem; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); font-size: 0.9rem;">
-        <!-- Dynamic Topology Analysis -->
+      <!-- Detailed Specs & Educational Analysis Card -->
+      <div class="p-5 bg-surface-container-lowest rounded-2xl border border-outline-variant shadow-xs space-y-3" id="topo-info-box">
+        <!-- Injected dynamically -->
       </div>
     </div>
   `;
 
   const canvas = document.getElementById("topo-canvas");
+  if (!canvas) return;
   const ctx = canvas.getContext("2d");
-  let width = (canvas.width = canvas.parentElement.clientWidth);
-  let height = (canvas.height = canvas.parentElement.clientHeight);
+  
+  // Set canvas resolution
+  const rect = canvas.parentElement.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  let width = (canvas.width = (rect.width || 800) * dpr);
+  let height = (canvas.height = (rect.height || 380) * dpr);
+  ctx.scale(dpr, dpr);
+  const w = rect.width || 800;
+  const h = rect.height || 380;
+
+  // Authentic Network Vector Assets
+  const icons = {
+    workstation: new Image(),
+    laptop: new Image(),
+    switch: new Image(),
+    router: new Image(),
+    server: new Image(),
+    firewall: new Image(),
+    cloud: new Image(),
+    packet: new Image()
+  };
+  icons.workstation.src = "assets/images/icons/workstation.svg";
+  icons.laptop.src = "assets/images/icons/laptop.svg";
+  icons.switch.src = "assets/images/icons/switch.svg";
+  icons.router.src = "assets/images/icons/router.svg";
+  icons.server.src = "assets/images/icons/server.svg";
+  icons.firewall.src = "assets/images/icons/firewall.svg";
+  icons.cloud.src = "assets/images/icons/cloud.svg";
+  icons.packet.src = "assets/images/icons/packet.svg";
 
   let currentTopo = "bus";
   let isBroken = false;
   let packetAnim = { active: false, progress: 0, from: 0, to: 3 };
+  let animFrameId = null;
+  let tokenAngle = 0;
 
   const topoDescriptions = {
     bus: {
-      name: "Topologi Bus (Linear)",
-      desc: "Semua perangkat berderet pada kabel backbone koaksial tunggal. Wajib ada <strong>terminator 50-ohm</strong> di kedua ujung. Jika terminator dilepas, terjadi <em>signal reflection</em> (pantulan sinyal) yang merusak seluruh komunikasi!",
-      breakEffect: "Terminator ujung dilepas! Sinyal listrik memantul tak beraturan (signal collision) dan seluruh bus mati."
+      name: "Topologi Bus (Backbone Linear)",
+      media: "Kabel Koaksial RG-58 (Thicknet/Thinnet) & Konektor BNC T-Connector",
+      terminator: "Terminator 50-Ohm di kedua ujung wajib terpasang",
+      desc: "Semua perangkat berderet pada satu kabel koaksial tunggal (backbone). Paket dikirim ke seluruh bus (broadcast); hanya PC dengan MAC tujuan yang menerima data, sementara PC lain mengabaikannya.",
+      breakEffect: "Terminator 50-ohm dilepas! Sinyal listrik memantul kembali (Signal Reflection Wave) sehingga gelombang tabrakan menghancurkan seluruh data di bus.",
+      pros: "Hemat kabel, instalasi awal murah dan mudah untuk skala kecil.",
+      cons: "Jika kabel utama putus atau terminator lepas, seluruh jaringan langsung lumpuh total. Sulit mendeteksi letak kabel rusak."
     },
     star: {
-      name: "Topologi Star (Bintang)",
-      desc: "Setiap workstation terhubung ke satu Switch sentral. Jika salah satu workstation kabelnya putus, workstation lain tetap beroperasi normal.",
-      breakEffect: "Switch sentral mengalami kegagalan listrik (Single Point of Failure)! Seluruh workstation terputus serentak."
+      name: "Topologi Star (Bintang Sentral Switch)",
+      media: "Kabel Twisted Pair UTP Cat5e/Cat6 & Konektor RJ-45",
+      terminator: "Tidak memerlukan terminator fisik (titik terminasi internal di port Switch)",
+      desc: "Setiap perangkat memiliki kabel tersendiri yang terhubung langsung ke port Switch sentral. Switch membaca MAC Table dan meneruskan paket tepat ke port tujuan (Dedicated Collision Domain per Port).",
+      breakEffect: "Switch Sentral mati total (Single Point of Failure)! Seluruh workstation terputus serentak, meskipun kabel masing-masing PC masih utuh.",
+      pros: "Paling andal dan fleksibel: jika kabel salah satu PC putus, PC lain tetap bekerja 100% normal tanpa terganggu.",
+      cons: "Membutuhkan kabel lebih panjang dan sangat bergantung pada keandalan perangkat Switch sentral."
     },
     ring: {
-      name: "Topologi Ring (Cincin)",
-      desc: "Node terhubung melingkar searah. Menggunakan mekanisme peredaran <em>Token Passing</em> (IEEE 802.5). Bebas tabrakan data (collision-free).",
-      breakEffect: "Satu sambungan kabel ring terputus! Peredaran token terhenti dan jaringan cincin lumpuh total."
+      name: "Topologi Ring (Token Ring IEEE 802.5)",
+      media: "Kabel Fiber Optik FDDI atau STP (Shielded Twisted Pair)",
+      terminator: "Cincin tertutup mandiri (Closed Loop)",
+      desc: "Perangkat terhubung melingkar tertutup. Paket diedarkan searah jarum jam menggunakan tanda khusus berupa Token Elektronik. Hanya pemegang token yang berhak mengirim data, sehingga dijamin bebas tabrakan (Collision-Free).",
+      breakEffect: "Satu ruas cincin terputus! Sirkulasi token berhenti dan komunikasi cincin terhenti (kecuali sistem Dual-Ring FDDI yang mampu self-healing).",
+      pros: "Tidak pernah terjadi collision (tabrakan data), performa stabil saat lalu lintas jaringan padat.",
+      cons: "Penambahan atau pemindahan satu node dapat mengganggu komunikasi seluruh cincin."
     },
     mesh: {
-      name: "Topologi Full Mesh (Jala Redundan)",
-      desc: "Setiap server terhubung ke setiap server lain (n*(n-1)/2 koneksi). Toleransi kesalahan 99.999% paling tinggi untuk bursa saham & perbankan.",
-      breakEffect: "Link utama terputus, namun paket data otomatis dialihkan (auto-reroute) lewat jalur alternatif tanpa downtime!"
+      name: "Topologi Full Mesh (Jala Redundan Penuh)",
+      media: "Kabel Fiber Optik 10G/100G Multi-Core & Router Berkelompok",
+      terminator: "Point-to-Point Full Matrix [N × (N - 1) ÷ 2 tautan]",
+      desc: "Setiap node memiliki jalur langsung ke setiap node lainnya. Menawarkan toleransi kesalahan paling tinggi (High Availability 99.999%) karena selalu tersedia rute alternatif.",
+      breakEffect: "Link utama terputus! Protokol perutean dinamis (OSPF) otomatis mengalihkan aliran data lewat tautan alternatif seketika (0ms downtime).",
+      pros: "Sangat tangguh, zero downtime, tidak ada titik kegagalan tunggal (No Single Point of Failure).",
+      cons: "Biaya kabel dan konfigurasi antarmuka sangat mahal; hanya digunakan pada Data Center & Backbone Inti ISP."
     },
     tree: {
-      name: "Topologi Tree (Pohon / Hierarchical)",
-      desc: "Kombinasi hierarkis (Core Switch -> Distribution Switch -> Access Switch) umum di gedung bertingkat 4 lantai.",
-      breakEffect: "Switch Distribusi Lantai 3 putus! Hanya Lantai 3 yang terisolasi, sementara Lantai 1, 2, dan 4 normal."
+      name: "Topologi Tree (Hierarkis Bertingkat 3-Tier)",
+      media: "Fiber Optik untuk Backbone & UTP Cat6 untuk Jalur Distribusi/Akses",
+      terminator: "Hirarki Tree Berjenjang: Core -> Distribution -> Access",
+      desc: "Kombinasi bertingkat yang membagi jaringan ke dalam kelompok gedung/lantai. Switch Core mengatur rute antar gedung, Switch Distribusi membatasi broadcast domain, dan Switch Akses melayani komputer pengguna.",
+      breakEffect: "Switch Distribusi Lantai 2 terputus! Hanya komputer di Lantai 2 yang terisolasi, sementara Lantai 1, 3, dan Switch Core tetap berfungsi normal.",
+      pros: "Manajemen jaringan skala besar sangat terstruktur, mudah di-upgrade lantai per lantai.",
+      cons: "Jika Switch Core puncak mengalami kegagalan, koneksi lintas lantai/gedung akan terputus."
     }
   };
 
   function updateTopoInfo() {
     const data = topoDescriptions[currentTopo];
     const alertBox = document.getElementById("topo-alert-overlay");
+    const alertText = document.getElementById("topo-alert-text");
+    const inspectorText = document.getElementById("topo-inspector-text");
+
     if (isBroken) {
-      alertBox.style.display = "block";
-      alertBox.textContent = `🚨 ${data.breakEffect}`;
+      alertBox?.classList.remove("hidden");
+      if (alertText) alertText.textContent = data.breakEffect.slice(0, 48) + "...";
+      if (inspectorText) inspectorText.textContent = "Status: ⚠️ GANGGUAN TERDETEKSI — " + data.breakEffect;
     } else {
-      alertBox.style.display = "none";
+      alertBox?.classList.add("hidden");
+      if (inspectorText) inspectorText.textContent = "Status: Jaringan Normal • Siap mentransmisikan paket data";
     }
 
-    document.getElementById("topo-info-box").innerHTML = `
-      <div style="font-weight: 700; color: var(--primary); margin-bottom: 0.35rem;">⚡ ${data.name}</div>
-      <p style="color: var(--text-muted); line-height: 1.5;">${data.desc}</p>
-      ${isBroken ? `<p style="color: var(--accent-rose); font-weight: 600; margin-top: 0.4rem;">⚠️ Efek Gangguan: ${data.breakEffect}</p>` : ""}
-    `;
+    const infoBox = document.getElementById("topo-info-box");
+    if (infoBox) {
+      infoBox.innerHTML = `
+        <div class="flex items-center justify-between border-b border-outline-variant pb-2.5">
+          <div class="flex items-center gap-2">
+            <span class="w-3 h-3 rounded-full ${isBroken ? 'bg-rose-500' : 'bg-emerald-500'} animate-pulse"></span>
+            <h3 class="text-sm font-bold text-on-surface font-display">${data.name}</h3>
+          </div>
+          <span class="px-2.5 py-0.5 rounded text-[10px] font-mono font-bold ${isBroken ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'}">
+            ${isBroken ? 'SIMULASI RUSAK AKTIF' : 'KONDISI SEHAT (ONLINE)'}
+          </span>
+        </div>
+
+        <p class="text-xs text-on-surface-variant leading-relaxed font-sans">${data.desc}</p>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 text-xs font-mono">
+          <div class="p-3 rounded-xl bg-surface-container-low border border-outline-variant space-y-1">
+            <span class="text-[10px] text-outline uppercase block font-bold">Media Transmisi & Konektor:</span>
+            <span class="text-on-surface font-medium">${data.media}</span>
+            <span class="text-primary block text-[11px] pt-1">Terminasi: ${data.terminator}</span>
+          </div>
+
+          <div class="p-3 rounded-xl ${isBroken ? 'bg-rose-50 border border-rose-200 text-rose-900' : 'bg-surface-container-low border border-outline-variant text-on-surface'} space-y-1">
+            <span class="text-[10px] ${isBroken ? 'text-rose-700' : 'text-outline'} uppercase block font-bold">Uji Ketahanan Gangguan Fisik:</span>
+            <span class="text-xs font-medium leading-relaxed">${data.breakEffect}</span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1 text-xs">
+          <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-950 font-sans">
+            <strong class="font-mono text-emerald-800 block text-[11px] uppercase mb-1 font-bold">✅ Kelebihan:</strong>
+            ${data.pros}
+          </div>
+          <div class="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-950 font-sans">
+            <strong class="font-mono text-amber-800 block text-[11px] uppercase mb-1 font-bold">⚠️ Kelemahan:</strong>
+            ${data.cons}
+          </div>
+        </div>
+      `;
+    }
   }
 
+  // Bind Buttons
   container.querySelectorAll(".topo-btn").forEach(btn => {
     btn.addEventListener("click", () => {
-      container.querySelectorAll(".topo-btn").forEach(b => b.classList.remove("active"));
-      btn.classList.add("active");
+      container.querySelectorAll(".topo-btn").forEach(b => {
+        b.classList.remove("active", "bg-primary", "text-on-primary", "shadow-xs");
+        b.classList.add("text-on-surface-variant");
+      });
+      btn.classList.add("active", "bg-primary", "text-on-primary", "shadow-xs");
+      btn.classList.remove("text-on-surface-variant");
       currentTopo = btn.dataset.topo;
       isBroken = false;
       packetAnim.active = false;
@@ -334,8 +455,415 @@ function renderSimulationTopology(container) {
 
   updateTopoInfo();
 
+  // Helper Drawing Functions
+  function drawDevice(type, x, y, label, ip, isFaulty = false) {
+    const size = 40;
+    const img = icons[type];
+    
+    // Node shadow / glow
+    ctx.save();
+    if (isFaulty) {
+      ctx.shadowColor = "rgba(239, 68, 68, 0.8)";
+      ctx.shadowBlur = 16;
+    } else {
+      ctx.shadowColor = "rgba(56, 189, 248, 0.35)";
+      ctx.shadowBlur = 10;
+    }
+
+    if (img && img.complete) {
+      ctx.drawImage(img, x - size / 2, y - size / 2, size, size);
+    } else {
+      ctx.fillStyle = isFaulty ? "#ef4444" : "#1e293b";
+      ctx.beginPath();
+      ctx.arc(x, y, size / 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+
+    // Device Badge Label
+    ctx.fillStyle = isFaulty ? "#fee2e2" : "#0f172a";
+    ctx.strokeStyle = isFaulty ? "#ef4444" : "#38bdf8";
+    ctx.lineWidth = 1;
+    const badgeW = Math.max(ctx.measureText(label).width + 16, 56);
+    ctx.fillRect(x - badgeW / 2, y + size / 2 + 4, badgeW, 16);
+    ctx.strokeRect(x - badgeW / 2, y + size / 2 + 4, badgeW, 16);
+
+    ctx.font = "bold 9px monospace";
+    ctx.fillStyle = isFaulty ? "#991b1b" : "#e2e8f0";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(label, x, y + size / 2 + 12);
+
+    if (ip) {
+      ctx.font = "8px monospace";
+      ctx.fillStyle = "#94a3b8";
+      ctx.fillText(ip, x, y + size / 2 + 25);
+    }
+  }
+
+  function drawGridBg() {
+    ctx.fillStyle = "#090d16";
+    ctx.fillRect(0, 0, w, h);
+
+    // Subtle technical grid dots
+    ctx.fillStyle = "rgba(56, 189, 248, 0.08)";
+    for (let gx = 20; gx < w; gx += 28) {
+      for (let gy = 20; gy < h; gy += 28) {
+        ctx.fillRect(gx, gy, 1.5, 1.5);
+      }
+    }
+  }
+
+  // 1. TOPOLOGI BUS (Linear Coaxial Backbone with BNC & Terminators)
+  function drawBusTopology() {
+    drawGridBg();
+    const cy = h / 2 + 10;
+    const startX = 75;
+    const endX = w - 75;
+
+    // Main Coaxial Backbone Line
+    ctx.beginPath();
+    ctx.moveTo(startX, cy);
+    ctx.lineTo(endX, cy);
+    ctx.strokeStyle = isBroken ? "#ef4444" : "#0284c7";
+    ctx.lineWidth = 6;
+    ctx.lineCap = "round";
+    ctx.stroke();
+
+    // Backbone Inner Copper Core
+    ctx.beginPath();
+    ctx.moveTo(startX + 4, cy);
+    ctx.lineTo(endX - 4, cy);
+    ctx.strokeStyle = isBroken ? "#fca5a5" : "#38bdf8";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // 50-Ohm Terminators at Ends
+    const drawTerminator = (x, isTermBroken) => {
+      ctx.fillStyle = isTermBroken ? "#991b1b" : "#f59e0b";
+      ctx.strokeStyle = isTermBroken ? "#ef4444" : "#fbbf24";
+      ctx.lineWidth = 1.5;
+      ctx.fillRect(x - 10, cy - 14, 20, 28);
+      ctx.strokeRect(x - 10, cy - 14, 20, 28);
+
+      ctx.font = "bold 8px monospace";
+      ctx.fillStyle = "#ffffff";
+      ctx.textAlign = "center";
+      ctx.fillText(isTermBroken ? "LEPAS!" : "50Ω", x, cy - 3);
+      ctx.fillText("TERM", x, cy + 7);
+    };
+
+    drawTerminator(startX - 6, false);
+    drawTerminator(endX + 6, isBroken);
+
+    // 4 Workstation Drops
+    const nodeCount = 4;
+    for (let i = 0; i < nodeCount; i++) {
+      const nx = startX + 60 + (i * (endX - startX - 120)) / (nodeCount - 1);
+      const isTop = i % 2 === 0;
+      const ny = isTop ? cy - 85 : cy + 85;
+
+      // Drop Line
+      ctx.beginPath();
+      ctx.moveTo(nx, cy);
+      ctx.lineTo(nx, isTop ? ny + 20 : ny - 20);
+      ctx.strokeStyle = isBroken ? "rgba(239, 68, 68, 0.5)" : "rgba(56, 189, 248, 0.6)";
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+
+      // BNC T-Connector symbol at backbone
+      ctx.fillStyle = "#cbd5e1";
+      ctx.beginPath();
+      ctx.arc(nx, cy, 5, 0, Math.PI * 2);
+      ctx.fill();
+
+      drawDevice(i === 3 ? "server" : "workstation", nx, ny, `NODE ${i + 1}`, `192.168.1.${10 + i}`, isBroken);
+    }
+
+    // Packet / Signal Transmission
+    if (packetAnim.active) {
+      if (!isBroken) {
+        const curX = startX + 60 + ((endX - startX - 120) * packetAnim.progress);
+        ctx.drawImage(icons.packet, curX - 12, cy - 12, 24, 24);
+      } else {
+        // Signal reflection wave bouncing back and forth
+        const bounceX = startX + (endX - startX) * Math.abs(Math.sin(packetAnim.progress * Math.PI * 3));
+        ctx.beginPath();
+        ctx.arc(bounceX, cy, 14, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(239, 68, 68, 0.4)";
+        ctx.fill();
+        ctx.strokeStyle = "#ef4444";
+        ctx.stroke();
+        ctx.font = "bold 9px monospace";
+        ctx.fillStyle = "#ffffff";
+        ctx.fillText("COLLISION!", bounceX, cy - 18);
+      }
+    }
+  }
+
+  // 2. TOPOLOGI STAR (Central Switch with Radiating Cat6 UTP)
+  function drawStarTopology() {
+    drawGridBg();
+    const cx = w / 2;
+    const cy = h / 2 - 5;
+    const radius = Math.min(w, h) * 0.32;
+    const nodes = 6;
+
+    // Cables from Switch to Nodes
+    for (let i = 0; i < nodes; i++) {
+      const angle = (i * 2 * Math.PI) / nodes - Math.PI / 2;
+      const nx = cx + Math.cos(angle) * radius;
+      const ny = cy + Math.sin(angle) * radius;
+
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(nx, ny);
+      ctx.strokeStyle = isBroken ? "rgba(239, 68, 68, 0.4)" : "#0284c7";
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+
+      // Cat6 RJ45 port lights
+      ctx.beginPath();
+      ctx.arc(cx + Math.cos(angle) * 26, cy + Math.sin(angle) * 16, 2.5, 0, Math.PI * 2);
+      ctx.fillStyle = isBroken ? "#ef4444" : "#22c55e";
+      ctx.fill();
+
+      const type = i === 0 ? "laptop" : (i === 3 ? "server" : "workstation");
+      drawDevice(type, nx, ny, `PC-${i + 1}`, `192.168.1.${10 + i}`, isBroken);
+    }
+
+    // Central Switch Device
+    drawDevice("switch", cx, cy, isBroken ? "SWITCH (OFFLINE)" : "CISCO L2 SWITCH", "192.168.1.1", isBroken);
+
+    // Packet Animation: Host -> Switch -> Target
+    if (packetAnim.active && !isBroken) {
+      const p = packetAnim.progress;
+      let px, py;
+      if (p < 0.5) {
+        // Laptop (node 0 at top) to Switch
+        const fromAngle = -Math.PI / 2;
+        const startX = cx + Math.cos(fromAngle) * radius;
+        const startY = cy + Math.sin(fromAngle) * radius;
+        px = startX + (cx - startX) * (p * 2);
+        py = startY + (cy - startY) * (p * 2);
+      } else {
+        // Switch to Server (node 3 at bottom)
+        const toAngle = Math.PI / 2;
+        const targetX = cx + Math.cos(toAngle) * radius;
+        const targetY = cy + Math.sin(toAngle) * radius;
+        px = cx + (targetX - cx) * ((p - 0.5) * 2);
+        py = cy + (targetY - cy) * ((p - 0.5) * 2);
+      }
+      ctx.drawImage(icons.packet, px - 11, py - 11, 22, 22);
+    }
+  }
+
+  // 3. TOPOLOGI RING (Continuous Token Passing Cycle)
+  function drawRingTopology() {
+    drawGridBg();
+    const cx = w / 2;
+    const cy = h / 2 - 5;
+    const radius = Math.min(w, h) * 0.32;
+    const count = 5;
+
+    // Dual-Ring Fiber Loop
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.strokeStyle = isBroken ? "rgba(239, 68, 68, 0.4)" : "#38bdf8";
+    ctx.lineWidth = 3.5;
+    ctx.stroke();
+
+    // Inner Secondary Ring (FDDI Self-Healing)
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius - 14, 0, Math.PI * 2);
+    ctx.strokeStyle = isBroken ? "#ef4444" : "rgba(168, 85, 247, 0.4)";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Draw broken cut if active
+    if (isBroken) {
+      const breakAngle = Math.PI * 0.2;
+      const bx = cx + Math.cos(breakAngle) * radius;
+      const by = cy + Math.sin(breakAngle) * radius;
+      ctx.font = "16px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("✂️", bx, by);
+    }
+
+    // Stations
+    for (let i = 0; i < count; i++) {
+      const angle = (i * 2 * Math.PI) / count - Math.PI / 2;
+      const nx = cx + Math.cos(angle) * radius;
+      const ny = cy + Math.sin(angle) * radius;
+      drawDevice(i === 0 ? "laptop" : "workstation", nx, ny, `STATION-${i + 1}`, `10.0.0.${i + 1}`, isBroken);
+    }
+
+    // Rotating Token Emblem
+    tokenAngle += isBroken ? 0 : 0.025;
+    const tx = cx + Math.cos(tokenAngle) * radius;
+    const ty = cy + Math.sin(tokenAngle) * radius;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(tx, ty, 9, 0, Math.PI * 2);
+    ctx.fillStyle = isBroken ? "#ef4444" : "#fbbf24";
+    ctx.shadowColor = isBroken ? "#ef4444" : "#f59e0b";
+    ctx.shadowBlur = 12;
+    ctx.fill();
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.font = "bold 8px monospace";
+    ctx.fillStyle = "#0f172a";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("T", tx, ty);
+  }
+
+  // 4. TOPOLOGI FULL MESH (Full Redundancy Matrix with Auto-Reroute)
+  function drawMeshTopology() {
+    drawGridBg();
+    const cx = w / 2;
+    const cy = h / 2 - 5;
+    const radius = Math.min(w, h) * 0.32;
+    const count = 5;
+    const nodes = [];
+
+    for (let i = 0; i < count; i++) {
+      const angle = (i * 2 * Math.PI) / count - Math.PI / 2;
+      nodes.push({
+        x: cx + Math.cos(angle) * radius,
+        y: cy + Math.sin(angle) * radius,
+        name: `ROUTER-${i + 1}`,
+        ip: `172.16.${i + 1}.1`
+      });
+    }
+
+    // Interconnect all nodes (5 * 4 / 2 = 10 links)
+    for (let i = 0; i < count; i++) {
+      for (let j = i + 1; j < count; j++) {
+        const isCutLink = (i === 0 && j === 2 && isBroken);
+        ctx.beginPath();
+        ctx.moveTo(nodes[i].x, nodes[i].y);
+        ctx.lineTo(nodes[j].x, nodes[j].y);
+        ctx.strokeStyle = isCutLink ? "#ef4444" : (isBroken ? "rgba(16, 185, 129, 0.45)" : "rgba(56, 189, 248, 0.35)");
+        ctx.lineWidth = isCutLink ? 2.5 : 1.5;
+        if (isCutLink) ctx.setLineDash([4, 4]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        if (isCutLink) {
+          const mx = (nodes[i].x + nodes[j].x) / 2;
+          const my = (nodes[i].y + nodes[j].y) / 2;
+          ctx.font = "14px sans-serif";
+          ctx.fillText("✂️", mx, my);
+        }
+      }
+    }
+
+    // Draw Core Routers
+    nodes.forEach((n, idx) => {
+      drawDevice(idx === 2 ? "server" : "router", n.x, n.y, n.name, n.ip, false);
+    });
+
+    // Packet Transmission: Primary direct link or Auto-Reroute
+    if (packetAnim.active) {
+      const p = packetAnim.progress;
+      let px, py;
+      if (!isBroken) {
+        // Direct link node 0 -> node 2
+        px = nodes[0].x + (nodes[2].x - nodes[0].x) * p;
+        py = nodes[0].y + (nodes[2].y - nodes[0].y) * p;
+      } else {
+        // Rerouted path: node 0 -> node 1 -> node 2
+        if (p < 0.5) {
+          px = nodes[0].x + (nodes[1].x - nodes[0].x) * (p * 2);
+          py = nodes[0].y + (nodes[1].y - nodes[0].y) * (p * 2);
+        } else {
+          px = nodes[1].x + (nodes[2].x - nodes[1].x) * ((p - 0.5) * 2);
+          py = nodes[1].y + (nodes[2].y - nodes[1].y) * ((p - 0.5) * 2);
+        }
+      }
+      ctx.drawImage(icons.packet, px - 11, py - 11, 22, 22);
+    }
+  }
+
+  // 5. TOPOLOGI TREE (3-Tier Hierarchical: Core -> Distribution -> Access)
+  function drawTreeTopology() {
+    drawGridBg();
+    const cx = w / 2;
+
+    // Tier 1: Core Router (Top)
+    const coreX = cx;
+    const coreY = 46;
+
+    // Tier 2: 2 Distribution Switches
+    const distY = 150;
+    const dist1X = cx - 140;
+    const dist2X = cx + 140;
+
+    // Tier 3: 4 Access Workstations / Switches
+    const accY = 270;
+    const acc1X = dist1X - 60;
+    const acc2X = dist1X + 60;
+    const acc3X = dist2X - 60;
+    const acc4X = dist2X + 60;
+
+    // Cables Core -> Distribution
+    ctx.beginPath();
+    ctx.moveTo(coreX, coreY);
+    ctx.lineTo(dist1X, distY);
+    ctx.moveTo(coreX, coreY);
+    ctx.lineTo(dist2X, distY);
+    ctx.strokeStyle = "#38bdf8";
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    // Cables Distribution -> Access
+    const drawCable = (x1, y1, x2, y2, isCut) => {
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.strokeStyle = isCut ? "#ef4444" : "#0284c7";
+      ctx.lineWidth = isCut ? 2.5 : 2;
+      if (isCut) ctx.setLineDash([4, 4]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      if (isCut) {
+        ctx.font = "14px sans-serif";
+        ctx.fillText("✂️", (x1 + x2) / 2, (y1 + y2) / 2);
+      }
+    };
+
+    drawCable(dist1X, distY, acc1X, accY, false);
+    drawCable(dist1X, distY, acc2X, accY, false);
+    drawCable(dist2X, distY, acc3X, accY, isBroken);
+    drawCable(dist2X, distY, acc4X, accY, false);
+
+    // Draw Devices
+    drawDevice("router", coreX, coreY, "CORE ROUTER", "10.0.0.1", false);
+    drawDevice("switch", dist1X, distY, "DIST-GEDUNG A", "10.0.1.1", false);
+    drawDevice("switch", dist2X, distY, "DIST-GEDUNG B", "10.0.2.1", false);
+
+    drawDevice("workstation", acc1X, accY, "LAB-A1", "10.0.1.10", false);
+    drawDevice("workstation", acc2X, accY, "LAB-A2", "10.0.1.11", false);
+    drawDevice("workstation", acc3X, accY, "LAB-B1", "10.0.2.10", isBroken);
+    drawDevice("server", acc4X, accY, "SERVER-B2", "10.0.2.50", false);
+
+    // Tier Label Banners on the right
+    ctx.font = "bold 9px monospace";
+    ctx.fillStyle = "#64748b";
+    ctx.textAlign = "left";
+    ctx.fillText("TIER 1: CORE LAYER", 16, coreY + 4);
+    ctx.fillText("TIER 2: DISTRIBUTION LAYER", 16, distY + 4);
+    ctx.fillText("TIER 3: ACCESS ENDPOINTS", 16, accY + 4);
+  }
+
+  // Animation Loop
   function animate() {
-    ctx.clearRect(0, 0, width, height);
+    ctx.clearRect(0, 0, w, h);
 
     if (currentTopo === "bus") {
       drawBusTopology();
@@ -350,202 +878,17 @@ function renderSimulationTopology(container) {
     }
 
     if (packetAnim.active) {
-      packetAnim.progress += 0.02;
+      packetAnim.progress += 0.022;
       if (packetAnim.progress >= 1) packetAnim.active = false;
     }
 
-    requestAnimationFrame(animate);
+    animFrameId = requestAnimationFrame(animate);
   }
+
   animate();
-
-  function drawBusTopology() {
-    const y = height / 2;
-    // Backbone line
-    ctx.beginPath();
-    ctx.moveTo(80, y);
-    ctx.lineTo(width - 80, y);
-    ctx.strokeStyle = isBroken ? "var(--accent-rose)" : "var(--primary)";
-    ctx.lineWidth = 4;
-    ctx.stroke();
-
-    // Terminators
-    ctx.fillStyle = isBroken ? "#475569" : "#f59e0b";
-    ctx.fillRect(65, y - 10, 15, 20);
-    ctx.fillRect(width - 80, y - 10, 15, 20);
-
-    // Nodes
-    const nodeCount = 5;
-    for (let i = 0; i < nodeCount; i++) {
-      const x = 120 + (i * (width - 240)) / (nodeCount - 1);
-      // Drop cable
-      ctx.beginPath();
-      ctx.moveTo(x, y);
-      ctx.lineTo(x, y - 60);
-      ctx.strokeStyle = "rgba(255,255,255,0.4)";
-      ctx.lineWidth = 2;
-      ctx.stroke();
-
-      // Node box
-      ctx.fillStyle = "#1e293b";
-      ctx.strokeStyle = "var(--primary)";
-      ctx.lineWidth = 2;
-      ctx.fillRect(x - 20, y - 90, 40, 30);
-      ctx.strokeRect(x - 20, y - 90, 40, 30);
-
-      ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 10px sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText(`PC ${i + 1}`, x, y - 72);
-    }
-
-    // Packet
-    if (packetAnim.active) {
-      const startX = 120;
-      const endX = 120 + (3 * (width - 240)) / 4;
-      const curX = startX + (endX - startX) * packetAnim.progress;
-      ctx.beginPath();
-      ctx.arc(curX, y, 6, 0, Math.PI * 2);
-      ctx.fillStyle = isBroken ? "var(--accent-rose)" : "#00ff9d";
-      ctx.fill();
-    }
-  }
-
-  function drawStarTopology() {
-    const cx = width / 2;
-    const cy = height / 2;
-
-    // Central Switch
-    ctx.fillStyle = isBroken ? "var(--accent-rose)" : "#0284c7";
-    ctx.fillRect(cx - 30, cy - 20, 60, 40);
-    ctx.strokeStyle = "#ffffff";
-    ctx.strokeRect(cx - 30, cy - 20, 60, 40);
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 10px sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(isBroken ? "DEAD" : "SWITCH", cx, cy + 4);
-
-    const nodes = 6;
-    const radius = 110;
-    for (let i = 0; i < nodes; i++) {
-      const angle = (i * 2 * Math.PI) / nodes;
-      const nx = cx + Math.cos(angle) * radius;
-      const ny = cy + Math.sin(angle) * radius;
-
-      ctx.beginPath();
-      ctx.moveTo(cx, cy);
-      ctx.lineTo(nx, ny);
-      ctx.strokeStyle = isBroken ? "rgba(244, 63, 94, 0.3)" : "rgba(0, 240, 255, 0.4)";
-      ctx.lineWidth = 2;
-      ctx.stroke();
-
-      ctx.fillStyle = "#1e293b";
-      ctx.strokeStyle = "var(--primary)";
-      ctx.beginPath();
-      ctx.arc(nx, ny, 16, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.fillStyle = "#ffffff";
-      ctx.fillText(`PC${i + 1}`, nx, ny + 3);
-    }
-  }
-
-  function drawRingTopology() {
-    const cx = width / 2;
-    const cy = height / 2;
-    const r = 100;
-    const count = 5;
-
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.strokeStyle = isBroken ? "rgba(244, 63, 94, 0.4)" : "var(--primary)";
-    ctx.lineWidth = 3;
-    ctx.stroke();
-
-    for (let i = 0; i < count; i++) {
-      const a = (i * 2 * Math.PI) / count;
-      const nx = cx + Math.cos(a) * r;
-      const ny = cy + Math.sin(a) * r;
-
-      ctx.fillStyle = "#1e293b";
-      ctx.strokeStyle = "#a855f7";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(nx, ny, 15, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.fillStyle = "#ffffff";
-      ctx.fillText(`N${i + 1}`, nx, ny + 3);
-    }
-  }
-
-  function drawMeshTopology() {
-    const cx = width / 2;
-    const cy = height / 2;
-    const count = 5;
-    const r = 110;
-    const pos = [];
-
-    for (let i = 0; i < count; i++) {
-      const a = (i * 2 * Math.PI) / count;
-      pos.push({ x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r });
-    }
-
-    // Interconnect all
-    for (let i = 0; i < count; i++) {
-      for (let j = i + 1; j < count; j++) {
-        ctx.beginPath();
-        ctx.moveTo(pos[i].x, pos[i].y);
-        ctx.lineTo(pos[j].x, pos[j].y);
-        ctx.strokeStyle = "rgba(0, 255, 157, 0.25)";
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-      }
-    }
-
-    pos.forEach((p, idx) => {
-      ctx.fillStyle = "#1e293b";
-      ctx.strokeStyle = "#00ff9d";
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, 16, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.fillStyle = "#ffffff";
-      ctx.fillText(`SRV${idx + 1}`, p.x, p.y + 3);
-    });
-  }
-
-  function drawTreeTopology() {
-    const cx = width / 2;
-    // Core
-    ctx.fillStyle = "#0284c7";
-    ctx.fillRect(cx - 30, 40, 60, 30);
-    ctx.fillStyle = "#ffffff";
-    ctx.fillText("CORE", cx, 60);
-
-    // Distribution
-    const distXs = [cx - 120, cx, cx + 120];
-    distXs.forEach((dx, idx) => {
-      ctx.beginPath();
-      ctx.moveTo(cx, 70);
-      ctx.lineTo(dx, 120);
-      ctx.strokeStyle = idx === 2 && isBroken ? "var(--accent-rose)" : "rgba(0, 240, 255, 0.4)";
-      ctx.lineWidth = 2;
-      ctx.stroke();
-
-      ctx.fillStyle = idx === 2 && isBroken ? "var(--accent-rose)" : "#1e293b";
-      ctx.strokeStyle = "var(--primary)";
-      ctx.fillRect(dx - 25, 120, 50, 25);
-      ctx.strokeRect(dx - 25, 120, 50, 25);
-      ctx.fillStyle = "#ffffff";
-      ctx.fillText(`Lantai ${idx + 1}`, dx, 137);
-    });
-  }
 }
 
-// ============================================================================
+
 // TOPIK 3: SIMULASI 7 LAPISAN OSI & TCP 3-WAY HANDSHAKE
 // ============================================================================
 function renderSimulationOSI(container) {
@@ -1039,3 +1382,7 @@ function escapeHtml(str) {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
 }
+
+// ============================================================================
+// Re-export modularized workbench
+export { renderUnifiedWorkbench } from "./workbench.js";

@@ -19,6 +19,7 @@ To update antislop later: download `antislop.md` again, or run `npx antislop-ai 
 Proyek ini telah dikonfigurasi dengan ekosistem multi-skill untuk menghasilkan antarmuka web berkualitas tinggi, terarah, dan terbebas dari artefak klise AI generik:
 
 ### 1. Peran dan Pembagian Tugas Skill
+- **Design Taste Frontend (Taste Skill)** (`.agents/skills/design-taste-frontend/SKILL.md`): Skill anti-slop frontend versi 2.5.1 (tasteskill.dev) yang mengarahkan perancangan setara standar figma.com dan x.ai, copy lugas, rasio satu seksi per layar, micro-interaksi halus, dan verifikasi visual browser.
 - **Frontend Design** (`.agents/skills/frontend-design/SKILL.md`): Menentukan arah visual yang berkarakter, palet warna otentik, tipografi intensional, dan identitas desain yang sesuai dengan bidang subjek.
 - **Frontend Craft** (`.agents/skills/frontend-craft/SKILL.md`): Membangun implementasi kode frontend yang matang, presisi spasi, ritme komponen, dan eliminasi pola template massal (*density-based slop detection*).
 - **UI/UX Designer** (`.agents/skills/ui-ux-designer/SKILL.md`): Meningkatkan hierarki visual, arsitektur informasi, alur navigasi, konsistensi desain berbasis token, dan standar aksesibilitas inklusif (WCAG).

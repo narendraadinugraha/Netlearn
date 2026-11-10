@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="fwGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#dc2626"/>
+      <stop offset="100%" stop-color="#991b1b"/>
+    </linearGradient>
+  </defs>
+  <!-- Brick Firewall Wall -->
+  <rect x="8" y="14" width="48" height="36" rx="3" fill="url(#fwGrad)" stroke="#7f1d1d" stroke-width="2"/>
+  <path d="M8 26 L56 26 M8 38 L56 38" stroke="#fca5a5" stroke-width="1.5" opacity="0.6"/>
+  <path d="M20 14 L20 26 M36 14 L36 26 M50 14 L50 26" stroke="#fca5a5" stroke-width="1.5" opacity="0.6"/>
+  <path d="M14 26 L14 38 M28 26 L28 38 M44 26 L44 38" stroke="#fca5a5" stroke-width="1.5" opacity="0.6"/>
+  <path d="M22 38 L22 50 M38 38 L38 50 M52 38 L52 50" stroke="#fca5a5" stroke-width="1.5" opacity="0.6"/>
+  <!-- Security Shield Emblem -->
+  <path d="M32 20 L40 24 L40 33 C40 38 36 41 32 43 C28 41 24 38 24 33 L24 24 Z" fill="#ffffff" stroke="#7f1d1d" stroke-width="1.5"/>
+  <path d="M32 25 L32 37 M28 31 L36 31" stroke="#dc2626" stroke-width="2" stroke-linecap="round"/>
+</svg>

@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NetQuest - HTB Interactive Network Command Center</title>
+  
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "htb-bg": "#0d1117",
+            "htb-card": "#161f30",
+            "htb-border": "#1e293b",
+            "htb-green": "#9FEF00",
+            "htb-green-hover": "#c5f467",
+            "htb-cyan": "#06b6d4",
+            "htb-slate": "#a4b1cd"
+          },
+          fontFamily: {
+            sans: ["Inter", "-apple-system", "sans-serif"],
+            mono: ["'JetBrains Mono'", "monospace"]
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    body {
+      background-color: #0d1117;
+      color: #ffffff;
+      font-family: 'Inter', sans-serif;
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+    }
+    .material-symbols-outlined {
+      font-family: 'Material Symbols Outlined' !important;
+      font-size: 18px;
+      vertical-align: middle;
+    }
+    ::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0d1117;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1e293b;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #9FEF00;
+    }
+  </style>
+</head>
+<body class="bg-htb-bg text-white antialiased flex flex-col min-h-screen">
+
+  <!-- HTB Academy Command Header -->
+  <header class="sticky top-0 w-full h-14 bg-[#111927] border-b border-htb-border z-40 flex items-center justify-between px-4 sm:px-6">
+    <div class="flex items-center gap-4">
+      <a href="/" class="flex items-center gap-2.5 cursor-pointer no-underline text-white">
+        <div class="w-7 h-7 rounded bg-[#9FEF00] text-[#0d1117] flex items-center justify-center font-black font-mono text-sm shadow-[0_0_10px_#9FEF00]">
+          #
+        </div>
+        <div class="flex items-center gap-1.5 font-mono">
+          <span class="font-extrabold text-sm tracking-tight text-white">NetQuest</span>
+          <span class="px-1.5 py-0.2 rounded bg-htb-green text-[#0d1117] text-[8.5px] font-black uppercase tracking-wider">ACADEMY</span>
+        </div>
+      </a>
+      <span class="text-htb-border">|</span>
+      <div class="hidden sm:flex items-center gap-2 text-xs font-mono">
+        <span class="text-htb-slate">Module:</span>
+        <span class="text-white font-bold">Packet Routing Protocol</span>
+        <span class="px-1.5 py-0.5 rounded bg-htb-green/10 text-htb-green border border-htb-green/30 text-[9px] font-bold">ACTIVE LAB</span>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-3 text-xs font-mono">
+      <div class="hidden md:flex items-center gap-1.5 px-2.5 py-1 bg-htb-card border border-htb-border rounded-lg">
+        <span class="material-symbols-outlined text-[15px] text-htb-cyan">hub</span>
+        <span class="text-htb-cyan font-bold">4 Nodes Active</span>
+        <span class="text-htb-border">|</span>
+        <span class="text-htb-slate text-[11px]">Lab Simulasi TKJ</span>
+      </div>
+
+      <a href="/" class="px-3 py-1 bg-htb-card hover:bg-[#1f2c42] border border-htb-border text-htb-slate hover:text-white rounded-lg text-xs font-mono transition-colors">
+        Kembali ke NetLearn ➔
+      </a>
+    </div>
+  </header>
+
+  <!-- 3-COLUMN INDUSTRIAL COMMAND CENTER -->
+  <main class="flex-1 w-full max-w-[1560px] mx-auto p-4 sm:p-5 flex flex-col gap-4">
+    
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start w-full">
+      
+      <!-- ================================================================= -->
+      <!-- SIDEBAR KIRI: MISSION & PROGRESS (3 Kolom)                        -->
+      <!-- ================================================================= -->
+      <aside class="lg:col-span-3 space-y-4">
+        
+        <!-- Module & Rank Progress Card -->
+        <div class="p-4 bg-htb-card border border-htb-border rounded-xl shadow-sm space-y-3">
+          <div class="flex items-center justify-between pb-2 border-b border-htb-border">
+            <span class="text-[10px] font-mono uppercase text-htb-slate font-bold tracking-wider">MISSION CONTROL</span>
+            <span class="px-2 py-0.5 rounded bg-htb-green/15 text-htb-green border border-htb-green/30 font-mono text-[10px] font-bold">
+              🎖️ Novice Networker
+            </span>
+          </div>
+
+          <div>
+            <span class="text-[10px] font-mono text-htb-cyan uppercase tracking-wider block">TIER 1 • NETWORK PROTOCOL</span>
+            <h1 class="text-base font-bold text-white font-mono tracking-tight mt-0.5">Packet Routing Protocol</h1>
+            <p class="text-[11px] text-htb-slate leading-relaxed mt-1">
+              Analisis alur transmisi paket ICMP melintasi segmentasi Layer 2 Switch dan Layer 3 Router Gateway.
+            </p>
+          </div>
+
+          <!-- Level Progress -->
+          <div class="space-y-1.5 pt-1">
+            <div class="flex justify-between items-center text-xs font-mono">
+              <span class="text-htb-slate">Level Mastery:</span>
+              <span class="text-htb-green font-bold">Level 2 (68%)</span>
+            </div>
+            <div class="w-full bg-[#070a0f] h-2 rounded-full overflow-hidden border border-htb-border">
+              <div class="bg-htb-green h-full rounded-full shadow-[0_0_8px_#9FEF00] transition-all duration-300" style="width: 68%;"></div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2 pt-1 text-[11px] font-mono">
+            <div class="p-2 bg-[#070a0f] rounded-lg border border-htb-border">
+              <span class="text-htb-slate block text-[10px]">TOPOLOGI:</span>
+              <span class="font-bold text-htb-green">4 Node Link UP</span>
+            </div>
+            <div class="p-2 bg-[#070a0f] rounded-lg border border-htb-border">
+              <span class="text-htb-slate block text-[10px]">EXPERIENCE:</span>
+              <span class="font-bold text-htb-cyan">350 XP</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Checkpoints Misi -->
+        <div class="p-4 bg-htb-card border border-htb-border rounded-xl shadow-sm space-y-3">
+          <div class="flex items-center justify-between pb-2 border-b border-htb-border">
+            <div class="flex items-center gap-1.5">
+              <span class="material-symbols-outlined text-[16px] text-htb-green">checklist</span>
+              <span class="text-xs font-mono font-bold text-white uppercase tracking-wider">CHECKPOINT MISI</span>
+            </div>
+            <span class="text-[10px] font-mono text-htb-slate" id="cp-counter">2/4 Tuntas</span>
+          </div>
+
+          <div class="space-y-2.5 font-mono text-xs">
+            
+            <!-- CP 1 -->
+            <div class="p-2.5 rounded-lg border bg-[#070a0f] border-htb-green/40 text-htb-green">
+              <div class="flex items-start justify-between gap-2">
+                <div class="flex items-start gap-2">
+                  <span class="material-symbols-outlined text-[16px] text-htb-green mt-0.5">check_circle</span>
+                  <div>
+                    <span class="font-bold block">1. Inspect ARP Cache</span>
+                    <span class="text-[10px] text-htb-slate leading-tight block mt-0.5">Pemetaan MAC Host A ke Switch-01.</span>
+                  </div>
+                </div>
+                <button class="px-2 py-0.5 rounded text-[10px] bg-transparent border border-htb-green/30 text-htb-green cursor-pointer" onclick="runCmd('arp -a')">Done ✔</button>
+              </div>
+            </div>
+
+            <!-- CP 2 -->
+            <div class="p-2.5 rounded-lg border bg-[#070a0f] border-htb-green/40 text-htb-green">
+              <div class="flex items-start justify-between gap-2">
+                <div class="flex items-start gap-2">
+                  <span class="material-symbols-outlined text-[16px] text-htb-green mt-0.5">check_circle</span>
+                  <div>
+                    <span class="font-bold block">2. Configure Default Gateway</span>
+                    <span class="text-[10px] text-htb-slate leading-tight block mt-0.5">Gateway 192.168.1.1 terpasang.</span>
+                  </div>
+                </div>
+                <button class="px-2 py-0.5 rounded text-[10px] bg-transparent border border-htb-green/30 text-htb-green cursor-pointer" onclick="runCmd('ip route')">Done ✔</button>
+              </div>
+            </div>
+
+            <!-- CP 3 -->
+            <div class="p-2.5 rounded-lg border bg-[#070a0f] border-htb-border text-white hover:border-htb-cyan/40" id="cp3-box">
+              <div class="flex items-start justify-between gap-2">
+                <div class="flex items-start gap-2">
+                  <span class="material-symbols-outlined text-[16px] text-htb-slate mt-0.5" id="cp3-icon">radio_button_unchecked</span>
+                  <div>
+                    <span class="font-bold block" id="cp3-title">3. Verify Routing Hop</span>
+                    <span class="text-[10px] text-htb-slate leading-tight block mt-0.5">Amati penurunan nilai TTL (64 ➔ 63).</span>
+                  </div>
+                </div>
+                <button class="px-2 py-0.5 rounded text-[10px] bg-htb-green hover:bg-htb-green-hover text-[#0d1117] font-bold cursor-pointer" onclick="runCmd('traceroute 10.10.20.50')">Trace</button>
+              </div>
+            </div>
+
+            <!-- CP 4 -->
+            <div class="p-2.5 rounded-lg border bg-[#070a0f] border-htb-border text-white hover:border-htb-cyan/40" id="cp4-box">
+              <div class="flex items-start justify-between gap-2">
+                <div class="flex items-start gap-2">
+                  <span class="material-symbols-outlined text-[16px] text-htb-slate mt-0.5" id="cp4-icon">radio_button_unchecked</span>
+                  <div>
+                    <span class="font-bold block" id="cp4-title">4. Execute Ping Sequence</span>
+                    <span class="text-[10px] text-htb-slate leading-tight block mt-0.5">Kirim 4 paket ICMP dari Host A ke Server-B.</span>
+                  </div>
+                </div>
+                <button class="px-2 py-0.5 rounded text-[10px] bg-htb-green hover:bg-htb-green-hover text-[#0d1117] font-bold cursor-pointer" onclick="firePacket()">Ping</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- ================================================================= -->
+      <!-- TENGAH: MAIN WORKSPACE & CANVAS (6 Kolom)                         -->
+      <!-- ================================================================= -->
+      <section class="lg:col-span-6 space-y-4">
+        
+        <!-- Canvas Command Card -->
+        <div class="bg-htb-card border border-htb-border rounded-xl shadow-sm overflow-hidden">
+          
+          <!-- Top Tool Strip -->
+          <div class="p-3 bg-[#111927] border-b border-htb-border flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-[16px] text-htb-cyan">hub</span>
+              <span class="font-bold text-white">Topologi L2/L3 Live</span>
+              <span class="text-htb-border">|</span>
+              <span class="text-[11px] text-htb-green flex items-center gap-1 font-bold" id="link-status-badge">
+                <span class="w-1.5 h-1.5 rounded-full bg-htb-green animate-ping"></span>
+                Link: UP
+              </span>
+            </div>
+
+            <div class="flex items-center gap-1.5">
+              <button class="px-2 py-1 rounded text-[10px] font-mono border cursor-pointer bg-[#070a0f] border-htb-border text-white hover:border-htb-green" id="btn-toggle-fault" onclick="toggleFault()">
+                Link: UP ✔️
+              </button>
+              <button class="px-2 py-1 rounded text-[10px] font-mono border cursor-pointer bg-[#070a0f] border-htb-border text-white hover:border-htb-green" id="btn-toggle-hub" onclick="toggleHub()">
+                Concentrator: Switch-01
+              </button>
+            </div>
+          </div>
+
+          <!-- Canvas Element -->
+          <div class="relative w-full bg-[#070a0f]" style="height: 330px;">
+            <canvas id="arena-canvas" class="w-full h-full block cursor-pointer"></canvas>
+            
+            <!-- Quick Fire Bar -->
+            <div class="absolute bottom-3 left-3 right-3 bg-[#111927]/90 backdrop-blur-md p-2 rounded-lg border border-htb-border flex items-center justify-between gap-2 text-xs font-mono">
+              <div class="flex items-center gap-1.5 text-htb-slate text-[11px]">
+                <span class="text-white font-bold">Host A (192.168.1.10)</span>
+                <span class="text-htb-green">➔</span>
+                <span>Switch-01</span>
+                <span class="text-htb-cyan">➔</span>
+                <span>Router-Core</span>
+                <span class="text-htb-green">➔</span>
+                <span class="text-white font-bold">Server-B (10.10.20.50)</span>
+              </div>
+
+              <button class="px-4 py-1.5 bg-htb-green hover:bg-htb-green-hover text-[#0d1117] font-bold font-mono text-xs rounded-md shadow-[0_0_12px_rgba(159,239,0,0.35)] cursor-pointer transition-all flex items-center gap-1.5" onclick="firePacket()">
+                <span class="material-symbols-outlined text-[15px]">send</span>
+                <span>🚀 SEND ICMP PACKET</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- KARTU INSPEKSI PAKET (LAYER 2 & LAYER 3 HEADER DISSECTOR) -->
+        <div class="p-4 bg-htb-card border border-htb-border rounded-xl shadow-sm space-y-3">
+          <div class="flex items-center justify-between pb-2 border-b border-htb-border">
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-[16px] text-htb-cyan">layers</span>
+              <span class="text-xs font-mono font-bold text-white uppercase tracking-wider">PACKET DISSECTOR (LAYER 2 &amp; LAYER 3 INSPECTION)</span>
+            </div>
+            <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-htb-cyan/10 text-htb-cyan border border-htb-cyan/30 font-bold">
+              ICMP PDU LIVE
+            </span>
+          </div>
+
+          <div class="space-y-2.5 font-mono text-xs">
+            
+            <!-- Layer 2: Ethernet II Frame Header -->
+            <div class="p-3 bg-[#070a0f] rounded-lg border border-htb-border space-y-1.5">
+              <div class="flex items-center justify-between">
+                <span class="text-htb-cyan font-bold text-[11px] flex items-center gap-1">
+                  <span class="w-1.5 h-1.5 rounded-full bg-htb-cyan"></span>
+                  LAYER 2: ETHERNET II (DATA LINK FRAME)
+                </span>
+                <span class="text-[10px] text-htb-green font-bold">CRC32 FCS: VALID</span>
+              </div>
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10px] pt-1">
+                <div class="p-1.5 bg-htb-card rounded border border-htb-border">
+                  <span class="text-htb-slate block">SOURCE MAC:</span>
+                  <span class="text-white font-bold truncate block">00:AA:11:22:33:01</span>
+                </div>
+                <div class="p-1.5 bg-htb-card rounded border border-htb-border">
+                  <span class="text-htb-slate block">DEST MAC (SWITCH):</span>
+                  <span class="text-white font-bold truncate block">00:SW:99:88:77:01</span>
+                </div>
+                <div class="p-1.5 bg-htb-card rounded border border-htb-border">
+                  <span class="text-htb-slate block">ETHERTYPE:</span>
+                  <span class="text-htb-green font-bold block">0x0800 (IPv4)</span>
+                </div>
+                <div class="p-1.5 bg-htb-card rounded border border-htb-border">
+                  <span class="text-htb-slate block">FRAME SIZE:</span>
+                  <span class="text-white font-bold block">98 Bytes</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Layer 3: IPv4 Packet Header -->
+            <div class="p-3 bg-[#070a0f] rounded-lg border border-htb-border space-y-1.5">
+              <div class="flex items-center justify-between">
+                <span class="text-htb-green font-bold text-[11px] flex items-center gap-1">
+                  <span class="w-1.5 h-1.5 rounded-full bg-htb-green"></span>
+                  LAYER 3: IPv4 PACKET HEADER (NETWORK ROUTING)
+                </span>
+                <span class="text-[10px] text-htb-slate">Next Hop: Router-Core Gateway</span>
+              </div>
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10px] pt-1">
+                <div class="p-1.5 bg-htb-card rounded border border-htb-border">
+                  <span class="text-htb-slate block">SRC IP:</span>
+                  <span class="text-white font-bold block">192.168.1.10</span>
+                </div>
+                <div class="p-1.5 bg-htb-card rounded border border-htb-border">
+                  <span class="text-htb-slate block">DST IP:</span>
+                  <span class="text-htb-cyan font-bold block">10.10.20.50</span>
+                </div>
+                <div class="p-1.5 bg-htb-card rounded border border-htb-border">
+                  <span class="text-htb-slate block">TIME TO LIVE:</span>
+                  <span class="text-htb-green font-bold block" id="header-ttl">64 ➔ 63 (Dec 1)</span>
+                </div>
+                <div class="p-1.5 bg-htb-card rounded border border-htb-border">
+                  <span class="text-htb-slate block">PROTOCOL:</span>
+                  <span class="text-white font-bold block">1 (ICMP)</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Layer 4: ICMP Payload -->
+            <div class="p-2.5 bg-[#070a0f] rounded-lg border border-htb-border flex items-center justify-between text-[10px]">
+              <span class="text-htb-slate">ICMP PAYLOAD:</span>
+              <span class="text-white font-bold">Type: 8 (Echo Request) / Code: 0</span>
+              <span class="text-htb-slate">Checksum: 0x4F2A</span>
+              <span class="text-htb-green font-bold">Payload: 32 Bytes (00 01 02 ... 1F)</span>
+            </div>
+          </div>
+
+          <div id="verdict-banner" class="p-3 rounded-lg border text-xs font-mono bg-htb-green/10 border-htb-green/40 text-htb-green">
+            <div class="flex items-center justify-between font-bold mb-1">
+              <span id="verdict-title">TRANSMISSION READY: ALL LINKS OPERATIONAL</span>
+              <span id="verdict-rtt">RTT: 0.82 ms</span>
+            </div>
+            <p class="text-[11px] text-htb-slate" id="verdict-desc">
+              Host A siap mengirimkan frame ICMP menuju Server-B melintasi Router Gateway (192.168.1.1).
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================================================================= -->
+      <!-- SIDEBAR KANAN: TERMINAL & TARGET BOX (3 Kolom)                    -->
+      <!-- ================================================================= -->
+      <aside class="lg:col-span-3 space-y-4">
+        
+        <!-- TARGET SYSTEM DETAIL BOX -->
+        <div class="p-4 bg-htb-card border border-htb-border rounded-xl shadow-sm space-y-3">
+          <div class="flex items-center justify-between pb-2 border-b border-htb-border">
+            <div class="flex items-center gap-1.5">
+              <span class="material-symbols-outlined text-[16px] text-htb-green">terminal</span>
+              <span class="text-xs font-mono font-bold text-white uppercase tracking-wider">TARGET SYSTEM BOX</span>
+            </div>
+            <span class="px-2 py-0.5 rounded bg-htb-green/15 text-htb-green border border-htb-green/30 font-mono text-[9px] font-bold flex items-center gap-1" id="target-status-pill">
+              <span class="w-1.5 h-1.5 rounded-full bg-htb-green animate-pulse"></span>
+              ACTIVE
+            </span>
+          </div>
+
+          <!-- Target Specifications -->
+          <div class="space-y-2 text-xs font-mono">
+            <div class="p-2.5 bg-[#070a0f] rounded-lg border border-htb-border space-y-1">
+              <span class="text-[10px] text-htb-slate block uppercase">TARGET MACHINE:</span>
+              <span class="font-bold text-white block text-sm">Server-B (Debian Linux)</span>
+              <span class="text-[10px] text-htb-cyan block">Linux Debian 12 (Kernel 6.1)</span>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 text-[11px]">
+              <div class="p-2 bg-[#070a0f] rounded border border-htb-border">
+                <span class="text-[10px] text-htb-slate block">TARGET IP:</span>
+                <span class="font-bold text-htb-green block truncate">10.10.20.50</span>
+              </div>
+              <div class="p-2 bg-[#070a0f] rounded border border-htb-border">
+                <span class="text-[10px] text-htb-slate block">SUBNET:</span>
+                <span class="font-bold text-white block truncate">/24 (255.255.255.0)</span>
+              </div>
+            </div>
+
+            <div class="p-2 bg-[#070a0f] rounded border border-htb-border text-[11px]">
+              <span class="text-[10px] text-htb-slate block">DEFAULT GATEWAY:</span>
+              <span class="font-bold text-white">192.168.1.1 (Router-Core)</span>
+            </div>
+
+            <!-- Open Ports -->
+            <div>
+              <span class="text-[10px] text-htb-slate uppercase tracking-wider block mb-1">OPEN PORTS / SERVICES:</span>
+              <div class="space-y-1 text-[10px]">
+                <div class="px-2 py-1 bg-[#070a0f] rounded border border-htb-border flex items-center justify-between">
+                  <span class="text-htb-green font-bold">22/TCP</span>
+                  <span class="text-htb-slate">SSH (OpenSSH 9.2)</span>
+                  <span class="text-htb-cyan font-bold">OPEN</span>
+                </div>
+                <div class="px-2 py-1 bg-[#070a0f] rounded border border-htb-border flex items-center justify-between">
+                  <span class="text-htb-green font-bold">80/TCP</span>
+                  <span class="text-htb-slate">HTTP (Nginx 1.22)</span>
+                  <span class="text-htb-cyan font-bold">OPEN</span>
+                </div>
+                <div class="px-2 py-1 bg-[#070a0f] rounded border border-htb-border flex items-center justify-between">
+                  <span class="text-htb-green font-bold">ICMP</span>
+                  <span class="text-htb-slate">Echo Request/Reply</span>
+                  <span class="text-htb-green font-bold">ACTIVE</span>
+                </div>
+              </div>
+            </div>
+
+            <button class="w-full py-1.5 bg-[#070a0f] hover:bg-[#1f2c42] text-white border border-htb-border hover:border-htb-green rounded-lg text-xs font-mono font-bold cursor-pointer transition-colors flex items-center justify-center gap-1.5" onclick="resetTarget()">
+              <span class="material-symbols-outlined text-[15px] text-htb-green">refresh</span>
+              <span>Reset Target System</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- JENDELA TERMINAL INTERAKTIF MINI (root@netquest:~#) -->
+        <div class="bg-[#070a0f] border border-htb-border rounded-xl shadow-md overflow-hidden flex flex-col font-mono text-xs">
+          
+          <!-- Terminal Titlebar -->
+          <div class="px-3 py-2 bg-[#111927] border-b border-htb-border flex items-center justify-between text-htb-slate">
+            <div class="flex items-center gap-1.5">
+              <span class="w-2.5 h-2.5 rounded-full bg-[#ef4444]"></span>
+              <span class="w-2.5 h-2.5 rounded-full bg-[#FFAF00]"></span>
+              <span class="w-2.5 h-2.5 rounded-full bg-htb-green"></span>
+              <span class="text-[11px] font-bold text-white ml-1">terminal: root@netquest:~#</span>
+            </div>
+            <div class="flex gap-1 text-[10px]">
+              <button class="px-1.5 py-0.5 rounded bg-htb-card hover:bg-[#1f2c42] text-white cursor-pointer" onclick="runCmd('ping 10.10.20.50')">ping</button>
+              <button class="px-1.5 py-0.5 rounded bg-htb-card hover:bg-[#1f2c42] text-white cursor-pointer" onclick="runCmd('ip route')">route</button>
+            </div>
+          </div>
+
+          <!-- Terminal Output Screen -->
+          <div id="term-screen" class="p-3 text-htb-slate space-y-1 overflow-y-auto" style="min-height: 200px; max-height: 230px;">
+            <div>NetQuest Linux Terminal v4.1 (x86_64-pc-linux-gnu)</div>
+            <div>Target: 192.168.1.0/24 &lt;-&gt; 10.10.20.0/24 (OSPF Core)</div>
+            <div>Ketik 'help' untuk daftar perintah taktis (ping, arp, route, traceroute).</div>
+          </div>
+
+          <!-- Terminal Input Prompt -->
+          <form id="term-form" class="p-2 border-t border-htb-border flex items-center gap-1.5 bg-[#0a0f18]" onsubmit="handleTermSubmit(event)">
+            <span class="text-htb-green font-bold shrink-0">root@netquest:~#</span>
+            <input 
+              type="text" 
+              id="term-input" 
+              class="flex-1 bg-transparent text-white outline-none font-mono text-xs placeholder:text-[#475569]" 
+              placeholder="Ketik ping, arp -a, ip route, help..."
+              autocomplete="off"
+            />
+            <button type="submit" class="px-2 py-0.5 bg-htb-green hover:bg-htb-green-hover text-[#0d1117] rounded text-[10px] font-bold cursor-pointer">Enter</button>
+          </form>
+        </div>
+      </aside>
+    </div>
+  </main>
+
+  <script>
+    // State
+    let cableCut = false;
+    let isHub = false;
+    let packetAnim = null;
+    let termHistory = [];
+
+    const nodes = {
+      hostA: { name: "Host A", ip: "192.168.1.10", x: 80, y: 160 },
+      switch01: { name: "Switch-01", ip: "L2 Distribution", x: 235, y: 160 },
+      routerCore: { name: "Router-Core", ip: "192.168.1.1", x: 395, y: 160 },
+      serverB: { name: "Server-B", ip: "10.10.20.50", x: 555, y: 160 }
+    };
+
+    function toggleFault() {
+      cableCut = !cableCut;
+      document.getElementById("btn-toggle-fault").textContent = cableCut ? "Link: DOWN ❌" : "Link: UP ✔️";
+      document.getElementById("btn-toggle-fault").className = cableCut ? "px-2 py-1 rounded text-[10px] font-mono border cursor-pointer bg-[#ef4444]/20 border-[#ef4444] text-[#ef4444] font-bold" : "px-2 py-1 rounded text-[10px] font-mono border cursor-pointer bg-[#070a0f] border-htb-border text-white";
+      document.getElementById("link-status-badge").innerHTML = cableCut ? '<span class="w-1.5 h-1.5 rounded-full bg-[#ef4444] animate-ping"></span> Link: DOWN' : '<span class="w-1.5 h-1.5 rounded-full bg-htb-green animate-ping"></span> Link: UP';
+      document.getElementById("link-status-badge").className = cableCut ? "text-[11px] text-[#ef4444] flex items-center gap-1 font-bold" : "text-[11px] text-htb-green flex items-center gap-1 font-bold";
+    }
+
+    function toggleHub() {
+      isHub = !isHub;
+      document.getElementById("btn-toggle-hub").textContent = isHub ? "Concentrator: Hub-L1" : "Concentrator: Switch-01";
+      document.getElementById("btn-toggle-hub").className = isHub ? "px-2 py-1 rounded text-[10px] font-mono border cursor-pointer bg-[#FFAF00]/20 border-[#FFAF00] text-[#FFAF00] font-bold" : "px-2 py-1 rounded text-[10px] font-mono border cursor-pointer bg-[#070a0f] border-htb-border text-white";
+    }
+
+    function resetTarget() {
+      cableCut = false;
+      isHub = false;
+      document.getElementById("btn-toggle-fault").textContent = "Link: UP ✔️";
+      document.getElementById("btn-toggle-fault").className = "px-2 py-1 rounded text-[10px] font-mono border cursor-pointer bg-[#070a0f] border-htb-border text-white";
+      appendTerm("[!] Target System has been reset to active state.");
+    }
+
+    function firePacket() {
+      if (cableCut) {
+        packetAnim = { progress: 0, isSuccess: false };
+        updateVerdict(false, "TRANSMISSION FAILED: PHYSICAL LINK DOWN", "Kabel UTP antara Host A dan Switch-01 terputus. Sinyal carrier elektrik hilang.");
+        appendTerm("From 192.168.1.10 icmp_seq=1 Destination Host Unreachable (Link Down)");
+      } else {
+        packetAnim = { progress: 0, isSuccess: true };
+        updateVerdict(true, "PACKET ROUTED SUCCESSFULLY: 100% TRANSMISSION", "Paket menyeberang melalui Router-Core (TTL: 64 ➔ 63) dan sampai ke Server-B.");
+        appendTerm("64 bytes from 10.10.20.50: icmp_seq=1 ttl=63 time=0.82 ms");
+        markCheckpoint("cp3");
+        markCheckpoint("cp4");
+      }
+    }
+
+    function markCheckpoint(id) {
+      const box = document.getElementById(id + "-box");
+      const icon = document.getElementById(id + "-icon");
+      const title = document.getElementById(id + "-title");
+      if (box && icon) {
+        box.className = "p-2.5 rounded-lg border bg-[#070a0f] border-htb-green/40 text-htb-green";
+        icon.textContent = "check_circle";
+        icon.className = "material-symbols-outlined text-[16px] text-htb-green mt-0.5";
+        title.className = "font-bold block text-htb-green";
+      }
+      document.getElementById("cp-counter").textContent = "4/4 Tuntas";
+    }
+
+    function updateVerdict(success, title, desc) {
+      const b = document.getElementById("verdict-banner");
+      b.className = success ? "p-3 rounded-lg border text-xs font-mono bg-htb-green/10 border-htb-green/40 text-htb-green" : "p-3 rounded-lg border text-xs font-mono bg-[#ef4444]/15 border-[#ef4444]/40 text-[#ef4444]";
+      document.getElementById("verdict-title").textContent = title;
+      document.getElementById("verdict-desc").textContent = desc;
+      document.getElementById("verdict-rtt").textContent = success ? "RTT: 0.82 ms" : "DROP";
+    }
+
+    function runCmd(cmdStr) {
+      appendTerm("root@netquest:~# " + cmdStr);
+      const parts = cmdStr.trim().split(/\s+/);
+      const cmd = parts[0]?.toLowerCase();
+      const arg = parts[1];
+
+      if (cmd === "help") {
+        appendTerm("Perintah: ping, arp -a, ip route, traceroute, ifconfig, clear");
+      } else if (cmd === "ping") {
+        firePacket();
+      } else if (cmd === "arp") {
+        appendTerm("? (192.168.1.1) at 00:SW:99:88:77:01 [ether] on eth0");
+        appendTerm("? (10.10.20.50) at 00:BB:44:55:66:02 [ether] on eth0");
+      } else if (cmd === "ip" && arg === "route") {
+        appendTerm("default via 192.168.1.1 dev eth0 proto static onlink");
+        appendTerm("192.168.1.0/24 dev eth0 proto kernel scope link");
+        appendTerm("10.10.20.0/24 via 192.168.1.1 dev eth0 proto ospf");
+      } else if (cmd === "traceroute") {
+        appendTerm("traceroute to 10.10.20.50, 30 hops max");
+        appendTerm(" 1  router-core (192.168.1.1)  0.398 ms");
+        appendTerm(" 2  server-b (10.10.20.50)  0.812 ms");
+        markCheckpoint("cp3");
+      } else if (cmd === "ifconfig") {
+        appendTerm("eth0: inet 192.168.1.10 netmask 255.255.255.0 broadcast 192.168.1.255");
+        appendTerm("      ether 00:aa:11:22:33:01  txqueuelen 1000");
+      } else if (cmd === "clear") {
+        document.getElementById("term-screen").innerHTML = "";
+      } else {
+        appendTerm("bash: " + cmd + ": command not found");
+      }
+    }
+
+    function appendTerm(text) {
+      const s = document.getElementById("term-screen");
+      const d = document.createElement("div");
+      d.textContent = text;
+      s.appendChild(d);
+      s.scrollTop = s.scrollHeight;
+    }
+
+    function handleTermSubmit(e) {
+      e.preventDefault();
+      const input = document.getElementById("term-input");
+      const val = input.value.trim();
+      if (val) {
+        runCmd(val);
+        input.value = "";
+      }
+    }
+
+    // Canvas Engine
+    const canvas = document.getElementById("arena-canvas");
+    const ctx = canvas.getContext("2d");
+    let pulseT = 0;
+
+    function draw() {
+      const w = canvas.width = canvas.parentElement.clientWidth;
+      const h = canvas.height = canvas.parentElement.clientHeight;
+      const scaleX = w / 640;
+      const scaleY = h / 330;
+
+      pulseT = (pulseT + 0.015) % 1;
+
+      // Dark BG with Grid Dots
+      ctx.fillStyle = "#070a0f";
+      ctx.fillRect(0, 0, w, h);
+
+      ctx.fillStyle = "rgba(30, 41, 59, 0.45)";
+      for (let x = 12; x < w; x += 24) {
+        for (let y = 12; y < h; y += 24) {
+          ctx.beginPath();
+          ctx.arc(x, y, 1, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      const xA = nodes.hostA.x * scaleX, yA = nodes.hostA.y * scaleY;
+      const xSw = nodes.switch01.x * scaleX, ySw = nodes.switch01.y * scaleY;
+      const xRt = nodes.routerCore.x * scaleX, yRt = nodes.routerCore.y * scaleY;
+      const xB = nodes.serverB.x * scaleX, yB = nodes.serverB.y * scaleY;
+
+      // Cables
+      drawLink(ctx, xA, yA, xSw, ySw, cableCut, pulseT);
+      drawLink(ctx, xSw, ySw, xRt, yRt, false, pulseT);
+      drawLink(ctx, xRt, yRt, xB, yB, false, pulseT);
+
+      // Hardware Cards
+      drawCard(ctx, xA, yA, "Host A", "192.168.1.10", "💻 Host A", "#9FEF00");
+      drawCard(ctx, xSw, ySw, "Switch-01", "24-Port L2", "🔀 Switch-01", "#06b6d4");
+      drawCard(ctx, xRt, yRt, "Router-Core", "GW: 192.168.1.1", "🌐 Router-Core", "#9FEF00");
+      drawCard(ctx, xB, yB, "Server-B", "10.10.20.50", "🎯 Server-B", "#06b6d4");
+
+      // Moving Packet
+      if (packetAnim) {
+        packetAnim.progress += 0.02;
+        let px = xA, py = yA;
+
+        if (cableCut) {
+          const t = Math.min(packetAnim.progress * 3, 0.45);
+          px = xA + (xSw - xA) * t;
+          py = yA + (ySw - yA) * t;
+          drawPkt(ctx, px, py, "DROP ❌", "#ef4444");
+          if (packetAnim.progress >= 0.6) packetAnim = null;
+        } else {
+          if (packetAnim.progress < 0.33) {
+            const t = packetAnim.progress / 0.33;
+            px = xA + (xSw - xA) * t;
+            py = yA + (ySw - yA) * t;
+            drawPkt(ctx, px, py, "✉️ ICMP PDU", "#9FEF00");
+          } else if (packetAnim.progress < 0.66) {
+            const t = (packetAnim.progress - 0.33) / 0.33;
+            px = xSw + (xRt - xSw) * t;
+            py = ySw + (yRt - ySw) * t;
+            drawPkt(ctx, px, py, "🌐 ROUTING", "#06b6d4");
+          } else {
+            const t = (packetAnim.progress - 0.66) / 0.34;
+            px = xRt + (xB - xRt) * t;
+            py = yRt + (yB - yRt) * t;
+            drawPkt(ctx, px, py, "✅ REPLY (TTL:63)", "#9FEF00");
+          }
+          if (packetAnim.progress >= 1.0) packetAnim = null;
+        }
+      }
+
+      requestAnimationFrame(draw);
+    }
+
+    function drawLink(ctx, x1, y1, x2, y2, broken, pT) {
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+
+      if (broken) {
+        ctx.strokeStyle = "rgba(239, 68, 68, 0.85)";
+        ctx.lineWidth = 2.5;
+        ctx.setLineDash([5, 5]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+        ctx.fillStyle = "#ef4444";
+        ctx.fillRect(mx - 40, my - 10, 80, 20);
+        ctx.font = "bold 9px monospace";
+        ctx.fillStyle = "#ffffff";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("✂️ LINK DOWN", mx, my);
+      } else {
+        ctx.strokeStyle = "rgba(159, 239, 0, 0.65)";
+        ctx.lineWidth = 2.5;
+        ctx.setLineDash([]);
+        ctx.stroke();
+
+        const px = x1 + (x2 - x1) * pT;
+        const py = y1 + (y2 - y1) * pT;
+        ctx.beginPath();
+        ctx.arc(px, py, 3.5, 0, Math.PI * 2);
+        ctx.fillStyle = "#9FEF00";
+        ctx.shadowColor = "#9FEF00";
+        ctx.shadowBlur = 8;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      }
+    }
+
+    function drawCard(ctx, x, y, title, sub, icon, accent) {
+      const w = 114, h = 58;
+      const rx = x - w / 2, ry = y - h / 2;
+
+      ctx.fillStyle = "#161f30";
+      ctx.fillRect(rx, ry, w, h);
+      ctx.strokeStyle = "#1e293b";
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(rx, ry, w, h);
+
+      ctx.beginPath();
+      ctx.arc(rx + 10, ry + 12, 3, 0, Math.PI * 2);
+      ctx.fillStyle = "#9FEF00";
+      ctx.fill();
+
+      ctx.font = "bold 10px monospace";
+      ctx.fillStyle = "#ffffff";
+      ctx.textAlign = "left";
+      ctx.fillText(icon, rx + 18, ry + 15);
+
+      ctx.fillStyle = "#0d1117";
+      ctx.fillRect(rx + 6, ry + 26, w - 12, 22);
+
+      ctx.font = "bold 9.5px monospace";
+      ctx.fillStyle = accent;
+      ctx.textAlign = "center";
+      ctx.fillText(sub, x, ry + 40);
+    }
+
+    function drawPkt(ctx, x, y, txt, col) {
+      ctx.save();
+      ctx.shadowColor = col;
+      ctx.shadowBlur = 10;
+      ctx.fillStyle = col;
+      ctx.fillRect(x - 50, y - 10, 100, 20);
+
+      ctx.font = "bold 9px monospace";
+      ctx.fillStyle = col === "#9FEF00" ? "#0d1117" : "#ffffff";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(txt, x, y);
+      ctx.restore();
+    }
+
+    draw();
+  </script>
+</body>
+</html>
+
