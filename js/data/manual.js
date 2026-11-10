@@ -80,16 +80,25 @@ export const MANUAL_BOOK = {
       {
         title: "4. Tata Cara Menggunakan Simulator Cisco Packet Tracer & 5 Topologi",
         content: `
-<p class="leading-relaxed">Laboratorium virtual NetLearn menghadirkan simulator jaringan berstandar Cisco Packet Tracer yang dapat dijalankan langsung di browser:</p>
+<p class="leading-relaxed">Laboratorium virtual NetLearn menghadirkan simulator jaringan berstandar Cisco Packet Tracer dengan kanvas bebas interaktif yang dapat dijalankan langsung di browser:</p>
 <ol class="list-decimal pl-5 space-y-2 mt-2">
   <li><strong>Membuka Laboratorium Virtual</strong>: Klik menu <strong>"Lab Simulasi"</strong> pada navigasi utama.</li>
-  <li><strong>Simulasi Pengiriman Paket Data (Cisco Packet Tracer Mode)</strong>:
+  <li><strong>Simulator Cisco Packet Tracer Bebas (Drag &amp; Drop Canvas)</strong>:
     <ul class="list-disc pl-5 mt-1 space-y-1 text-on-surface-variant">
-      <li><strong>Mode Realtime</strong>: Tekan tombol <em>"Kirim Simple PDU (Ping)"</em> untuk menguji konektivitas langsung antara Laptop Siswa (PC-A), Switch 2960, Router Core 2911, hingga Server Web.</li>
-      <li><strong>Mode Simulasi (Event List)</strong>: Pilih mode <em>"⏱️ Mode Simulasi"</em> untuk menjalankan inspeksi frame per frame. Gunakan tombol <strong>"Maju 1 Langkah (Step)"</strong> atau <strong>"Auto Play"</strong> untuk melihat pergerakan amplop PDU di sepanjang kabel.</li>
-      <li><strong>PDU Inspector (Amplop Paket)</strong>: Klik tombol amplop atau baris pada tabel Event List untuk membuka jendela analisis <strong>Model OSI 7-Layer</strong> (Inbound & Outbound PDU: Physical, Data Link MAC, Network IPv4/ARP/ICMP, Transport, dan Application).</li>
-      <li><strong>Cisco Physical Chassis & IOS CLI Terminal</strong>: Klik salah satu ikon perangkat pada kanvas kerja untuk membuka panel inspeksi perangkat. Anda dapat mengamati tampak fisik port chassis (Fa0/1 s.d Fa0/24) dan menjalankan perintah CLI Cisco IOS nyata (seperti <code>enable</code>, <code>show ip interface brief</code>, <code>ping</code>, dan <code>show ip route</code>).</li>
-      <li><strong>Simulasi Gangguan Kabel Putus</strong>: Tekan tombol <em>"Putuskan Kabel Fa0/1"</em> untuk menguji respon jaringan saat kabel fisik putus, dan amati lampu link berubah merah serta paket dinyatakan drop/gagal.</li>
+      <li><strong>Kotak Perangkat &amp; Alat (Device Palette Box)</strong>: Tambahkan perangkat jaringan (Router 2911, Switch 2960, Hub) dan perangkat akhir (PC Workstation, Laptop, Server Web) langsung ke kanvas dengan sekali klik.</li>
+      <li><strong>Pemasangan Kabel Fleksibel</strong>: Pilih alat kabel (<em>Straight-Through</em> atau <em>Cross-Over</em>), klik perangkat asal untuk memilih port (misal <code>FastEthernet0/1</code>), lalu klik perangkat tujuan untuk menyambungkan kabel dengan indikator LED link hijau realistis.</li>
+      <li><strong>Penggeseran &amp; Penghapusan</strong>: Gunakan mode kursor <em>Pilih/Geser</em> untuk menata posisi perangkat secara bebas di kanvas, atau gunakan alat <em>Hapus</em> untuk membuang perangkat/kabel.</li>
+      <li><strong>Add Simple PDU (Kirim Paket Tes)</strong>: Pilih alat <em>Kirim PDU (Amplop Emas)</em>, klik perangkat sumber lalu klik perangkat target. Simulator secara dinamis melakukan analisis rute kabel, subnet IP, dan gateway, lalu menggerakkan amplop paket di kanvas lengkap dengan status <em>Successful / Failed</em>.</li>
+      <li><strong>Mode Realtime vs Mode Simulasi (Event List)</strong>: Jalankan simulasi paket secara real-time atau frame-by-frame dengan tombol <em>Step</em> / <em>Auto Play</em> untuk meneliti perjalanan paket data hop-demi-hop.</li>
+      <li><strong>PDU Inspector (OSI 7-Layer)</strong>: Klik tombol amplop pada daftar peristiwa (Event List) untuk membedah paket data pada Layer 1 Fisik, Layer 2 Ethernet MAC, Layer 3 IPv4/ARP/ICMP, Layer 4 Transport, dan Layer 7 Application.</li>
+      <li><strong>Device Inspector Lengkap</strong>: Klik ganda (double-click) pada perangkat apa pun untuk membuka jendela konfigurasi:
+        <ul class="list-circle pl-4 mt-1 space-y-0.5">
+          <li><strong>Desktop PC/Laptop</strong>: Buka <em>IP Configuration</em> untuk mengubah IP/Mask/Gateway, <em>Command Prompt (CMD)</em> untuk menjalankan <code>ping &lt;ip&gt;</code> dan <code>ipconfig</code>, serta <em>Web Browser</em> untuk menguji koneksi HTTP port 80 ke server target.</li>
+          <li><strong>Cisco IOS CLI Terminal</strong>: Untuk Switch &amp; Router, jalankan perintah standar IOS seperti <code>enable</code>, <code>show ip interface brief</code>, <code>show ip route</code>, dan <code>show mac-address-table</code>.</li>
+          <li><strong>Tampak Fisik (Chassis)</strong>: Pantau LED link port dan saklar daya (Power ON/OFF).</li>
+        </ul>
+      </li>
+      <li><strong>Pilihan Topologi Cepat</strong>: Melalui menu dropdown <em>Muat Topologi Lab</em>, Anda dapat memuat template siap pakai (Lab Standar TKJ, Star LAN Sekolah, Peer-to-Peer) atau memilih <em>Kanvas Kosong</em> untuk merancang topologi dari awal.</li>
     </ul>
   </li>
   <li><strong>Eksplorasi 5 Topologi Fisik Interaktif</strong>:
