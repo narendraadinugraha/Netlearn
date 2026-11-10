@@ -95,7 +95,7 @@ export const MANUAL_BOOK = {
   <li><strong>Eksplorasi 5 Topologi Fisik Interaktif</strong>:
     <ul class="list-disc pl-5 mt-1 space-y-1 text-on-surface-variant">
       <li>Pilih tab <strong>"5 Topologi Jaringan Fisik"</strong>. Tersedia 5 pilihan bentuk topologi: <em>Bus (Kabel Koaksial & Terminator 50Ω), Star (Sentral Switch L2), Ring (Token Ring FDDI), Full Mesh (Redundansi Matriks), dan Tree (Hirarki 3-Tier)</em>.</li>
-      <li>Tekan <strong>"Kirim Simple PDU"</strong> untuk melihat animasi aliran data, atau tekan <strong>"Simulasi Putus Link"</strong> untuk melihat analisis kegagalan fisik (Single Point of Failure / Signal Reflection).</li>
+      <li>Amati pemetaan kabel fisik, jenis koneksi kabel (Straight, Cross, WAN), lampu status link port (▲ Up), serta klik salah satu node perangkat untuk menginspeksi rincian antarmuka dan alamat IP.</li>
     </ul>
   </li>
   <li><strong>Kalkulator Subnetting VLSM</strong>:

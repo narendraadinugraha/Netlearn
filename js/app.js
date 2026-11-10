@@ -3115,32 +3115,8 @@ function renderMiniGame(container) {
           </div>
         </div>
 
-        <!-- Floating Bottom-Left: On-Screen Touch Controls (Kiri & Kanan - Left Hand Steering) -->
-        <div class="absolute bottom-3 left-3 sm:bottom-4 sm:left-4 z-20 flex items-center gap-2 pointer-events-auto select-none touch-none">
-          <button class="w-[52px] h-[52px] sm:w-[58px] sm:h-[58px] rounded-2xl bg-slate-900/90 active:bg-indigo-600 active:scale-95 text-white border border-slate-700/80 shadow-lg flex flex-col items-center justify-center cursor-pointer transition-all touch-none select-none" id="btn-touch-left" title="Belok Kiri (A / ←)">
-            <span class="material-symbols-outlined text-[24px]">arrow_back</span>
-            <span class="text-[9px] font-mono font-bold text-slate-300 tracking-wider">KIRI</span>
-          </button>
-          <button class="w-[52px] h-[52px] sm:w-[58px] sm:h-[58px] rounded-2xl bg-slate-900/90 active:bg-indigo-600 active:scale-95 text-white border border-slate-700/80 shadow-lg flex flex-col items-center justify-center cursor-pointer transition-all touch-none select-none" id="btn-touch-right" title="Belok Kanan (D / →)">
-            <span class="material-symbols-outlined text-[24px]">arrow_forward</span>
-            <span class="text-[9px] font-mono font-bold text-slate-300 tracking-wider">KANAN</span>
-          </button>
-        </div>
-
-        <!-- Floating Bottom-Right: On-Screen Touch Controls (Maju, Mundur, Rem, Nitro - Right Hand Drive) -->
-        <div class="absolute bottom-3 right-3 sm:bottom-4 sm:right-4 z-20 flex items-end gap-2 pointer-events-auto select-none touch-none">
-          <!-- Auxiliary: Nitro & Rem -->
-          <div class="flex flex-col gap-1.5">
-            <button class="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-cyan-600/90 active:bg-cyan-400 active:scale-95 text-white border border-cyan-400/80 font-mono text-[9px] font-bold flex flex-col items-center justify-center gap-0.5 shadow-md cursor-pointer transition-all touch-none select-none" id="btn-touch-nitro" title="Nitro Boost (Shift)">
-              <span class="material-symbols-outlined text-[16px]">bolt</span>
-              <span>NITRO</span>
-            </button>
-            <button class="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-rose-600/90 active:bg-rose-400 active:scale-95 text-white border border-rose-400/80 font-mono text-[9px] font-bold flex flex-col items-center justify-center gap-0.5 shadow-md cursor-pointer transition-all touch-none select-none" id="btn-touch-brake" title="Rem / Drift (Spasi)">
-              <span class="material-symbols-outlined text-[16px]">front_hand</span>
-              <span>REM</span>
-            </button>
-          </div>
-
+        <!-- Floating Bottom-Left: On-Screen Touch Controls (Maju, Mundur, Rem, Nitro - Left Hand Drive Pedals) -->
+        <div class="absolute bottom-3 left-3 sm:bottom-4 sm:left-4 z-20 flex items-end gap-2 pointer-events-auto select-none touch-none">
           <!-- Main Pedals: Gas (Maju) & Mundur (Reverse) -->
           <div class="flex flex-col gap-1.5">
             <button class="w-[52px] h-[52px] sm:w-[58px] sm:h-[58px] rounded-2xl bg-emerald-600/90 active:bg-emerald-400 active:scale-95 text-white border border-emerald-400/80 font-mono text-[10px] font-bold flex flex-col items-center justify-center gap-0.5 shadow-lg cursor-pointer transition-all touch-none select-none" id="btn-touch-gas" title="Maju / Gas (W / ↑)">
@@ -3152,6 +3128,30 @@ function renderMiniGame(container) {
               <span>MUNDUR</span>
             </button>
           </div>
+
+          <!-- Auxiliary: Nitro & Rem -->
+          <div class="flex flex-col gap-1.5">
+            <button class="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-cyan-600/90 active:bg-cyan-400 active:scale-95 text-white border border-cyan-400/80 font-mono text-[9px] font-bold flex flex-col items-center justify-center gap-0.5 shadow-md cursor-pointer transition-all touch-none select-none" id="btn-touch-nitro" title="Nitro Boost (Shift)">
+              <span class="material-symbols-outlined text-[16px]">bolt</span>
+              <span>NITRO</span>
+            </button>
+            <button class="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-rose-600/90 active:bg-rose-400 active:scale-95 text-white border border-rose-400/80 font-mono text-[9px] font-bold flex flex-col items-center justify-center gap-0.5 shadow-md cursor-pointer transition-all touch-none select-none" id="btn-touch-brake" title="Rem / Drift (Spasi)">
+              <span class="material-symbols-outlined text-[16px]">front_hand</span>
+              <span>REM</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Floating Bottom-Right: On-Screen Touch Controls (Kiri & Kanan - Right Hand Steering) -->
+        <div class="absolute bottom-3 right-3 sm:bottom-4 sm:right-4 z-20 flex items-center gap-2 pointer-events-auto select-none touch-none">
+          <button class="w-[52px] h-[52px] sm:w-[58px] sm:h-[58px] rounded-2xl bg-slate-900/90 active:bg-indigo-600 active:scale-95 text-white border border-slate-700/80 shadow-lg flex flex-col items-center justify-center cursor-pointer transition-all touch-none select-none" id="btn-touch-left" title="Belok Kiri (A / ←)">
+            <span class="material-symbols-outlined text-[24px]">arrow_back</span>
+            <span class="text-[9px] font-mono font-bold text-slate-300 tracking-wider">KIRI</span>
+          </button>
+          <button class="w-[52px] h-[52px] sm:w-[58px] sm:h-[58px] rounded-2xl bg-slate-900/90 active:bg-indigo-600 active:scale-95 text-white border border-slate-700/80 shadow-lg flex flex-col items-center justify-center cursor-pointer transition-all touch-none select-none" id="btn-touch-right" title="Belok Kanan (D / →)">
+            <span class="material-symbols-outlined text-[24px]">arrow_forward</span>
+            <span class="text-[9px] font-mono font-bold text-slate-300 tracking-wider">KANAN</span>
+          </button>
         </div>
 
         <!-- Floating Center Above Dashboard: Proximity Prompt -->

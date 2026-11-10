@@ -253,15 +253,11 @@ function renderSimulationTopology(container) {
           </div>
         </div>
 
-        <div class="flex items-center gap-2 flex-wrap">
-          <button class="px-3 sm:px-3.5 py-1.5 sm:py-2 bg-primary hover:bg-primary-container text-on-primary font-mono text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer" id="btn-topo-send">
-            <span class="material-symbols-outlined text-[16px]">send</span>
-            <span>Kirim Simple PDU</span>
-          </button>
-          <button class="px-3 sm:px-3.5 py-1.5 sm:py-2 font-mono text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer border bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200" id="btn-topo-break">
-            <span class="material-symbols-outlined text-[16px]">content_cut</span>
-            <span>Simulasi Putus</span>
-          </button>
+        <div class="flex items-center gap-2">
+          <span class="px-3 py-1.5 rounded-xl bg-surface-container border border-outline-variant font-mono text-[11px] font-bold text-on-surface flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span>Diagram Arsitektur Fisik</span>
+          </span>
         </div>
       </div>
 
@@ -403,28 +399,21 @@ function renderSimulationTopology(container) {
   function updateTopoInfo() {
     const data = topoDescriptions[currentTopo];
     const alertBox = document.getElementById("topo-alert-overlay");
-    const alertText = document.getElementById("topo-alert-text");
     const inspectorText = document.getElementById("topo-inspector-text");
 
-    if (isBroken) {
-      alertBox?.classList.remove("hidden");
-      if (alertText) alertText.textContent = data.breakEffect.slice(0, 48) + "...";
-      if (inspectorText) inspectorText.textContent = "Status: ⚠️ GANGGUAN TERDETEKSI — " + data.breakEffect;
-    } else {
-      alertBox?.classList.add("hidden");
-      if (inspectorText) inspectorText.textContent = "Status: Jaringan Normal • Siap mentransmisikan paket data";
-    }
+    alertBox?.classList.add("hidden");
+    if (inspectorText) inspectorText.textContent = `Status: ${data.name} • Klik perangkat untuk melihat info port`;
 
     const infoBox = document.getElementById("topo-info-box");
     if (infoBox) {
       infoBox.innerHTML = `
         <div class="flex items-center justify-between border-b border-outline-variant pb-2.5">
           <div class="flex items-center gap-2">
-            <span class="w-3 h-3 rounded-full ${isBroken ? 'bg-rose-500' : 'bg-emerald-500'} animate-pulse"></span>
+            <span class="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></span>
             <h3 class="text-sm font-bold text-on-surface font-display">${data.name}</h3>
           </div>
-          <span class="px-2.5 py-0.5 rounded text-[10px] font-mono font-bold ${isBroken ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'}">
-            ${isBroken ? 'SIMULASI RUSAK AKTIF' : 'KONDISI SEHAT (ONLINE)'}
+          <span class="px-2.5 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-100 text-emerald-800">
+            KONDISI SEHAT (ONLINE)
           </span>
         </div>
 
@@ -437,8 +426,8 @@ function renderSimulationTopology(container) {
             <span class="text-primary block text-[11px] pt-1">Terminasi: ${data.terminator}</span>
           </div>
 
-          <div class="p-3 rounded-xl ${isBroken ? 'bg-rose-50 border border-rose-200 text-rose-900' : 'bg-surface-container-low border border-outline-variant text-on-surface'} space-y-1">
-            <span class="text-[10px] ${isBroken ? 'text-rose-700' : 'text-outline'} uppercase block font-bold">Uji Ketahanan Gangguan Fisik:</span>
+          <div class="p-3 rounded-xl bg-surface-container-low border border-outline-variant text-on-surface space-y-1">
+            <span class="text-[10px] text-outline uppercase block font-bold">Karakteristik Arsitektur & Keamanan:</span>
             <span class="text-xs font-medium leading-relaxed">${data.breakEffect}</span>
           </div>
         </div>
@@ -471,16 +460,6 @@ function renderSimulationTopology(container) {
       packetAnim.active = false;
       updateTopoInfo();
     });
-  });
-
-  document.getElementById("btn-topo-send")?.addEventListener("click", () => {
-    packetAnim.active = true;
-    packetAnim.progress = 0;
-  });
-
-  document.getElementById("btn-topo-break")?.addEventListener("click", () => {
-    isBroken = !isBroken;
-    updateTopoInfo();
   });
 
   updateTopoInfo();
