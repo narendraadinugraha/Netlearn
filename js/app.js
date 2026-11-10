@@ -480,7 +480,7 @@ export function navigateTo(viewName, params = {}) {
     manual: isId ? "Panduan Pengguna" : "User Guide",
     admin: isId ? "Panel Guru" : "Teacher Console",
     minigame: isId ? "NetDrive 3D: Mini Game Quest" : "NetDrive 3D: Quest City",
-    profile: isId ? "Profil Pengguna" : "Student Profile",
+    profile: isId ? "Profil" : "Profile",
     "posttest-results": isId ? "Hasil Evaluasi & Diagnostik" : "Assessment Results & Diagnostics"
   };
 
@@ -1112,10 +1112,10 @@ function renderDashboard(container) {
   const modPhotoMap = {
     1: "assets/images/datacenter_rack.jpg",
     2: "assets/images/network_switch.jpg",
-    3: "assets/images/materials/mod3_osi_layers.svg",
-    4: "assets/images/materials/mod4_subnetting_structure.svg",
+    3: "https://images.unsplash.com/photo-1544197150-b99a580bb7a8?auto=format&fit=crop&w=600&q=80",
+    4: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=600&q=80",
     5: "assets/images/fiber_optics.jpg",
-    6: "assets/images/materials/mod6_dns_dhcp_dora.svg"
+    6: "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=600&q=80"
   };
   const activeSvg = modSvgMap[activeMod.id] || modSvgMap[1];
   const activePhoto = modPhotoMap[activeMod.id] || "assets/images/network_switch.jpg";
@@ -1139,9 +1139,10 @@ function renderDashboard(container) {
         <!-- Real Authentic Datacenter Photography (Soft Architectural Fade) -->
         <div class="absolute inset-y-0 right-0 w-full sm:w-2/3 pointer-events-none select-none overflow-hidden">
           <img 
-            src="assets/images/datacenter_rack.jpg" 
+            src="https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=1200&q=80" 
+            onerror="this.src='assets/images/datacenter_rack.jpg'"
             alt="Modern Enterprise Data Center Infrastructure" 
-            class="w-full h-full object-cover object-right opacity-[0.20] filter contrast-125 saturate-125"
+            class="w-full h-full object-cover object-right opacity-[0.22] filter contrast-125 saturate-125"
           />
           <div class="absolute inset-0 bg-gradient-to-r from-white via-white/70 to-transparent"></div>
           <div class="absolute inset-0 bg-gradient-to-t from-white via-transparent to-transparent"></div>
@@ -1323,6 +1324,103 @@ function renderDashboard(container) {
               const active = d <= (readCount + 1);
               return `<div class="flex-1 h-1.5 rounded-full ${active ? 'bg-amber-400' : 'bg-slate-100'}" title="Aktivitas ${d}"></div>`;
             }).join("")}
+          </div>
+        </div>
+      </section>
+
+      <!-- INNOVATION & FEATURED HIGHLIGHTS (New Features: 3D City Mini Game & Cisco Packet Tracer Lab) -->
+      <section class="space-y-3" aria-label="Wahana Interaktif Unggulan">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-indigo-600 animate-pulse"></span>
+            <h2 class="text-sm font-bold font-mono uppercase tracking-wider text-slate-900">${isId ? "Wahana Interaktif & Fitur Baru" : "Featured Interactive Sandboxes"}</h2>
+          </div>
+          <span class="text-xs text-slate-500 font-mono">${isId ? "Simulasi Visual & Praktikum 3D" : "Hands-on Visual Labs"}</span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Card 1: NetDrive 3D City Mini Game -->
+          <div class="taste-card relative overflow-hidden rounded-2xl bg-slate-950 border border-slate-800 text-white p-5 sm:p-6 shadow-md flex flex-col justify-between group min-h-[190px]">
+            <img 
+              src="https://images.unsplash.com/photo-1519501025264-65ba15a82390?auto=format&fit=crop&w=900&q=80" 
+              alt="Cyber City Road Infrastructure" 
+              class="absolute inset-0 w-full h-full object-cover opacity-25 group-hover:scale-105 transition-transform duration-500 filter contrast-125"
+            />
+            <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/60 to-transparent"></div>
+
+            <div class="relative z-10 space-y-2.5">
+              <div class="flex items-center justify-between gap-2">
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  <span class="material-symbols-outlined text-[13px]">sports_esports</span>
+                  3D METROPOLITAN QUEST
+                </span>
+                <span class="text-[11px] font-mono text-slate-400">36 Superblok Kota</span>
+              </div>
+              <div>
+                <h3 class="text-base sm:text-lg font-bold text-white tracking-tight flex items-center gap-2">
+                  <span>NetDrive 3D: Network Quest City</span>
+                </h3>
+                <p class="text-xs text-slate-300 mt-1 leading-relaxed line-clamp-2">
+                  ${isId 
+                    ? "Kendarai kendaraan kurir paket data melintasi kota, antar paket TCP/UDP ke server gedung, pantau radar GPS mini-map, dan tuntaskan 6 pos kuis protokol." 
+                    : "Drive a network vehicle across the city, deliver TCP/UDP packets, track GPS radar, and solve 6 protocol quiz checkpoints."}
+                </p>
+              </div>
+            </div>
+
+            <div class="relative z-10 flex items-center justify-between gap-3 pt-3.5 border-t border-white/10 mt-3">
+              <div class="flex items-center gap-2 text-[11px] font-mono text-slate-300">
+                <span class="text-amber-400 font-bold">10 Pilihan Mobil</span>
+                <span>•</span>
+                <span>Misi Kurir Realtime</span>
+              </div>
+              <button class="taste-btn px-4 py-2 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-mono text-xs font-bold rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer" id="btn-dash-minigame">
+                <span class="material-symbols-outlined text-[16px]">play_arrow</span>
+                <span>${isId ? "Mainkan 3D Kota" : "Play 3D Quest"}</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Card 2: Cisco Packet Tracer Realistic Simulator -->
+          <div class="taste-card relative overflow-hidden rounded-2xl bg-slate-950 border border-slate-800 text-white p-5 sm:p-6 shadow-md flex flex-col justify-between group min-h-[190px]">
+            <img 
+              src="https://images.unsplash.com/photo-1544197150-b99a580bb7a8?auto=format&fit=crop&w=900&q=80" 
+              alt="Data Center Server Switches" 
+              class="absolute inset-0 w-full h-full object-cover opacity-25 group-hover:scale-105 transition-transform duration-500 filter contrast-125"
+            />
+            <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/60 to-transparent"></div>
+
+            <div class="relative z-10 space-y-2.5">
+              <div class="flex items-center justify-between gap-2">
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                  <span class="material-symbols-outlined text-[13px]">science</span>
+                  CISCO PACKET TRACER STUDIO
+                </span>
+                <span class="text-[11px] font-mono text-slate-400">Mode Realtime &amp; Simulasi</span>
+              </div>
+              <div>
+                <h3 class="text-base sm:text-lg font-bold text-white tracking-tight flex items-center gap-2">
+                  <span>Laboratorium Virtual &amp; 5 Topologi</span>
+                </h3>
+                <p class="text-xs text-slate-300 mt-1 leading-relaxed line-clamp-2">
+                  ${isId 
+                    ? "Uji ping end-to-end, inspeksi paket Model OSI 7-Layer di Event List, tampak fisik port switch & router, Cisco IOS CLI terminal, dan uji kerusakan kabel." 
+                    : "End-to-end ping testing, OSI 7-Layer PDU dissector, physical chassis inspection, Cisco IOS CLI terminal, and fault link simulation."}
+                </p>
+              </div>
+            </div>
+
+            <div class="relative z-10 flex items-center justify-between gap-3 pt-3.5 border-t border-white/10 mt-3">
+              <div class="flex items-center gap-2 text-[11px] font-mono text-slate-300">
+                <span class="text-indigo-400 font-bold">5 Topologi Fisik</span>
+                <span>•</span>
+                <span>PDU Inspector</span>
+              </div>
+              <button class="taste-btn px-4 py-2 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-mono text-xs font-bold rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer" id="btn-dash-cisco">
+                <span class="material-symbols-outlined text-[16px]">terminal</span>
+                <span>${isId ? "Buka Simulator Cisco" : "Open Cisco Lab"}</span>
+              </button>
+            </div>
           </div>
         </div>
       </section>
@@ -1564,29 +1662,40 @@ function renderDashboard(container) {
             </div>
             
             <div class="grid grid-cols-1 gap-2.5">
-              <!-- Tool 1: Interactive Lab -->
-              <button class="taste-card taste-btn p-3 bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-200/80 flex items-center gap-3 transition-colors text-left cursor-pointer group" id="btn-tool-topology">
+              <!-- Tool 1: 3D Mini Game Quest -->
+              <button class="taste-card taste-btn p-3 bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-200/80 flex items-center gap-3 transition-colors text-left cursor-pointer group" id="btn-tool-minigame">
                 <div class="w-11 h-11 rounded-lg overflow-hidden border border-slate-200 shrink-0 shadow-2xs">
-                  <img src="assets/images/network_switch.jpg" alt="Lab Switch" class="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                  <img src="https://images.unsplash.com/photo-1508873696983-2df5703bc20d?auto=format&fit=crop&w=200&q=80" alt="3D City" class="w-full h-full object-cover group-hover:scale-105 transition-transform" />
                 </div>
                 <div class="min-w-0">
-                  <span class="block text-xs font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">${isId ? "Lab Interkoneksi (Packet Routing)" : "Packet Routing Lab"}</span>
-                  <span class="block text-[11px] text-slate-500 mt-0.5">${isId ? "Simulasi interaktif kabel, switch L2, dan router" : "Interactive topology &amp; packet trace"}</span>
+                  <span class="block text-xs font-bold text-slate-900 group-hover:text-emerald-600 transition-colors">${isId ? "NetDrive 3D: Petualangan Kota" : "NetDrive 3D City Quest"}</span>
+                  <span class="block text-[11px] text-slate-500 mt-0.5">${isId ? "Kurir paket data & 6 pos kuis perkotaan" : "Data delivery & 6 protocol quizzes"}</span>
                 </div>
               </button>
 
-              <!-- Tool 2: VLSM Subnet Calculator -->
+              <!-- Tool 2: Cisco Packet Tracer Lab -->
+              <button class="taste-card taste-btn p-3 bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-200/80 flex items-center gap-3 transition-colors text-left cursor-pointer group" id="btn-tool-topology">
+                <div class="w-11 h-11 rounded-lg overflow-hidden border border-slate-200 shrink-0 shadow-2xs">
+                  <img src="https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=200&q=80" alt="Lab Switch" class="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                </div>
+                <div class="min-w-0">
+                  <span class="block text-xs font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">${isId ? "Lab Cisco & 5 Topologi Fisik" : "Cisco Lab & 5 Topologies"}</span>
+                  <span class="block text-[11px] text-slate-500 mt-0.5">${isId ? "Simulasi PDU, inspeksi frame & CLI terminal" : "Interactive topology & packet trace"}</span>
+                </div>
+              </button>
+
+              <!-- Tool 3: VLSM Subnet Calculator -->
               <button class="taste-card taste-btn p-3 bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-200/80 flex items-center gap-3 transition-colors text-left cursor-pointer group" id="btn-tool-subnet">
                 <div class="w-11 h-11 rounded-lg overflow-hidden border border-slate-200 shrink-0 shadow-2xs">
-                  <img src="assets/images/fiber_optics.jpg" alt="VLSM Media" class="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                  <img src="https://images.unsplash.com/photo-1544197150-b99a580bb7a8?auto=format&fit=crop&w=200&q=80" alt="VLSM Media" class="w-full h-full object-cover group-hover:scale-105 transition-transform" />
                 </div>
                 <div class="min-w-0">
                   <span class="block text-xs font-bold text-slate-900 group-hover:text-emerald-600 transition-colors">${isId ? "Kalkulator Subnetting VLSM" : "VLSM Subnet Calculator"}</span>
-                  <span class="block text-[11px] text-slate-500 mt-0.5">${isId ? "Alokasi prefix CIDR, broadcast IP &amp; subnet mask" : "CIDR prefix allocation &amp; binary bits"}</span>
+                  <span class="block text-[11px] text-slate-500 mt-0.5">${isId ? "Alokasi prefix CIDR, broadcast IP & subnet mask" : "CIDR prefix allocation & binary bits"}</span>
                 </div>
               </button>
 
-              <!-- Tool 3: Pretest Diagnostics -->
+              <!-- Tool 4: Pretest Diagnostics -->
               <button class="taste-card taste-btn p-3 bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-200/80 flex items-center gap-3 transition-colors text-left cursor-pointer group" id="btn-tool-pretest">
                 <div class="w-10 h-10 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 border border-amber-100 group-hover:bg-amber-100 transition-colors">
                   <span class="material-symbols-outlined text-[20px]">quiz</span>
@@ -1604,6 +1713,9 @@ function renderDashboard(container) {
   `;
 
   // Attach Dashboard events
+  document.getElementById("btn-dash-minigame")?.addEventListener("click", () => navigateTo("minigame"));
+  document.getElementById("btn-dash-cisco")?.addEventListener("click", () => navigateTo("simulation"));
+  document.getElementById("btn-tool-minigame")?.addEventListener("click", () => navigateTo("minigame"));
   document.getElementById("btn-hero-continue")?.addEventListener("click", () => {
     if (activeMod) {
       openMaterialModal(activeMod.id);
@@ -2907,8 +3019,8 @@ function renderMiniGame(container) {
         </div>
       </div>
 
-      <!-- 3D Canvas Stage & Floating HUD -->
-      <div class="relative w-full rounded-2xl overflow-hidden border border-slate-300 shadow-md bg-slate-900 select-none" style="height: 600px;" id="netgame-viewport">
+      <!-- 3D Canvas Stage & Floating HUD (Responsive Viewport) -->
+      <div class="relative w-full rounded-2xl overflow-hidden border border-slate-300 shadow-md bg-slate-900 select-none h-[380px] sm:h-[480px] md:h-[600px]" id="netgame-viewport">
         <!-- Three.js Canvas Container -->
         <div id="netgame-canvas-mount" class="w-full h-full"></div>
 
@@ -3550,32 +3662,41 @@ function renderManual(container) {
         </button>
       </div>
 
-      <!-- Quick Summary Cards (Pilar Utama Penggunaan) -->
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <!-- Quick Summary Cards (Pilar Utama Penggunaan Sesuai Fitur Baru) -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant shadow-xs flex items-center gap-3">
-          <div class="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+          <div class="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 border border-indigo-100">
             <span class="material-symbols-outlined text-[22px]">menu_book</span>
           </div>
           <div>
-            <div class="font-bold text-xs text-on-surface">${isId ? "1. Modul & Video" : "1. Modules & Video"}</div>
-            <div class="text-[11px] text-on-surface-variant">${isId ? "6 topik kurikulum & dokumen Word" : "6 curriculum topics & Word docs"}</div>
+            <div class="font-bold text-xs text-on-surface">${isId ? "1. Modul Kurikulum" : "1. Curriculum Modules"}</div>
+            <div class="text-[11px] text-on-surface-variant">${isId ? "6 modul teori & dokumen Word" : "6 curriculum modules & Word docs"}</div>
           </div>
         </div>
         <div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant shadow-xs flex items-center gap-3">
-          <div class="w-10 h-10 rounded-lg bg-secondary/10 text-secondary flex items-center justify-center shrink-0">
-            <span class="material-symbols-outlined text-[22px]">terminal</span>
+          <div class="w-10 h-10 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center shrink-0 border border-sky-100">
+            <span class="material-symbols-outlined text-[22px]">science</span>
           </div>
           <div>
-            <div class="font-bold text-xs text-on-surface">${isId ? "2. Simulator & VLSM" : "2. Simulator & VLSM"}</div>
-            <div class="text-[11px] text-on-surface-variant">${isId ? "Kalkulator subnetting interaktif" : "Interactive subnet calculator"}</div>
+            <div class="font-bold text-xs text-on-surface">${isId ? "2. Lab Cisco & Topologi" : "2. Cisco Lab & Topologies"}</div>
+            <div class="text-[11px] text-on-surface-variant">${isId ? "Event list, PDU & CLI terminal" : "Event list, PDU & CLI terminal"}</div>
           </div>
         </div>
         <div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant shadow-xs flex items-center gap-3">
-          <div class="w-10 h-10 rounded-lg bg-tertiary/10 text-tertiary flex items-center justify-center shrink-0">
-            <span class="material-symbols-outlined text-[22px]">fact_check</span>
+          <div class="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100">
+            <span class="material-symbols-outlined text-[22px]">sports_esports</span>
           </div>
           <div>
-            <div class="font-bold text-xs text-on-surface">${isId ? "3. Evaluasi HOTS" : "3. HOTS Assessment"}</div>
+            <div class="font-bold text-xs text-on-surface">${isId ? "3. Mini Game 3D Kota" : "3. 3D City Quest"}</div>
+            <div class="text-[11px] text-on-surface-variant">${isId ? "Kurir paket & 6 pos protokol" : "Data courier & 6 protocol checkpoints"}</div>
+          </div>
+        </div>
+        <div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant shadow-xs flex items-center gap-3">
+          <div class="w-10 h-10 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 border border-amber-100">
+            <span class="material-symbols-outlined text-[22px]">psychology</span>
+          </div>
+          <div>
+            <div class="font-bold text-xs text-on-surface">${isId ? "4. Evaluasi HOTS" : "4. HOTS Assessment"}</div>
             <div class="text-[11px] text-on-surface-variant">${isId ? "Pretest, posttest & gain score" : "Pretest, posttest & gain score"}</div>
           </div>
         </div>
@@ -3628,9 +3749,9 @@ function renderProfile(container) {
           <span>/</span>
           <span>${isId ? "Akun" : "Account"}</span>
           <span>/</span>
-          <span class="text-on-surface font-semibold">${isId ? "Profil & Pengaturan" : "Profile & Settings"}</span>
+          <span class="text-on-surface font-semibold">${isId ? "Profil" : "Profile"}</span>
         </div>
-        <h1 class="text-2xl sm:text-3xl font-extrabold text-on-surface tracking-tight">${isId ? "Profil Pengguna & Pengaturan Akun" : "User Profile & Account Settings"}</h1>
+        <h1 class="text-2xl sm:text-3xl font-extrabold text-on-surface tracking-tight">${isId ? "Profil Siswa" : "Student Profile"}</h1>
       </div>
 
       <!-- Hero Identity Card -->

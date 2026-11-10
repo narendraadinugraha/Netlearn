@@ -63,6 +63,12 @@ function renderSimulationScope(container) {
   let width = (canvas.width = canvas.parentElement.clientWidth);
   let height = (canvas.height = canvas.parentElement.clientHeight);
 
+  window.addEventListener("resize", () => {
+    if (!canvas || !canvas.parentElement) return;
+    width = canvas.width = canvas.parentElement.clientWidth;
+    height = canvas.height = canvas.parentElement.clientHeight;
+  });
+
   let currentScope = "pan";
   let pulseRadius = 0;
   let packets = [];
@@ -232,61 +238,61 @@ function renderSimulationTopology(container) {
   container.innerHTML = `
     <div class="sim-wrapper space-y-4">
       <!-- Cisco Packet Tracer Style Controls Bar -->
-      <div class="p-4 bg-surface-container-lowest rounded-2xl border border-outline-variant shadow-xs flex flex-wrap items-center justify-between gap-3">
-        <div class="flex items-center gap-2 flex-wrap">
+      <div class="p-3.5 sm:p-4 bg-surface-container-lowest rounded-2xl border border-outline-variant shadow-xs flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-2 flex-wrap max-w-full">
           <span class="font-bold text-xs text-on-surface flex items-center gap-1.5 font-mono">
             <span class="material-symbols-outlined text-primary text-[18px]">hub</span>
             <span>Bentuk Topologi:</span>
           </span>
-          <div class="inline-flex rounded-xl p-1 bg-surface-container border border-outline-variant gap-1">
-            <button class="px-3 py-1.5 text-xs font-mono font-bold rounded-lg transition-all topo-btn active cursor-pointer bg-primary text-on-primary shadow-xs" data-topo="bus">Bus</button>
-            <button class="px-3 py-1.5 text-xs font-mono font-bold rounded-lg transition-all topo-btn cursor-pointer text-on-surface-variant hover:text-on-surface" data-topo="star">Star</button>
-            <button class="px-3 py-1.5 text-xs font-mono font-bold rounded-lg transition-all topo-btn cursor-pointer text-on-surface-variant hover:text-on-surface" data-topo="ring">Ring</button>
-            <button class="px-3 py-1.5 text-xs font-mono font-bold rounded-lg transition-all topo-btn cursor-pointer text-on-surface-variant hover:text-on-surface" data-topo="mesh">Full Mesh</button>
-            <button class="px-3 py-1.5 text-xs font-mono font-bold rounded-lg transition-all topo-btn cursor-pointer text-on-surface-variant hover:text-on-surface" data-topo="tree">Tree (Hierarkis)</button>
+          <div class="inline-flex rounded-xl p-1 bg-surface-container border border-outline-variant gap-1 overflow-x-auto max-w-full">
+            <button class="px-2.5 sm:px-3 py-1.5 text-xs font-mono font-bold rounded-lg transition-all topo-btn active cursor-pointer bg-primary text-on-primary shadow-xs shrink-0" data-topo="bus">Bus</button>
+            <button class="px-2.5 sm:px-3 py-1.5 text-xs font-mono font-bold rounded-lg transition-all topo-btn cursor-pointer text-on-surface-variant hover:text-on-surface shrink-0" data-topo="star">Star</button>
+            <button class="px-2.5 sm:px-3 py-1.5 text-xs font-mono font-bold rounded-lg transition-all topo-btn cursor-pointer text-on-surface-variant hover:text-on-surface shrink-0" data-topo="ring">Ring</button>
+            <button class="px-2.5 sm:px-3 py-1.5 text-xs font-mono font-bold rounded-lg transition-all topo-btn cursor-pointer text-on-surface-variant hover:text-on-surface shrink-0" data-topo="mesh">Full Mesh</button>
+            <button class="px-2.5 sm:px-3 py-1.5 text-xs font-mono font-bold rounded-lg transition-all topo-btn cursor-pointer text-on-surface-variant hover:text-on-surface shrink-0" data-topo="tree">Tree</button>
           </div>
         </div>
 
         <div class="flex items-center gap-2 flex-wrap">
-          <button class="px-3.5 py-2 bg-primary hover:bg-primary-container text-on-primary font-mono text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer" id="btn-topo-send">
+          <button class="px-3 sm:px-3.5 py-1.5 sm:py-2 bg-primary hover:bg-primary-container text-on-primary font-mono text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer" id="btn-topo-send">
             <span class="material-symbols-outlined text-[16px]">send</span>
-            <span>Kirim Simple PDU [P]</span>
+            <span>Kirim Simple PDU</span>
           </button>
-          <button class="px-3.5 py-2 font-mono text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer border bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200" id="btn-topo-break">
+          <button class="px-3 sm:px-3.5 py-1.5 sm:py-2 font-mono text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer border bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200" id="btn-topo-break">
             <span class="material-symbols-outlined text-[16px]">content_cut</span>
-            <span>Simulasi Putus Link</span>
+            <span>Simulasi Putus</span>
           </button>
         </div>
       </div>
 
       <!-- Cisco Cable & Interface Legend -->
-      <div class="px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl flex items-center justify-between text-[11px] font-mono text-slate-300 flex-wrap gap-2">
-        <div class="flex items-center gap-4 flex-wrap">
-          <span class="text-slate-400 font-bold uppercase text-[10px]">Tipe Kabel Cisco:</span>
-          <span class="flex items-center gap-1.5"><span class="w-4 h-1 bg-sky-400 rounded"></span> Copper Straight-Through</span>
-          <span class="flex items-center gap-1.5"><span class="w-4 h-0.5 border-t-2 border-dashed border-amber-400"></span> Copper Cross-Over</span>
-          <span class="flex items-center gap-1.5"><span class="text-rose-500 font-bold text-xs">⚡</span> Serial WAN DCE/DTE</span>
-          <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 bg-emerald-400 rotate-45 inline-block"></span> Link Light (▲ Up)</span>
+      <div class="px-3.5 sm:px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl flex items-center justify-between text-[10px] sm:text-[11px] font-mono text-slate-300 flex-wrap gap-2">
+        <div class="flex items-center gap-3 sm:gap-4 flex-wrap">
+          <span class="text-slate-400 font-bold uppercase text-[9px] sm:text-[10px]">Tipe Kabel:</span>
+          <span class="flex items-center gap-1.5"><span class="w-3 sm:w-4 h-1 bg-sky-400 rounded"></span> Straight</span>
+          <span class="flex items-center gap-1.5"><span class="w-3 sm:w-4 h-0.5 border-t-2 border-dashed border-amber-400"></span> Cross</span>
+          <span class="flex items-center gap-1.5"><span class="text-rose-500 font-bold text-xs">⚡</span> WAN</span>
+          <span class="flex items-center gap-1.5"><span class="w-2 sm:w-2.5 h-2 sm:h-2.5 bg-emerald-400 rotate-45 inline-block"></span> Link Light (▲ Up)</span>
         </div>
-        <div class="text-[10px] text-slate-400">
+        <div class="text-[9px] sm:text-[10px] text-slate-400 hidden sm:block">
           Cisco Packet Tracer Architecture Studio
         </div>
       </div>
 
-      <!-- Canvas Stage -->
-      <div class="relative w-full rounded-2xl overflow-hidden border border-outline-variant shadow-sm bg-slate-950" style="height: 380px;">
+      <!-- Canvas Stage (Responsive Height) -->
+      <div class="relative w-full rounded-2xl overflow-hidden border border-outline-variant shadow-sm bg-slate-950 h-[260px] sm:h-[320px] md:h-[380px]" id="topo-canvas-wrapper">
         <canvas id="topo-canvas" class="w-full h-full block"></canvas>
         
         <!-- Live Status Overlay -->
-        <div id="topo-alert-overlay" class="hidden absolute top-3 right-3 px-3 py-1.5 rounded-xl bg-rose-600/95 text-white border border-rose-400 font-mono text-xs font-bold shadow-xl backdrop-blur-md flex items-center gap-1.5 animate-bounce">
-          <span class="material-symbols-outlined text-[16px]">error</span>
+        <div id="topo-alert-overlay" class="hidden absolute top-2.5 sm:top-3 right-2.5 sm:right-3 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl bg-rose-600/95 text-white border border-rose-400 font-mono text-[10px] sm:text-xs font-bold shadow-xl backdrop-blur-md flex items-center gap-1.5 animate-bounce">
+          <span class="material-symbols-outlined text-[15px] sm:text-[16px]">error</span>
           <span id="topo-alert-text">KABEL TERPUTUS</span>
         </div>
 
         <!-- Selected Node Inspector Tooltip -->
-        <div id="topo-node-inspector" class="absolute bottom-3 left-3 bg-slate-900/90 text-white border border-slate-700 px-3 py-2 rounded-xl text-xs font-mono backdrop-blur-md pointer-events-none flex items-center gap-2 shadow-lg">
-          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span id="topo-inspector-text">Status: Jaringan Normal • Klik perangkat untuk melihat info</span>
+        <div id="topo-node-inspector" class="absolute bottom-2.5 sm:bottom-3 left-2.5 sm:left-3 bg-slate-900/90 text-white border border-slate-700 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl text-[10px] sm:text-xs font-mono backdrop-blur-md pointer-events-none flex items-center gap-2 shadow-lg max-w-[90%] truncate">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
+          <span id="topo-inspector-text" class="truncate">Status: Jaringan Normal • Klik perangkat untuk melihat info</span>
         </div>
       </div>
 
@@ -301,14 +307,24 @@ function renderSimulationTopology(container) {
   if (!canvas) return;
   const ctx = canvas.getContext("2d");
   
-  // Set canvas resolution
-  const rect = canvas.parentElement.getBoundingClientRect();
-  const dpr = window.devicePixelRatio || 1;
-  let width = (canvas.width = (rect.width || 800) * dpr);
-  let height = (canvas.height = (rect.height || 380) * dpr);
-  ctx.scale(dpr, dpr);
-  const w = rect.width || 800;
-  const h = rect.height || 380;
+  // Set canvas resolution & dynamic resize
+  let w = 800;
+  let h = 380;
+
+  function resizeCanvas() {
+    if (!canvas || !canvas.parentElement) return;
+    const rect = canvas.parentElement.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    w = rect.width || 800;
+    h = rect.height || 380;
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    ctx.resetTransform ? ctx.resetTransform() : ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.scale(dpr, dpr);
+  }
+
+  resizeCanvas();
+  window.addEventListener("resize", resizeCanvas);
 
   // Authentic Network Vector Assets
   const icons = {
@@ -471,17 +487,18 @@ function renderSimulationTopology(container) {
 
   // Helper Drawing Functions
   function drawDevice(type, x, y, label, ip, isFaulty = false) {
-    const size = 40;
+    const scale = Math.min(1, Math.max(0.60, w / 680));
+    const size = Math.max(24, Math.round(40 * scale));
     const img = icons[type];
     
     // Node shadow / glow
     ctx.save();
     if (isFaulty) {
       ctx.shadowColor = "rgba(239, 68, 68, 0.8)";
-      ctx.shadowBlur = 16;
+      ctx.shadowBlur = 12 * scale;
     } else {
       ctx.shadowColor = "rgba(56, 189, 248, 0.35)";
-      ctx.shadowBlur = 10;
+      ctx.shadowBlur = 8 * scale;
     }
 
     if (img && img.complete) {
@@ -498,20 +515,23 @@ function renderSimulationTopology(container) {
     ctx.fillStyle = isFaulty ? "#fee2e2" : "#0f172a";
     ctx.strokeStyle = isFaulty ? "#ef4444" : "#38bdf8";
     ctx.lineWidth = 1;
-    const badgeW = Math.max(ctx.measureText(label).width + 16, 56);
-    ctx.fillRect(x - badgeW / 2, y + size / 2 + 4, badgeW, 16);
-    ctx.strokeRect(x - badgeW / 2, y + size / 2 + 4, badgeW, 16);
 
-    ctx.font = "bold 9px monospace";
+    const fontSize = Math.max(7, Math.round(9 * scale));
+    ctx.font = `bold ${fontSize}px monospace`;
+    const badgeW = Math.max(ctx.measureText(label).width + 10 * scale, 44 * scale);
+    const badgeH = Math.max(12, Math.round(15 * scale));
+    ctx.fillRect(x - badgeW / 2, y + size / 2 + 3 * scale, badgeW, badgeH);
+    ctx.strokeRect(x - badgeW / 2, y + size / 2 + 3 * scale, badgeW, badgeH);
+
     ctx.fillStyle = isFaulty ? "#991b1b" : "#e2e8f0";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(label, x, y + size / 2 + 12);
+    ctx.fillText(label, x, y + size / 2 + 3 * scale + badgeH / 2);
 
-    if (ip) {
-      ctx.font = "8px monospace";
+    if (ip && w > 440) {
+      ctx.font = `${Math.max(6, Math.round(8 * scale))}px monospace`;
       ctx.fillStyle = "#94a3b8";
-      ctx.fillText(ip, x, y + size / 2 + 25);
+      ctx.fillText(ip, x, y + size / 2 + badgeH + 8 * scale);
     }
   }
 
@@ -531,9 +551,11 @@ function renderSimulationTopology(container) {
   // 1. TOPOLOGI BUS (Linear Coaxial Backbone with BNC & Terminators)
   function drawBusTopology() {
     drawGridBg();
-    const cy = h / 2 + 10;
-    const startX = 75;
-    const endX = w - 75;
+    const cy = h / 2 + 5;
+    const startX = Math.max(30, Math.round(w * 0.08));
+    const endX = w - startX;
+    const usableW = endX - startX;
+    const pad = Math.min(50, usableW * 0.12);
 
     // Main Coaxial Backbone Line
     ctx.beginPath();
@@ -573,14 +595,15 @@ function renderSimulationTopology(container) {
     // 4 Workstation Drops
     const nodeCount = 4;
     for (let i = 0; i < nodeCount; i++) {
-      const nx = startX + 60 + (i * (endX - startX - 120)) / (nodeCount - 1);
+      const nx = startX + pad + (i * (usableW - pad * 2)) / (nodeCount - 1);
       const isTop = i % 2 === 0;
-      const ny = isTop ? cy - 85 : cy + 85;
+      const dropH = Math.min(80, h * 0.28);
+      const ny = isTop ? cy - dropH : cy + dropH;
 
       // Drop Line
       ctx.beginPath();
       ctx.moveTo(nx, cy);
-      ctx.lineTo(nx, isTop ? ny + 20 : ny - 20);
+      ctx.lineTo(nx, isTop ? ny + 16 : ny - 16);
       ctx.strokeStyle = isBroken ? "rgba(239, 68, 68, 0.5)" : "rgba(56, 189, 248, 0.6)";
       ctx.lineWidth = 2.5;
       ctx.stroke();
@@ -588,7 +611,7 @@ function renderSimulationTopology(container) {
       // BNC T-Connector symbol at backbone
       ctx.fillStyle = "#cbd5e1";
       ctx.beginPath();
-      ctx.arc(nx, cy, 5, 0, Math.PI * 2);
+      ctx.arc(nx, cy, 4, 0, Math.PI * 2);
       ctx.fill();
 
       drawDevice(i === 3 ? "server" : "workstation", nx, ny, `NODE ${i + 1}`, `192.168.1.${10 + i}`, isBroken);
@@ -597,7 +620,7 @@ function renderSimulationTopology(container) {
     // Packet / Signal Transmission
     if (packetAnim.active) {
       if (!isBroken) {
-        const curX = startX + 60 + ((endX - startX - 120) * packetAnim.progress);
+        const curX = startX + pad + ((usableW - pad * 2) * packetAnim.progress);
         ctx.drawImage(icons.packet, curX - 12, cy - 12, 24, 24);
       } else {
         // Signal reflection wave bouncing back and forth
@@ -811,19 +834,21 @@ function renderSimulationTopology(container) {
 
     // Tier 1: Core Router (Top)
     const coreX = cx;
-    const coreY = 46;
+    const coreY = Math.max(34, h * 0.16);
 
     // Tier 2: 2 Distribution Switches
-    const distY = 150;
-    const dist1X = cx - 140;
-    const dist2X = cx + 140;
+    const distY = Math.min(140, h * 0.48);
+    const distOffset = Math.min(140, w * 0.28);
+    const dist1X = cx - distOffset;
+    const dist2X = cx + distOffset;
 
     // Tier 3: 4 Access Workstations / Switches
-    const accY = 270;
-    const acc1X = dist1X - 60;
-    const acc2X = dist1X + 60;
-    const acc3X = dist2X - 60;
-    const acc4X = dist2X + 60;
+    const accY = Math.min(270, h * 0.80);
+    const accOffset = Math.min(60, distOffset * 0.48);
+    const acc1X = dist1X - accOffset;
+    const acc2X = dist1X + accOffset;
+    const acc3X = dist2X - accOffset;
+    const acc4X = dist2X + accOffset;
 
     // Cables Core -> Distribution
     ctx.beginPath();

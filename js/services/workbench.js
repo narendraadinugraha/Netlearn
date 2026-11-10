@@ -308,17 +308,17 @@ export function renderUnifiedWorkbench(container) {
       <div class="space-y-4">
         
         <!-- Cisco Packet Tracer Style Top Control Toolbar -->
-        <div class="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3">
+        <div class="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-2.5 sm:gap-3">
           
           <!-- Mode Selector (Realtime vs Simulation) -->
-          <div class="flex items-center gap-2">
-            <span class="text-[11px] font-mono font-bold text-slate-500 uppercase">Mode Lab:</span>
+          <div class="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+            <span class="text-[10px] sm:text-[11px] font-mono font-bold text-slate-500 uppercase">Mode Lab:</span>
             <div class="inline-flex rounded-xl p-1 bg-slate-100 border border-slate-200 gap-1">
-              <button id="btn-mode-realtime" class="px-3 py-1.5 text-xs font-mono font-bold rounded-lg transition-all cursor-pointer ${state.mode === 'realtime' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}">
-                ⚡ Mode Realtime
+              <button id="btn-mode-realtime" class="px-2.5 sm:px-3 py-1 sm:py-1.5 text-[11px] sm:text-xs font-mono font-bold rounded-lg transition-all cursor-pointer ${state.mode === 'realtime' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}">
+                ⚡ Realtime
               </button>
-              <button id="btn-mode-simulation" class="px-3 py-1.5 text-xs font-mono font-bold rounded-lg transition-all cursor-pointer ${state.mode === 'simulation' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}">
-                ⏱️ Mode Simulasi (Event List)
+              <button id="btn-mode-simulation" class="px-2.5 sm:px-3 py-1 sm:py-1.5 text-[11px] sm:text-xs font-mono font-bold rounded-lg transition-all cursor-pointer ${state.mode === 'simulation' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}">
+                ⏱️ Simulasi (Event List)
               </button>
             </div>
           </div>
@@ -326,46 +326,46 @@ export function renderUnifiedWorkbench(container) {
           <!-- Simulation Playback Controls -->
           <div class="flex items-center gap-1.5 flex-wrap">
             ${state.mode === 'simulation' ? `
-              <button id="btn-sim-play" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-mono text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-1 cursor-pointer">
-                <span class="material-symbols-outlined text-[16px]">${state.simState === 'playing' ? 'pause' : 'play_arrow'}</span>
+              <button id="btn-sim-play" class="px-2.5 sm:px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-mono text-[11px] sm:text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-1 cursor-pointer">
+                <span class="material-symbols-outlined text-[15px] sm:text-[16px]">${state.simState === 'playing' ? 'pause' : 'play_arrow'}</span>
                 <span>${state.simState === 'playing' ? 'Jeda' : 'Auto Play'}</span>
               </button>
-              <button id="btn-sim-step" class="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 active:scale-95 text-indigo-700 border border-indigo-200 font-mono text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-1 cursor-pointer" title="Maju 1 Langkah Paket (Capture / Forward)">
-                <span class="material-symbols-outlined text-[16px]">step_over</span>
-                <span>Maju 1 Langkah (Step)</span>
+              <button id="btn-sim-step" class="px-2.5 sm:px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 active:scale-95 text-indigo-700 border border-indigo-200 font-mono text-[11px] sm:text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-1 cursor-pointer" title="Maju 1 Langkah Paket (Capture / Forward)">
+                <span class="material-symbols-outlined text-[15px] sm:text-[16px]">step_over</span>
+                <span>Step</span>
               </button>
-              <button id="btn-sim-reset" class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-mono text-xs font-bold rounded-xl transition-all cursor-pointer" title="Reset Paket">
+              <button id="btn-sim-reset" class="px-2 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-mono text-[11px] sm:text-xs font-bold rounded-xl transition-all cursor-pointer" title="Reset Paket">
                 <span class="material-symbols-outlined text-[16px]">restart_alt</span>
               </button>
             ` : `
-              <button id="btn-realtime-ping" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-mono text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer">
-                <span class="material-symbols-outlined text-[16px]">send</span>
-                <span>Kirim Simple PDU (Ping)</span>
+              <button id="btn-realtime-ping" class="px-3 sm:px-4 py-1.5 sm:py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-mono text-[11px] sm:text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer">
+                <span class="material-symbols-outlined text-[15px] sm:text-[16px]">send</span>
+                <span>Kirim Simple PDU</span>
               </button>
             `}
 
-            <div class="h-6 w-px bg-slate-200 mx-1"></div>
+            <div class="h-5 sm:h-6 w-px bg-slate-200 mx-0.5 sm:mx-1"></div>
 
             <!-- Fault Simulator: Cut Cable -->
-            <button id="btn-toggle-cable" class="px-3 py-1.5 font-mono text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 border ${state.cableCut ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'}">
-              <span class="material-symbols-outlined text-[16px]">${state.cableCut ? 'link' : 'content_cut'}</span>
-              <span>${state.cableCut ? 'Sambungkan Kabel' : 'Putuskan Kabel Fa0/1'}</span>
+            <button id="btn-toggle-cable" class="px-2.5 sm:px-3 py-1.5 font-mono text-[11px] sm:text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 border ${state.cableCut ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'}">
+              <span class="material-symbols-outlined text-[15px] sm:text-[16px]">${state.cableCut ? 'link' : 'content_cut'}</span>
+              <span>${state.cableCut ? 'Sambungkan' : 'Putus Fa0/1'}</span>
             </button>
           </div>
         </div>
 
-        <!-- Cisco Workspace Canvas -->
-        <div class="relative w-full rounded-2xl overflow-hidden border border-slate-300 shadow-md bg-slate-900 select-none" style="height: 380px;" id="cisco-canvas-wrapper">
+        <!-- Cisco Workspace Canvas (Responsive Height & Viewport Scaling) -->
+        <div class="relative w-full rounded-2xl overflow-hidden border border-slate-300 shadow-md bg-slate-900 select-none h-[260px] sm:h-[320px] md:h-[380px]" id="cisco-canvas-wrapper">
           <canvas id="cisco-canvas" class="w-full h-full block"></canvas>
 
-          <!-- Floating Device Help Hint -->
-          <div class="absolute top-3 left-3 bg-slate-900/85 backdrop-blur-md border border-slate-700 px-3 py-1.5 rounded-xl text-[11px] font-mono text-slate-300 pointer-events-none flex items-center gap-2 shadow-lg">
+          <!-- Floating Device Help Hint (Compact on Mobile) -->
+          <div class="hidden sm:flex absolute top-3 left-3 bg-slate-900/85 backdrop-blur-md border border-slate-700 px-3 py-1.5 rounded-xl text-[11px] font-mono text-slate-300 pointer-events-none items-center gap-2 shadow-lg">
             <span class="material-symbols-outlined text-indigo-400 text-[16px]">info</span>
             <span>Klik perangkat untuk membuka <strong>Physical Chassis &amp; Cisco IOS CLI</strong></span>
           </div>
 
           <!-- Current Envelope Progress Tag -->
-          <div class="absolute top-3 right-3 bg-slate-900/90 backdrop-blur-md border border-amber-500/50 px-3.5 py-1.5 rounded-xl text-xs font-mono text-amber-300 flex items-center gap-2 shadow-xl">
+          <div class="absolute top-2.5 sm:top-3 right-2.5 sm:right-3 bg-slate-900/90 backdrop-blur-md border border-amber-500/50 px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-xl text-[10px] sm:text-xs font-mono text-amber-300 flex items-center gap-1.5 sm:gap-2 shadow-xl">
             <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
             <span>Langkah: <strong>${state.currentStepIndex + 1} / ${SIMULATION_STEPS.length}</strong></span>
           </div>
@@ -554,7 +554,7 @@ export function renderUnifiedWorkbench(container) {
 
     modal.classList.remove("hidden");
     modal.innerHTML = `
-      <div class="bg-white rounded-2xl border border-slate-200 max-w-2xl w-full p-6 shadow-2xl space-y-4 animate-scale-up text-left font-mono">
+      <div class="bg-white rounded-2xl border border-slate-200 max-w-2xl w-full p-4 sm:p-6 shadow-2xl space-y-4 animate-scale-up text-left font-mono max-h-[88vh] overflow-y-auto">
         <!-- Header -->
         <div class="flex items-center justify-between border-b border-slate-100 pb-3">
           <div class="flex items-center gap-3">
@@ -643,7 +643,7 @@ export function renderUnifiedWorkbench(container) {
     if (!dev || !modal) return;
 
     modal.innerHTML = `
-      <div class="bg-white rounded-2xl border border-slate-200 max-w-3xl w-full p-6 shadow-2xl space-y-4 animate-scale-up text-left font-mono">
+      <div class="bg-white rounded-2xl border border-slate-200 max-w-3xl w-full p-4 sm:p-6 shadow-2xl space-y-4 animate-scale-up text-left font-mono max-h-[88vh] overflow-y-auto">
         <!-- Header -->
         <div class="flex items-center justify-between border-b border-slate-100 pb-3">
           <div class="flex items-center gap-3">
@@ -854,13 +854,21 @@ export function renderUnifiedWorkbench(container) {
     // Click Detection on Canvas
     canvas.addEventListener("click", (e) => {
       const rect = canvas.getBoundingClientRect();
-      const clickX = ((e.clientX - rect.left) / rect.width) * 680;
-      const clickY = ((e.clientY - rect.top) / rect.height) * 380;
+      const clickX = e.clientX - rect.left;
+      const clickY = e.clientY - rect.top;
+      const w = canvas.width;
+      const h = canvas.height;
+      const scaleX = w / 680;
+      const scaleY = h / 380;
+      const devScale = Math.min(1, Math.max(0.60, w / 650));
+      const hitRadius = 45 * devScale;
 
       Object.values(state.nodes).forEach(node => {
-        const dx = clickX - node.x;
-        const dy = clickY - node.y;
-        if (Math.sqrt(dx * dx + dy * dy) < 45) {
+        const nx = node.x * scaleX;
+        const ny = node.y * scaleY;
+        const dx = clickX - nx;
+        const dy = clickY - ny;
+        if (Math.sqrt(dx * dx + dy * dy) < hitRadius) {
           openDeviceModal(node.id);
         }
       });
@@ -891,6 +899,7 @@ export function renderUnifiedWorkbench(container) {
 
     const scaleX = w / 680;
     const scaleY = h / 380;
+    const devScale = Math.min(1, Math.max(0.60, w / 650));
 
     // Node Positions
     const nA = { x: state.nodes.hostA.x * scaleX, y: state.nodes.hostA.y * scaleY };
@@ -899,15 +908,15 @@ export function renderUnifiedWorkbench(container) {
     const nB = { x: state.nodes.serverB.x * scaleX, y: state.nodes.serverB.y * scaleY };
 
     // 1. Draw Cables (Copper Straight-Through)
-    drawCable(ctx, nA.x, nA.y, nSw.x, nSw.y, state.cableCut, "Fa0", "Fa0/1");
-    drawCable(ctx, nSw.x, nSw.y, nRt.x, nRt.y, false, "Fa0/24", "Gi0/0/0");
-    drawCable(ctx, nRt.x, nRt.y, nB.x, nB.y, false, "Gi0/0/1", "Fa0");
+    drawCable(ctx, nA.x, nA.y, nSw.x, nSw.y, state.cableCut, "Fa0", "Fa0/1", devScale, w);
+    drawCable(ctx, nSw.x, nSw.y, nRt.x, nRt.y, false, "Fa0/24", "Gi0/0/0", devScale, w);
+    drawCable(ctx, nRt.x, nRt.y, nB.x, nB.y, false, "Gi0/0/1", "Fa0", devScale, w);
 
     // 2. Draw Devices
-    drawDevice(ctx, nA.x, nA.y, state.nodes.hostA);
-    drawDevice(ctx, nSw.x, nSw.y, state.nodes.switch01);
-    drawDevice(ctx, nRt.x, nRt.y, state.nodes.routerCore);
-    drawDevice(ctx, nB.x, nB.y, state.nodes.serverB);
+    drawDevice(ctx, nA.x, nA.y, state.nodes.hostA, devScale);
+    drawDevice(ctx, nSw.x, nSw.y, state.nodes.switch01, devScale);
+    drawDevice(ctx, nRt.x, nRt.y, state.nodes.routerCore, devScale);
+    drawDevice(ctx, nB.x, nB.y, state.nodes.serverB, devScale);
 
     // 3. Draw Active PDU Flight Animation
     const s = SIMULATION_STEPS[state.currentStepIndex];
@@ -922,60 +931,71 @@ export function renderUnifiedWorkbench(container) {
 
       // Draw Glowing Envelope
       ctx.save();
-      ctx.translate(pX, pY - 42);
+      ctx.translate(pX, pY - 36 * devScale);
 
       // Envelope glow
       ctx.shadowColor = s.color;
       ctx.shadowBlur = 12;
 
+      const envW = 38 * devScale;
+      const envH = 24 * devScale;
+
       ctx.fillStyle = s.color;
-      ctx.fillRect(-22, -14, 44, 28);
+      ctx.fillRect(-envW / 2, -envH / 2, envW, envH);
 
       ctx.strokeStyle = "#ffffff";
-      ctx.lineWidth = 2;
-      ctx.strokeRect(-22, -14, 44, 28);
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(-envW / 2, -envH / 2, envW, envH);
 
       // Envelope fold
       ctx.beginPath();
-      ctx.moveTo(-22, -14);
-      ctx.lineTo(0, 2);
-      ctx.lineTo(22, -14);
+      ctx.moveTo(-envW / 2, -envH / 2);
+      ctx.lineTo(0, 2 * devScale);
+      ctx.lineTo(envW / 2, -envH / 2);
       ctx.stroke();
 
       ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 9px monospace";
+      const pduFontSize = Math.max(7, Math.round(8 * devScale));
+      ctx.font = `bold ${pduFontSize}px monospace`;
       ctx.textAlign = "center";
-      ctx.fillText(s.type, 0, 8);
+      ctx.fillText(s.type, 0, 7 * devScale);
 
       ctx.restore();
     }
   }
 
-  function drawCable(ctx, x1, y1, x2, y2, isCut, port1, port2) {
+  function drawCable(ctx, x1, y1, x2, y2, isCut, port1, port2, devScale = 1, w = 680) {
     ctx.save();
 
     if (isCut) {
       ctx.strokeStyle = "#ef4444";
-      ctx.lineWidth = 3;
-      ctx.setLineDash([6, 6]);
+      ctx.lineWidth = 2.5 * devScale;
+      ctx.setLineDash([6 * devScale, 4 * devScale]);
       ctx.beginPath();
       ctx.moveTo(x1, y1);
-      ctx.lineTo((x1 + x2) / 2 - 10, (y1 + y2) / 2);
+      const midX = (x1 + x2) / 2;
+      const midY = (y1 + y2) / 2;
+      ctx.lineTo(midX - 10 * devScale, midY);
       ctx.stroke();
 
       ctx.beginPath();
-      ctx.moveTo((x1 + x2) / 2 + 10, (y1 + y2) / 2);
+      ctx.moveTo(midX + 10 * devScale, midY);
       ctx.lineTo(x2, y2);
       ctx.stroke();
 
       // Cut Indicator
       ctx.fillStyle = "#ef4444";
-      ctx.font = "bold 14px monospace";
+      ctx.font = `bold ${Math.max(9, Math.round(12 * devScale))}px monospace`;
       ctx.textAlign = "center";
-      ctx.fillText("✕ LINK DOWN", (x1 + x2) / 2, (y1 + y2) / 2 - 10);
+      ctx.fillText("✕ PUTUS", midX, midY - 6 * devScale);
+
+      // Red Port LEDs
+      ctx.fillStyle = "#ef4444";
+      drawLinkLight(ctx, x1 + (x2 - x1) * 0.14, y1 + (y2 - y1) * 0.14, true);
+      drawLinkLight(ctx, x2 - (x2 - x1) * 0.14, y2 - (y2 - y1) * 0.14, false);
     } else {
       ctx.strokeStyle = "#38bdf8";
-      ctx.lineWidth = 3.5;
+      ctx.lineWidth = 2.5 * devScale;
       ctx.beginPath();
       ctx.moveTo(x1, y1);
       ctx.lineTo(x2, y2);
@@ -986,12 +1006,14 @@ export function renderUnifiedWorkbench(container) {
       drawLinkLight(ctx, x1 + (x2 - x1) * 0.14, y1 + (y2 - y1) * 0.14, true);
       drawLinkLight(ctx, x2 - (x2 - x1) * 0.14, y2 - (y2 - y1) * 0.14, false);
 
-      // Port Labels
-      ctx.fillStyle = "#94a3b8";
-      ctx.font = "10px monospace";
-      ctx.textAlign = "center";
-      ctx.fillText(port1, x1 + (x2 - x1) * 0.18, y1 - 12);
-      ctx.fillText(port2, x2 - (x2 - x1) * 0.18, y2 - 12);
+      // Port Labels (Only on screens > 480px to avoid clutter)
+      if (w > 480) {
+        ctx.fillStyle = "#94a3b8";
+        ctx.font = `${Math.max(7, Math.round(9 * devScale))}px monospace`;
+        ctx.textAlign = "center";
+        ctx.fillText(port1, x1 + (x2 - x1) * 0.18, y1 - 10 * devScale);
+        ctx.fillText(port2, x2 - (x2 - x1) * 0.18, y2 - 10 * devScale);
+      }
     }
 
     ctx.restore();
@@ -1000,54 +1022,63 @@ export function renderUnifiedWorkbench(container) {
   function drawLinkLight(ctx, x, y, isForward) {
     ctx.beginPath();
     if (isForward) {
-      ctx.moveTo(x - 5, y - 5);
-      ctx.lineTo(x + 5, y);
-      ctx.lineTo(x - 5, y + 5);
+      ctx.moveTo(x - 4, y - 4);
+      ctx.lineTo(x + 4, y);
+      ctx.lineTo(x - 4, y + 4);
     } else {
-      ctx.moveTo(x + 5, y - 5);
-      ctx.lineTo(x - 5, y);
-      ctx.lineTo(x + 5, y + 5);
+      ctx.moveTo(x + 4, y - 4);
+      ctx.lineTo(x - 4, y);
+      ctx.lineTo(x + 4, y + 4);
     }
     ctx.closePath();
     ctx.fill();
   }
 
-  function drawDevice(ctx, x, y, node) {
+  function drawDevice(ctx, x, y, node, devScale = 1) {
     ctx.save();
 
+    const halfW = 42 * devScale;
+    const halfH = 36 * devScale;
+    const cardW = 84 * devScale;
+    const cardH = 72 * devScale;
+    const radius = 10 * devScale;
+
     // Outer card
-    ctx.fillStyle = "rgba(15, 23, 42, 0.85)";
+    ctx.fillStyle = "rgba(15, 23, 42, 0.88)";
     ctx.strokeStyle = node.id === state.selectedDeviceId ? "#6366f1" : "rgba(148, 163, 184, 0.35)";
     ctx.lineWidth = node.id === state.selectedDeviceId ? 2.5 : 1.5;
 
     ctx.beginPath();
-    ctx.roundRect ? ctx.roundRect(x - 42, y - 36, 84, 72, 12) : ctx.rect(x - 42, y - 36, 84, 72);
+    ctx.roundRect ? ctx.roundRect(x - halfW, y - halfH, cardW, cardH, radius) : ctx.rect(x - halfW, y - halfH, cardW, cardH);
     ctx.fill();
     ctx.stroke();
 
     // Device Power LED
     ctx.fillStyle = node.poweredOn ? "#10b981" : "#ef4444";
     ctx.beginPath();
-    ctx.arc(x + 30, y - 24, 3.5, 0, Math.PI * 2);
+    ctx.arc(x + 30 * devScale, y - 24 * devScale, 3 * devScale, 0, Math.PI * 2);
     ctx.fill();
 
     // Device Icon Badge
     ctx.fillStyle = "#38bdf8";
-    ctx.font = "bold 20px monospace";
+    const iconFontSize = Math.max(12, Math.round(18 * devScale));
+    ctx.font = `bold ${iconFontSize}px monospace`;
     ctx.textAlign = "center";
     const symbol = node.type === "switch" ? "☵" : (node.type === "router" ? "⨁" : (node.type === "server" ? "🗄️" : "💻"));
-    ctx.fillText(symbol, x, y - 4);
+    ctx.fillText(symbol, x, y - 4 * devScale);
 
     // Device Name
     ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 10px monospace";
+    const nameFontSize = Math.max(8, Math.round(10 * devScale));
+    ctx.font = `bold ${nameFontSize}px monospace`;
     ctx.textAlign = "center";
-    ctx.fillText(node.name.split(" ")[0], x, y + 15);
+    ctx.fillText(node.name.split(" ")[0], x, y + 14 * devScale);
 
     // IP Badge
     ctx.fillStyle = "#94a3b8";
-    ctx.font = "9px monospace";
-    ctx.fillText(node.ip, x, y + 27);
+    const ipFontSize = Math.max(7, Math.round(9 * devScale));
+    ctx.font = `${ipFontSize}px monospace`;
+    ctx.fillText(node.ip, x, y + 25 * devScale);
 
     ctx.restore();
   }

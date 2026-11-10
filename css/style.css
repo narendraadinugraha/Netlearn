@@ -881,6 +881,22 @@ aside :root:not(.dark) .nav-item-btn.active {
   text-transform: uppercase;
 }
 
+/* Responsive Simulation Canvases for Mobile Smartphones */
+@media (max-width: 640px) {
+  #cisco-canvas-wrapper,
+  #topo-canvas-wrapper {
+    height: 270px !important;
+  }
+  #netgame-viewport {
+    height: 400px !important;
+  }
+  .event-row td {
+    padding: 6px 8px !important;
+    font-size: 10px !important;
+  }
+}
+
+
 .stat-value {
   font-family: 'JetBrains Mono', monospace;
   font-weight: 700;
