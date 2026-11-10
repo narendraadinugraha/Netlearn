@@ -2,10 +2,10 @@
 // Supports live Supabase Client via @supabase/supabase-js with robust live cloud integration
 
 export const CONFIG = {
-  SB_URL: localStorage.getItem("sb_url") || "",
-  SB_KEY: localStorage.getItem("sb_key") || "",
-  TEACHER_CODE: localStorage.getItem("teacher_code") || "",
-  PROJECT_REF: ""
+  SB_URL: localStorage.getItem("sb_url") || "https://erickoncpqwfnvpshfai.supabase.co",
+  SB_KEY: localStorage.getItem("sb_key") || "sb_publishable_KthTrEJg5NIUqb4CD5ZLVg_9C9Sy5nH",
+  TEACHER_CODE: localStorage.getItem("teacher_code") || "GURU2026",
+  PROJECT_REF: "erickoncpqwfnvpshfai"
 };
 
 /**
@@ -755,10 +755,10 @@ export async function signInWithGoogle({ role = "student" } = {}) {
     const { data, error } = await supabaseClient.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: window.location.origin,
+        redirectTo: window.location.origin + window.location.pathname,
         queryParams: {
           access_type: "offline",
-          prompt: "consent"
+          prompt: "select_account"
         }
       }
     });
