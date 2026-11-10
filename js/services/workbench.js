@@ -849,6 +849,10 @@ export function renderUnifiedWorkbench(container) {
               <select id="sel-pdu-source" class="bg-white px-2 py-1 rounded border border-slate-200 font-bold text-indigo-700 cursor-pointer"></select>
               <span class="text-slate-400 font-bold">➔</span>
               <select id="sel-pdu-target" class="bg-white px-2 py-1 rounded border border-slate-200 font-bold text-emerald-700 cursor-pointer"></select>
+              <button id="btn-quick-ping" class="ml-1 px-3 py-1 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-mono text-xs font-bold rounded-lg transition-all shadow-xs flex items-center gap-1 cursor-pointer" title="Kirim paket ping sekarang antara 2 perangkat terpilih">
+                <span class="material-symbols-outlined text-[15px]">send</span>
+                <span>Kirim</span>
+              </button>
             </div>
           </div>
 
@@ -1231,6 +1235,13 @@ export function renderUnifiedWorkbench(container) {
       }
     });
 
+    // Quick Ping Button (Send Ping on Selected Route)
+    document.getElementById("btn-quick-ping")?.addEventListener("click", () => {
+      const srcId = document.getElementById("sel-pdu-source")?.value;
+      const dstId = document.getElementById("sel-pdu-target")?.value;
+      sendPacket(srcId, dstId);
+    });
+
     // Fullscreen Toggle
     document.getElementById("btn-toggle-fullscreen")?.addEventListener("click", () => {
       const target = document.getElementById("cisco-workbench-root") || container;
@@ -1503,13 +1514,40 @@ export function renderUnifiedWorkbench(container) {
         if (clicked) {
           if (!state.pduPendingSource) {
             state.pduPendingSource = clicked.id;
+            state.pointerPos.active = true;
             sound.click();
             updateActiveToolDom();
           } else {
+            if (clicked.id === state.pduPendingSource) {
+              // Clicked same device again: cancel selection or keep it
+              state.pduPendingSource = null;
+              sound.click();
+              updateActiveToolDom();
+              return;
+            }
+
             const srcId = state.pduPendingSource;
             const dstId = clicked.id;
             state.pduPendingSource = null;
+
+            // Sync with top toolbar dropdowns
+            const selSrc = document.getElementById("sel-pdu-source");
+            const selDst = document.getElementById("sel-pdu-target");
+            if (selSrc) selSrc.value = srcId;
+            if (selDst) selDst.value = dstId;
+
             sendPacket(srcId, dstId);
+            updateActiveToolDom();
+
+            const guideText = document.getElementById("canvas-guidance-text");
+            if (guideText) {
+              guideText.textContent = `✓ Paket PDU meluncur (${state.nodes[srcId]?.name} ➔ ${state.nodes[dstId]?.name})! Klik perangkat SUMBER lain untuk mengirim lagi.`;
+            }
+          }
+        } else {
+          // Clicked empty canvas space: cancel pending PDU source cleanly
+          if (state.pduPendingSource) {
+            state.pduPendingSource = null;
             updateActiveToolDom();
           }
         }
@@ -1519,6 +1557,9 @@ export function renderUnifiedWorkbench(container) {
       // 4. SELECT TOOL (Drag to Move & Select)
       if (clicked) {
         state.selectedDeviceId = clicked.id;
+        const selSrc = document.getElementById("sel-pdu-source");
+        if (selSrc) selSrc.value = clicked.id;
+
         isDragging = true;
         draggedNodeId = clicked.id;
         dragOffsetX = pos.x - clicked.x;
@@ -1555,12 +1596,20 @@ export function renderUnifiedWorkbench(container) {
       if (clicked) openDeviceModal(clicked.id);
     });
 
-    canvas.addEventListener("mousedown", handleDown);
+    let lastTouchTime = 0;
+
+    canvas.addEventListener("mousedown", (e) => {
+      // Prevent synthetic mousedown firing immediately after touchstart
+      if (Date.now() - lastTouchTime < 450) return;
+      handleDown(e);
+    });
+
     canvas.addEventListener("mousemove", handleMove);
     window.addEventListener("mouseup", handleUp);
 
     canvas.addEventListener("touchstart", (e) => {
       e.preventDefault();
+      lastTouchTime = Date.now();
       handleDown(e);
     }, { passive: false });
 
@@ -1632,6 +1681,41 @@ export function renderUnifiedWorkbench(container) {
         ctx.beginPath();
         ctx.arc(srcNode.x, srcNode.y, 48, 0, Math.PI * 2);
         ctx.stroke();
+        ctx.restore();
+      }
+    } else if (state.activeTool === "pdu" && state.pduPendingSource && state.pointerPos.active) {
+      // 3b. Live Rubberband PDU Flight Target Line (from source node to pointer)
+      const srcNode = state.nodes[state.pduPendingSource];
+      if (srcNode) {
+        ctx.save();
+        ctx.strokeStyle = "#f59e0b";
+        ctx.lineWidth = 2.5;
+        ctx.setLineDash([5, 4]);
+        ctx.beginPath();
+        ctx.moveTo(srcNode.x, srcNode.y);
+        ctx.lineTo(state.pointerPos.x, state.pointerPos.y);
+        ctx.stroke();
+
+        ctx.strokeStyle = "#f59e0b";
+        ctx.beginPath();
+        ctx.arc(srcNode.x, srcNode.y, 50, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Draw floating target envelope icon on pointer
+        const px = state.pointerPos.x;
+        const py = state.pointerPos.y;
+        ctx.fillStyle = "#f59e0b";
+        ctx.fillRect(px + 10, py - 18, 24, 15);
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 1;
+        ctx.setLineDash([]);
+        ctx.strokeRect(px + 10, py - 18, 24, 15);
+        ctx.beginPath();
+        ctx.moveTo(px + 10, py - 18);
+        ctx.lineTo(px + 22, py - 9);
+        ctx.lineTo(px + 34, py - 18);
+        ctx.stroke();
+
         ctx.restore();
       }
     }
@@ -1738,6 +1822,29 @@ export function renderUnifiedWorkbench(container) {
     ctx.fillStyle = "#94a3b8";
     ctx.font = "9px monospace";
     ctx.fillText(node.ip, x, y + 26);
+
+    // Visual Indicator Badge for PDU Source or Cable Source
+    if (isPduSource) {
+      ctx.fillStyle = "#f59e0b";
+      ctx.beginPath();
+      ctx.roundRect ? ctx.roundRect(x - 38, y - halfH - 18, 76, 16, 5) : ctx.rect(x - 38, y - halfH - 18, 76, 16);
+      ctx.fill();
+
+      ctx.fillStyle = "#0f172a";
+      ctx.font = "bold 9px monospace";
+      ctx.textAlign = "center";
+      ctx.fillText("✉️ SUMBER", x, y - halfH - 6);
+    } else if (isCableSource) {
+      ctx.fillStyle = "#38bdf8";
+      ctx.beginPath();
+      ctx.roundRect ? ctx.roundRect(x - 42, y - halfH - 18, 84, 16, 5) : ctx.rect(x - 42, y - halfH - 18, 84, 16);
+      ctx.fill();
+
+      ctx.fillStyle = "#0f172a";
+      ctx.font = "bold 9px monospace";
+      ctx.textAlign = "center";
+      ctx.fillText("🔗 KABEL ASAL", x, y - halfH - 6);
+    }
 
     ctx.restore();
   }
