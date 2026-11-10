@@ -2,9 +2,9 @@
 // Supports live Supabase Client via @supabase/supabase-js with robust live cloud integration
 
 export const CONFIG = {
-  SB_URL: localStorage.getItem("sb_url") || "https://erickoncpqwfnvpshfai.supabase.co",
-  SB_KEY: localStorage.getItem("sb_key") || "sb_publishable_KthTrEJg5NIUqb4CD5ZLVg_9C9Sy5nH",
-  TEACHER_CODE: localStorage.getItem("teacher_code") || "GURU2026",
+  SB_URL: (typeof localStorage !== "undefined" ? localStorage.getItem("sb_url") : null) || "https://erickoncpqwfnvpshfai.supabase.co",
+  SB_KEY: (typeof localStorage !== "undefined" ? localStorage.getItem("sb_key") : null) || "sb_publishable_KthTrEJg5NIUqb4CD5ZLVg_9C9Sy5nH",
+  TEACHER_CODE: (typeof localStorage !== "undefined" ? localStorage.getItem("teacher_code") : null) || "GURU2026",
   PROJECT_REF: "erickoncpqwfnvpshfai"
 };
 
@@ -49,9 +49,9 @@ export async function loadEnvConfig() {
   const savedKey = localStorage.getItem("sb_key");
   const savedCode = localStorage.getItem("teacher_code");
 
-  CONFIG.SB_URL = (savedUrl && savedUrl.trim() !== "") ? savedUrl.trim() : (envVars.SUPABASE_URL || "");
-  CONFIG.SB_KEY = (savedKey && savedKey.trim() !== "") ? savedKey.trim() : (envVars.SUPABASE_ANON_KEY || "");
-  CONFIG.TEACHER_CODE = (savedCode && savedCode.trim() !== "") ? savedCode.trim() : (envVars.TEACHER_CODE || "GURU2026");
+  CONFIG.SB_URL = (savedUrl && savedUrl.trim() !== "") ? savedUrl.trim() : (envVars.SUPABASE_URL || CONFIG.SB_URL || "https://erickoncpqwfnvpshfai.supabase.co");
+  CONFIG.SB_KEY = (savedKey && savedKey.trim() !== "") ? savedKey.trim() : (envVars.SUPABASE_ANON_KEY || CONFIG.SB_KEY || "sb_publishable_KthTrEJg5NIUqb4CD5ZLVg_9C9Sy5nH");
+  CONFIG.TEACHER_CODE = (savedCode && savedCode.trim() !== "") ? savedCode.trim() : (envVars.TEACHER_CODE || CONFIG.TEACHER_CODE || "GURU2026");
 
   if (envVars.SUPABASE_PROJECT_REF) {
     CONFIG.PROJECT_REF = envVars.SUPABASE_PROJECT_REF.trim();
