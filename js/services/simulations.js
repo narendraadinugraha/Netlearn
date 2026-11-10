@@ -231,7 +231,7 @@ function renderSimulationScope(container) {
 function renderSimulationTopology(container) {
   container.innerHTML = `
     <div class="sim-wrapper space-y-4">
-      <!-- Controls Bar -->
+      <!-- Cisco Packet Tracer Style Controls Bar -->
       <div class="p-4 bg-surface-container-lowest rounded-2xl border border-outline-variant shadow-xs flex flex-wrap items-center justify-between gap-3">
         <div class="flex items-center gap-2 flex-wrap">
           <span class="font-bold text-xs text-on-surface flex items-center gap-1.5 font-mono">
@@ -243,19 +243,33 @@ function renderSimulationTopology(container) {
             <button class="px-3 py-1.5 text-xs font-mono font-bold rounded-lg transition-all topo-btn cursor-pointer text-on-surface-variant hover:text-on-surface" data-topo="star">Star</button>
             <button class="px-3 py-1.5 text-xs font-mono font-bold rounded-lg transition-all topo-btn cursor-pointer text-on-surface-variant hover:text-on-surface" data-topo="ring">Ring</button>
             <button class="px-3 py-1.5 text-xs font-mono font-bold rounded-lg transition-all topo-btn cursor-pointer text-on-surface-variant hover:text-on-surface" data-topo="mesh">Full Mesh</button>
-            <button class="px-3 py-1.5 text-xs font-mono font-bold rounded-lg transition-all topo-btn cursor-pointer text-on-surface-variant hover:text-on-surface" data-topo="tree">Tree</button>
+            <button class="px-3 py-1.5 text-xs font-mono font-bold rounded-lg transition-all topo-btn cursor-pointer text-on-surface-variant hover:text-on-surface" data-topo="tree">Tree (Hierarkis)</button>
           </div>
         </div>
 
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 flex-wrap">
           <button class="px-3.5 py-2 bg-primary hover:bg-primary-container text-on-primary font-mono text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer" id="btn-topo-send">
             <span class="material-symbols-outlined text-[16px]">send</span>
-            <span>Kirim Paket</span>
+            <span>Kirim Simple PDU [P]</span>
           </button>
-          <button class="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-mono text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer" id="btn-topo-break">
+          <button class="px-3.5 py-2 font-mono text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer border bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200" id="btn-topo-break">
             <span class="material-symbols-outlined text-[16px]">content_cut</span>
-            <span>Simulasi Putus Kabel</span>
+            <span>Simulasi Putus Link</span>
           </button>
+        </div>
+      </div>
+
+      <!-- Cisco Cable & Interface Legend -->
+      <div class="px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl flex items-center justify-between text-[11px] font-mono text-slate-300 flex-wrap gap-2">
+        <div class="flex items-center gap-4 flex-wrap">
+          <span class="text-slate-400 font-bold uppercase text-[10px]">Tipe Kabel Cisco:</span>
+          <span class="flex items-center gap-1.5"><span class="w-4 h-1 bg-sky-400 rounded"></span> Copper Straight-Through</span>
+          <span class="flex items-center gap-1.5"><span class="w-4 h-0.5 border-t-2 border-dashed border-amber-400"></span> Copper Cross-Over</span>
+          <span class="flex items-center gap-1.5"><span class="text-rose-500 font-bold text-xs">⚡</span> Serial WAN DCE/DTE</span>
+          <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 bg-emerald-400 rotate-45 inline-block"></span> Link Light (▲ Up)</span>
+        </div>
+        <div class="text-[10px] text-slate-400">
+          Cisco Packet Tracer Architecture Studio
         </div>
       </div>
 
