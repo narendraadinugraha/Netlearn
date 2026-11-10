@@ -1,7 +1,6 @@
 // NetQuest - Cisco Packet Tracer Style Interactive Virtual Network Lab
-// Complete Drag-and-Drop Canvas, Device Palette, Interactive Wiring Modal,
-// In-depth Device Inspector (PC Desktop IP Config / Command Prompt / Web Browser, Cisco IOS CLI),
-// Dynamic Pathfinding & Packet Tracer Simulation with OSI 7-Layer PDU Dissector & Fullscreen Support!
+// Complete Drag-and-Drop Canvas, Interactive Wiring, Source/Target PDU Transmission,
+// 60FPS Smooth Packet Flight Animation, Device Inspector & Fullscreen Engine!
 
 import { sound } from "./gamification.js";
 
@@ -25,18 +24,13 @@ export function renderUnifiedWorkbench(container) {
 
     // Active tool: "select" | "cable-straight" | "cable-cross" | "delete" | "pdu"
     activeTool: "select",
-    cablePending: null, // { fromNodeId, fromPort, cableType }
-    pduPendingSource: null, // nodeId
+    cableSourceNodeId: null, // First clicked node when wiring
+    pduSourceNodeId: "pc0",
+    pduTargetNodeId: "srv0",
 
     selectedDeviceId: "pc0",
-    deviceModalOpen: false,
     deviceActiveTab: "desktop", // "desktop" | "config" | "cli" | "physical"
     activeDesktopApp: "ipconfig", // "ipconfig" | "cmd" | "browser"
-    pduModalOpen: false,
-    activePduStep: null,
-
-    // Port selection modal state
-    portModal: null,
 
     // Last PDU Transaction status
     lastPduResult: {
@@ -45,7 +39,7 @@ export function renderUnifiedWorkbench(container) {
       target: "Server0",
       type: "ICMP",
       time: "0.82 ms",
-      message: "Ping sukses! Koneksi end-to-end normal (4 sent, 4 received, 0% loss)."
+      message: "Koneksi end-to-end normal (4 sent, 4 received, 0% packet loss)."
     },
 
     // Dynamic Nodes & Links
@@ -60,10 +54,24 @@ export function renderUnifiedWorkbench(container) {
     simulationSteps: [],
 
     // Pointer cursor coordinates for cable rubberband
-    pointerPos: { x: 0, y: 0, active: false }
+    pointerPos: { x: 0, y: 0, active: false },
+
+    // 60FPS Smooth Packet Flight State
+    flight: {
+      active: false,
+      pathNodes: [], // Array of node IDs e.g. ['pc0', 'sw0', 'rt0', 'srv0', 'rt0', 'sw0', 'pc0']
+      legIndex: 0,   // Which hop we are currently animating
+      progress: 0,   // 0.0 to 1.0 along current leg
+      speed: 0.035,  // Progress step per animation frame
+      isFailed: false,
+      failAtLeg: -1,
+      color: "#f59e0b",
+      label: "ICMP"
+    }
   };
 
   let simInterval = null;
+  let animFrameId = null;
 
   // --------------------------------------------------------------------------
   // Device Hardware Specifications
@@ -166,8 +174,8 @@ export function renderUnifiedWorkbench(container) {
         dns: "8.8.8.8",
         mac: "00:AA:11:22:33:01",
         poweredOn: true,
-        x: 95,
-        y: 170
+        x: 90,
+        y: 180
       },
       sw0: {
         id: "sw0",
@@ -182,8 +190,8 @@ export function renderUnifiedWorkbench(container) {
         dns: "8.8.8.8",
         mac: "00:SW:99:88:77:01",
         poweredOn: true,
-        x: 285,
-        y: 170
+        x: 270,
+        y: 180
       },
       rt0: {
         id: "rt0",
@@ -199,8 +207,8 @@ export function renderUnifiedWorkbench(container) {
         dns: "8.8.8.8",
         mac: "00:RT:55:44:33:01",
         poweredOn: true,
-        x: 475,
-        y: 170
+        x: 450,
+        y: 180
       },
       srv0: {
         id: "srv0",
@@ -215,8 +223,8 @@ export function renderUnifiedWorkbench(container) {
         dns: "8.8.8.8",
         mac: "00:BB:44:55:66:02",
         poweredOn: true,
-        x: 665,
-        y: 170
+        x: 630,
+        y: 180
       }
     };
 
@@ -251,8 +259,10 @@ export function renderUnifiedWorkbench(container) {
     ];
 
     state.selectedDeviceId = "pc0";
+    state.pduSourceNodeId = "pc0";
+    state.pduTargetNodeId = "srv0";
     initCliHistories();
-    runPduPathfinding("pc0", "srv0", false);
+    prepareSimulationSteps("pc0", "srv0");
   }
 
   function loadPeerToPeerTemplate() {
@@ -270,8 +280,8 @@ export function renderUnifiedWorkbench(container) {
         dns: "8.8.8.8",
         mac: "00:AA:11:22:33:01",
         poweredOn: true,
-        x: 200,
-        y: 170
+        x: 180,
+        y: 180
       },
       pc1: {
         id: "pc1",
@@ -286,8 +296,8 @@ export function renderUnifiedWorkbench(container) {
         dns: "8.8.8.8",
         mac: "00:AA:11:22:33:02",
         poweredOn: true,
-        x: 540,
-        y: 170
+        x: 500,
+        y: 180
       }
     };
 
@@ -304,8 +314,10 @@ export function renderUnifiedWorkbench(container) {
     ];
 
     state.selectedDeviceId = "pc0";
+    state.pduSourceNodeId = "pc0";
+    state.pduTargetNodeId = "pc1";
     initCliHistories();
-    runPduPathfinding("pc0", "pc1", false);
+    prepareSimulationSteps("pc0", "pc1");
   }
 
   function loadStarLanTemplate() {
@@ -323,8 +335,8 @@ export function renderUnifiedWorkbench(container) {
         dns: "8.8.8.8",
         mac: "00:SW:99:88:77:01",
         poweredOn: true,
-        x: 380,
-        y: 170
+        x: 350,
+        y: 180
       },
       pc0: {
         id: "pc0",
@@ -339,8 +351,8 @@ export function renderUnifiedWorkbench(container) {
         dns: "8.8.8.8",
         mac: "00:AA:11:22:33:01",
         poweredOn: true,
-        x: 150,
-        y: 90
+        x: 130,
+        y: 100
       },
       pc1: {
         id: "pc1",
@@ -355,8 +367,8 @@ export function renderUnifiedWorkbench(container) {
         dns: "8.8.8.8",
         mac: "00:AA:11:22:33:02",
         poweredOn: true,
-        x: 150,
-        y: 250
+        x: 130,
+        y: 260
       },
       srv0: {
         id: "srv0",
@@ -371,8 +383,8 @@ export function renderUnifiedWorkbench(container) {
         dns: "8.8.8.8",
         mac: "00:BB:44:55:66:01",
         poweredOn: true,
-        x: 610,
-        y: 170
+        x: 570,
+        y: 180
       }
     };
 
@@ -407,8 +419,10 @@ export function renderUnifiedWorkbench(container) {
     ];
 
     state.selectedDeviceId = "pc0";
+    state.pduSourceNodeId = "pc0";
+    state.pduTargetNodeId = "srv0";
     initCliHistories();
-    runPduPathfinding("pc0", "srv0", false);
+    prepareSimulationSteps("pc0", "srv0");
   }
 
   function clearCanvas() {
@@ -416,15 +430,15 @@ export function renderUnifiedWorkbench(container) {
     state.links = [];
     state.simulationSteps = [];
     state.selectedDeviceId = null;
-    state.cablePending = null;
-    state.pduPendingSource = null;
+    state.cableSourceNodeId = null;
+    state.flight.active = false;
     state.lastPduResult = {
       status: "Idle",
       source: "-",
       target: "-",
       type: "-",
       time: "-",
-      message: "Kanvas kosong. Tambahkan perangkat dari panel bawah lalu hubungkan kabel untuk mulai berpraktik."
+      message: "Kanvas kosong. Tambahkan perangkat dari panel bawah lalu sambungkan kabel untuk mulai berpraktik."
     };
   }
 
@@ -499,7 +513,7 @@ export function renderUnifiedWorkbench(container) {
   }
 
   // --------------------------------------------------------------------------
-  // Network Pathfinding & Simulation Engine
+  // Network Pathfinding & Simulation Steps
   // --------------------------------------------------------------------------
   function findPathBetween(srcId, dstId) {
     if (srcId === dstId) return [srcId];
@@ -544,321 +558,250 @@ export function renderUnifiedWorkbench(container) {
     return (a & m) === (b & m);
   }
 
-  function runPduPathfinding(srcId, dstId, triggerSound = true) {
+  function prepareSimulationSteps(srcId, dstId) {
     const src = state.nodes[srcId];
     const dst = state.nodes[dstId];
 
     if (!src || !dst) {
       state.simulationSteps = [];
-      return;
+      return { ok: false, reason: "Perangkat sumber atau tujuan tidak ditemukan" };
     }
 
     if (!src.poweredOn) {
-      state.lastPduResult = {
-        status: "Failed",
-        source: src.name,
-        target: dst.name,
-        type: "ICMP",
-        time: "0.00 ms",
-        message: `Gagal: Perangkat sumber (${src.name}) dalam kondisi mati (Power OFF). Nyalakan daya di Device Inspector.`
-      };
-      if (triggerSound) sound.error();
-      return;
+      return { ok: false, reason: `Daya ${src.name} mati (Power OFF)` };
     }
-
     if (!dst.poweredOn) {
-      state.lastPduResult = {
-        status: "Failed",
-        source: src.name,
-        target: dst.name,
-        type: "ICMP",
-        time: "0.00 ms",
-        message: `Gagal: Perangkat tujuan (${dst.name}) dalam kondisi mati (Power OFF). Nyalakan daya di Device Inspector.`
-      };
-      if (triggerSound) sound.error();
-      return;
+      return { ok: false, reason: `Daya ${dst.name} mati (Power OFF)` };
     }
 
     const path = findPathBetween(srcId, dstId);
     if (!path || path.length < 2) {
-      state.lastPduResult = {
-        status: "Failed",
-        source: src.name,
-        target: dst.name,
-        type: "ICMP",
-        time: "0.00 ms",
-        message: `Gagal: Tidak ada jalur kabel fisik yang menghubungkan ${src.name} dengan ${dst.name}.`
-      };
-      if (triggerSound) sound.error();
-      generateFailedSteps(src, dst, "Kabel Terputus / Belum Dihubungkan");
-      return;
+      return { ok: false, reason: `Tidak ada kabel fisik yang menghubungkan ${src.name} dan ${dst.name}` };
     }
 
     const sameSub = isSameSubnet(src.ip, dst.ip, src.mask);
     const hasRouter = path.some(nid => state.nodes[nid]?.type === "router");
 
     if (!sameSub && !hasRouter) {
+      return { ok: false, reason: `${src.name} dan ${dst.name} beda subnet tanpa Router` };
+    }
+
+    // Build Return Path Nodes sequence: e.g. [A, B, C, D, C, B, A]
+    const returnPath = [...path];
+    for (let i = path.length - 2; i >= 0; i--) {
+      returnPath.push(path[i]);
+    }
+
+    const steps = [];
+    let stepNum = 1;
+    let t = 0.0;
+
+    for (let i = 0; i < returnPath.length; i++) {
+      const dev = state.nodes[returnPath[i]];
+      const isReturn = i >= path.length;
+      const isTarget = i === path.length - 1;
+
+      steps.push({
+        step: stepNum++,
+        time: `${t.toFixed(3)}s`,
+        lastDevice: i === 0 ? src.name : state.nodes[returnPath[i - 1]].name,
+        atDevice: dev.name,
+        nodeId: dev.id,
+        type: i <= 1 ? "ARP" : "ICMP",
+        color: isTarget ? "#10b981" : (isReturn ? "#10b981" : "#f59e0b"),
+        info: isTarget 
+          ? `${dev.name} menerima Echo Request dan membalas ICMP Echo Reply` 
+          : (isReturn && i === returnPath.length - 1 
+              ? `Ping Selesai: ${src.name} menerima balasan 32 bytes time=0.82ms TTL=63 (Sukses 100%)` 
+              : `Paket transit di ${dev.name} menuju ${dst.name}`),
+        pduLayer: isReturn && i === returnPath.length - 1 ? 7 : (isTarget ? 4 : 3),
+        osiInfo: {
+          l7: isReturn && i === returnPath.length - 1 ? "Application: Ping Selesai 100% SUKSES" : "Application: ICMP Utility",
+          l4: isTarget || isReturn ? "Transport: ICMP Type 0 Echo Reply" : "Transport: ICMP Type 8 Echo Request",
+          l3: `Network: IPv4 Header (Src: ${src.ip}, Dst: ${dst.ip})`,
+          l2: `Ethernet II: Frame aktif di ${dev.name}`,
+          l1: "Physical: FastEthernet / Gigabit Link"
+        },
+        explanation: `${dev.name} memproses frame data dan meneruskannya ke tujuan.`
+      });
+      t += 0.008;
+    }
+
+    state.simulationSteps = steps;
+    state.currentStepIndex = 0;
+    return { ok: true, path: returnPath };
+  }
+
+  // --------------------------------------------------------------------------
+  // Execute Packet Transmission (Both Realtime & Simulation)
+  // --------------------------------------------------------------------------
+  function sendPacket(srcId, dstId) {
+    if (!srcId || !dstId) {
+      srcId = state.pduSourceNodeId || Object.keys(state.nodes)[0];
+      dstId = state.pduTargetNodeId || Object.keys(state.nodes)[1];
+    }
+
+    const src = state.nodes[srcId];
+    const dst = state.nodes[dstId];
+    if (!src || !dst) {
+      alert("Pilih setidaknya 2 perangkat di kanvas untuk mengirim paket.");
+      return;
+    }
+
+    sound.click();
+    const result = prepareSimulationSteps(srcId, dstId);
+
+    if (result.ok) {
+      state.lastPduResult = {
+        status: "Successful",
+        source: src.name,
+        target: dst.name,
+        type: "ICMP",
+        time: "0.82 ms",
+        message: `Koneksi normal! Paket ICMP berhasil terkirim dari ${src.name} ke ${dst.name} dan dibalas.`
+      };
+
+      // Launch 60FPS Flight Animation
+      state.flight.active = true;
+      state.flight.pathNodes = result.path;
+      state.flight.legIndex = 0;
+      state.flight.progress = 0;
+      state.flight.isFailed = false;
+      state.flight.speed = state.mode === "realtime" ? 0.05 : 0.02;
+
+      // Update CLI history
+      const hist = state.cliHistory[src.id];
+      if (hist) {
+        hist.push(
+          `C:\\> ping ${dst.ip}`,
+          `Pinging ${dst.ip} with 32 bytes of data:`,
+          `Reply from ${dst.ip}: bytes=32 time=0.82ms TTL=63`,
+          `Reply from ${dst.ip}: bytes=32 time=0.79ms TTL=63`,
+          `Reply from ${dst.ip}: bytes=32 time=0.81ms TTL=63`,
+          `Reply from ${dst.ip}: bytes=32 time=0.84ms TTL=63`,
+          `Ping statistics for ${dst.ip}: Packets: Sent = 4, Received = 4, Lost = 0 (0% loss)`
+        );
+      }
+    } else {
       state.lastPduResult = {
         status: "Failed",
         source: src.name,
         target: dst.name,
         type: "ICMP",
         time: "0.00 ms",
-        message: `Gagal: ${src.name} (${src.ip}) dan ${dst.name} (${dst.ip}) berbeda subnet tanpa Router.`
+        message: `Gagal: ${result.reason}`
       };
-      if (triggerSound) sound.error();
-      generateFailedSteps(src, dst, "Destination Host Unreachable (Beda Subnet & Tiada Router)");
+
+      // Flight with Failure at first hop
+      state.flight.active = true;
+      state.flight.pathNodes = [srcId];
+      state.flight.legIndex = 0;
+      state.flight.progress = 0;
+      state.flight.isFailed = true;
+
+      sound.error();
+    }
+
+    updateDomStatus();
+    updateEventListDom();
+  }
+
+  // --------------------------------------------------------------------------
+  // Connect Cable between Two Nodes
+  // --------------------------------------------------------------------------
+  function connectCable(fromNodeId, toNodeId, cableType = "straight") {
+    if (fromNodeId === toNodeId) return;
+    const n1 = state.nodes[fromNodeId];
+    const n2 = state.nodes[toNodeId];
+    if (!n1 || !n2) return;
+
+    // Check if already linked
+    const alreadyLinked = state.links.some(l => 
+      (l.fromNode === fromNodeId && l.toNode === toNodeId) ||
+      (l.fromNode === toNodeId && l.toNode === fromNodeId)
+    );
+
+    if (alreadyLinked) {
+      alert(`Kabel antara ${n1.name} dan ${n2.name} sudah terpasang.`);
       return;
     }
 
-    if (!sameSub && hasRouter) {
-      const routerNode = state.nodes[path.find(nid => state.nodes[nid]?.type === "router")];
-      if (src.gateway !== routerNode.ip && src.gateway !== routerNode.ip2) {
-        state.lastPduResult = {
-          status: "Failed",
-          source: src.name,
-          target: dst.name,
-          type: "ICMP",
-          time: "0.00 ms",
-          message: `Gagal: Default Gateway pada ${src.name} (${src.gateway}) tidak mengarah ke IP Router.`
-        };
-        if (triggerSound) sound.error();
-        generateFailedSteps(src, dst, "Default Gateway Mismatch / Routing Error");
-        return;
-      }
-    }
+    // Find first available ports
+    const usedPorts1 = new Set(state.links.filter(l => l.fromNode === fromNodeId || l.toNode === fromNodeId).map(l => l.fromNode === fromNodeId ? l.fromPort : l.toPort));
+    const usedPorts2 = new Set(state.links.filter(l => l.fromNode === toNodeId || l.toNode === toNodeId).map(l => l.fromNode === toNodeId ? l.fromPort : l.toPort));
 
-    // Build Success Steps
-    const steps = [];
-    let stepNum = 1;
-    let t = 0.0;
+    const p1 = n1.ports.find(p => !usedPorts1.has(p)) || n1.ports[0];
+    const p2 = n2.ports.find(p => !usedPorts2.has(p)) || n2.ports[0];
 
-    const firstHop = state.nodes[path[1]];
-    steps.push({
-      step: stepNum++,
-      time: `${t.toFixed(3)}s`,
-      lastDevice: src.name,
-      atDevice: src.name,
-      targetDevice: firstHop.name,
-      type: "ARP",
-      color: "#06b6d4",
-      info: `ARP Request: Who has ${sameSub ? dst.ip : src.gateway}? Tell ${src.ip} (Broadcast FF:FF:FF:FF:FF:FF)`,
-      pduLayer: 2,
-      osiInfo: {
-        l7: "Application: N/A (Address Resolution Protocol)",
-        l4: "Transport: N/A",
-        l3: `Network: ARP Request for ${sameSub ? dst.ip : src.gateway}`,
-        l2: `Ethernet II: Src MAC ${src.mac} -> Dst MAC FF:FF:FF:FF:FF:FF (Broadcast)`,
-        l1: "Physical: Tx Frame to copper cable"
-      },
-      explanation: `${src.name} ingin mengirim paket ke ${sameSub ? dst.name : 'Gateway'}, namun belum mengetahui MAC address fisiknya. Dibuat paket ARP Request broadcast.`
+    state.links.push({
+      id: `link_${Date.now().toString(36)}`,
+      fromNode: fromNodeId,
+      fromPort: p1,
+      toNode: toNodeId,
+      toPort: p2,
+      cableType: cableType,
+      status: "up"
     });
 
-    t += 0.004;
-    steps.push({
-      step: stepNum++,
-      time: `${t.toFixed(3)}s`,
-      lastDevice: src.name,
-      atDevice: firstHop.name,
-      targetDevice: firstHop.name,
-      type: "ARP",
-      color: "#06b6d4",
-      info: `${firstHop.name} menerima ARP frame, mencatat MAC, dan membalas ARP Reply unicast`,
-      pduLayer: 2,
-      osiInfo: {
-        l7: "Application: N/A",
-        l4: "Transport: N/A",
-        l3: "Network: ARP Reply",
-        l2: `Ethernet II: Src MAC ${firstHop.mac} -> Dst MAC ${src.mac}`,
-        l1: "Physical: FastEthernet / Gigabit Rx/Tx"
-      },
-      explanation: `${firstHop.name} mencatat port frame dan membalas alamat MAC unicast ke ${src.name}.`
-    });
+    sound.success();
+    state.cableSourceNodeId = null;
+    state.activeTool = "select";
 
-    // Forward Path (Echo Request)
-    for (let i = 0; i < path.length - 1; i++) {
-      t += 0.008;
-      const curr = state.nodes[path[i]];
-      const next = state.nodes[path[i + 1]];
-      const isRouter = curr.type === "router";
-
-      steps.push({
-        step: stepNum++,
-        time: `${t.toFixed(3)}s`,
-        lastDevice: curr.name,
-        atDevice: next.name,
-        targetDevice: next.name,
-        type: "ICMP",
-        color: "#f59e0b",
-        info: isRouter
-          ? `Router mencari tabel rute -> Dekremen TTL=127 -> Meneruskan ke ${next.name}`
-          : `ICMP Echo Request (Type 8): Src ${src.ip} -> Dst ${dst.ip} (TTL=128)`,
-        pduLayer: 3,
-        osiInfo: {
-          l7: "Application: Ping Utility (Payload 32 bytes abcdef...)",
-          l4: "Transport: ICMP Control Message (Type 8 Echo Request)",
-          l3: `Network: IPv4 Header (Src: ${src.ip}, Dst: ${dst.ip}, Protocol: 1 ICMP, TTL: ${isRouter ? 127 : 128})`,
-          l2: `Ethernet II: Src MAC ${curr.mac} -> Dst MAC ${next.mac}`,
-          l1: "Physical: Copper Interface Transmission"
-        },
-        explanation: `${curr.name} meneruskan paket ICMP Echo Request ke hop berikutnya (${next.name}).`
-      });
-    }
-
-    // Destination Echo Reply
-    t += 0.006;
-    steps.push({
-      step: stepNum++,
-      time: `${t.toFixed(3)}s`,
-      lastDevice: state.nodes[path[path.length - 2]].name,
-      atDevice: dst.name,
-      targetDevice: dst.name,
-      type: "ICMP",
-      color: "#10b981",
-      info: `${dst.name} menerima Echo Request dan membalas dengan ICMP Echo Reply (Type 0, Code 0)`,
-      pduLayer: 4,
-      osiInfo: {
-        l7: "Application: ICMP Daemon / Web Stack",
-        l4: "Transport: ICMP Type 0 Echo Reply",
-        l3: `Network: IPv4 Header (Src: ${dst.ip}, Dst: ${src.ip}, TTL: 64)`,
-        l2: `Ethernet II: Src MAC ${dst.mac} -> Dst MAC ${src.mac}`,
-        l1: "Physical: Rx / Tx Packet Frame"
-      },
-      explanation: `Target ${dst.name} memproses paket ping dan segera membalas kembali ke ${src.name}.`
-    });
-
-    // Return Path
-    for (let i = path.length - 1; i > 0; i--) {
-      t += 0.008;
-      const curr = state.nodes[path[i]];
-      const prev = state.nodes[path[i - 1]];
-
-      steps.push({
-        step: stepNum++,
-        time: `${t.toFixed(3)}s`,
-        lastDevice: curr.name,
-        atDevice: prev.name,
-        targetDevice: prev.name,
-        type: "ICMP",
-        color: "#10b981",
-        info: prev.id === src.id
-          ? `Ping Sukses! ${src.name} menerima Echo Reply dari ${dst.ip}: bytes=32 time=0.82ms TTL=63 (0% loss)`
-          : `Meneruskan balasan Echo Reply: dari ${curr.name} ke ${prev.name}`,
-        pduLayer: prev.id === src.id ? 7 : 3,
-        osiInfo: {
-          l7: prev.id === src.id ? "Application: Ping Selesai: 4 terkirim, 4 diterima (100% SUKSES)" : "Application: Transit",
-          l4: "Transport: ICMP Reply Completed",
-          l3: `Network: IPv4 Header (Src: ${dst.ip}, Dst: ${src.ip}, TTL: 63)`,
-          l2: `Ethernet II: Frame Diterima di ${prev.name}`,
-          l1: "Physical: FastEthernet / Gigabit Rx"
-        },
-        explanation: prev.id === src.id
-          ? `${src.name} telah menerima balasan paket ping secara lengkap. Transmisi PDU BERHASIL 100%! 🎉`
-          : `Paket balasan bergerak mundur menuju sumber melalui ${prev.name}.`
-      });
-    }
-
-    state.simulationSteps = steps;
-    state.currentStepIndex = 0;
-    state.lastPduResult = {
-      status: "Successful",
-      source: src.name,
-      target: dst.name,
-      type: "ICMP",
-      time: "0.82 ms",
-      message: `Ping Sukses! ${src.name} <-> ${dst.name} terhubung normal melalui ${path.length - 1} hop kabel.`
-    };
-
-    if (triggerSound) sound.success();
-  }
-
-  function generateFailedSteps(src, dst, reason) {
-    state.simulationSteps = [
-      {
-        step: 1,
-        time: "0.000s",
-        lastDevice: src.name,
-        atDevice: src.name,
-        targetDevice: dst.name,
-        type: "ICMP",
-        color: "#ef4444",
-        info: `ICMP Echo Request: ${src.name} (${src.ip}) -> ${dst.name} (${dst.ip}) - Gagal!`,
-        pduLayer: 3,
-        osiInfo: {
-          l7: "Application: Ping Utility Timeout",
-          l4: "Transport: ICMP Request Unanswered",
-          l3: `Network: Error - ${reason}`,
-          l2: "Ethernet II: Frame Dropped",
-          l1: "Physical: Link Inactive / Down"
-        },
-        explanation: `Paket tidak dapat ditransmisikan karena: ${reason}. Silakan periksa sambungan kabel atau konfigurasi IP di Device Inspector.`
-      }
-    ];
-    state.currentStepIndex = 0;
+    updateActiveToolDom();
+    updateDomStatus();
   }
 
   // --------------------------------------------------------------------------
-  // Main Render Routine
+  // Main DOM Mount (Rendered ONCE, State Updated Dynamically)
   // --------------------------------------------------------------------------
-  function render() {
-    const selectedDev = state.nodes[state.selectedDeviceId];
-
+  function mountUI() {
     container.innerHTML = `
-      <div class="space-y-4">
+      <div class="space-y-4 text-left font-sans select-none">
         
-        <!-- Cisco Packet Tracer Style Top Control Toolbar -->
-        <div class="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-2.5 sm:gap-3">
+        <!-- Top Toolbar -->
+        <div class="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3">
           
-          <!-- Mode Selector & Simulation Playback -->
-          <div class="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-            <span class="text-[10px] sm:text-[11px] font-mono font-bold text-slate-500 uppercase">Mode:</span>
+          <!-- Mode & Quick Ping -->
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="text-xs font-mono font-bold text-slate-500 uppercase">Mode:</span>
             <div class="inline-flex rounded-xl p-1 bg-slate-100 border border-slate-200 gap-1">
-              <button id="btn-mode-realtime" class="px-2.5 sm:px-3 py-1 sm:py-1.5 text-[11px] sm:text-xs font-mono font-bold rounded-lg transition-all cursor-pointer ${state.mode === 'realtime' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}">
+              <button id="btn-mode-realtime" class="px-3 py-1.5 text-xs font-mono font-bold rounded-lg transition-all cursor-pointer ${state.mode === 'realtime' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}">
                 ⚡ Realtime
               </button>
-              <button id="btn-mode-simulation" class="px-2.5 sm:px-3 py-1 sm:py-1.5 text-[11px] sm:text-xs font-mono font-bold rounded-lg transition-all cursor-pointer ${state.mode === 'simulation' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}">
+              <button id="btn-mode-simulation" class="px-3 py-1.5 text-xs font-mono font-bold rounded-lg transition-all cursor-pointer ${state.mode === 'simulation' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}">
                 ⏱️ Simulasi (Step)
               </button>
             </div>
 
-            <!-- Fast Action: Realtime Ping Button -->
-            <button id="btn-quick-ping" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-mono text-[11px] sm:text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer">
+            <!-- Fast Ping Sender -->
+            <button id="btn-action-send-pdu" class="px-3.5 py-1.5 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 active:scale-95 text-white font-mono text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer">
               <span class="material-symbols-outlined text-[16px]">send</span>
               <span>Kirim Simple PDU (Ping)</span>
             </button>
-
-            <!-- Simulation Step Controls -->
-            ${state.mode === 'simulation' ? `
-              <div class="flex items-center gap-1">
-                <button id="btn-sim-play" class="px-2.5 sm:px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-mono text-[11px] sm:text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-1 cursor-pointer">
-                  <span class="material-symbols-outlined text-[15px] sm:text-[16px]">${state.simState === 'playing' ? 'pause' : 'play_arrow'}</span>
-                  <span>${state.simState === 'playing' ? 'Jeda' : 'Auto Play'}</span>
-                </button>
-                <button id="btn-sim-step" class="px-2.5 sm:px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 active:scale-95 text-indigo-700 border border-indigo-200 font-mono text-[11px] sm:text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-1 cursor-pointer" title="Maju 1 Langkah">
-                  <span class="material-symbols-outlined text-[15px] sm:text-[16px]">step_over</span>
-                  <span>Step</span>
-                </button>
-                <button id="btn-sim-reset" class="px-2 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-mono text-[11px] sm:text-xs font-bold rounded-xl transition-all cursor-pointer" title="Reset Paket">
-                  <span class="material-symbols-outlined text-[16px]">restart_alt</span>
-                </button>
-              </div>
-            ` : ''}
           </div>
 
-          <!-- Top Right Presets & Quick Inspector -->
-          <div class="flex items-center gap-1.5 flex-wrap">
+          <!-- Quick Actions & Presets -->
+          <div class="flex items-center gap-2 flex-wrap">
             
-            <!-- Quick Inspect Button -->
-            <button id="btn-inspect-selected" class="px-3 py-1.5 ${selectedDev ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-slate-100 text-slate-400 cursor-not-allowed'} font-mono text-[11px] sm:text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-xs cursor-pointer" ${!selectedDev ? 'disabled' : ''}>
+            <!-- Source & Target Selector Quick Bar -->
+            <div class="hidden md:flex items-center gap-1.5 bg-slate-50 p-1.5 rounded-xl border border-slate-200 text-xs font-mono">
+              <span class="text-slate-400">Dari:</span>
+              <select id="sel-pdu-source" class="bg-white px-2 py-1 rounded border border-slate-200 font-bold text-indigo-700"></select>
+              <span class="text-slate-400">➔ Ke:</span>
+              <select id="sel-pdu-target" class="bg-white px-2 py-1 rounded border border-slate-200 font-bold text-emerald-700"></select>
+            </div>
+
+            <!-- Inspect Selected Device -->
+            <button id="btn-inspect-selected" class="px-3 py-1.5 bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 font-mono text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-xs cursor-pointer">
               <span class="material-symbols-outlined text-[16px]">settings</span>
-              <span>${selectedDev ? `Konfigurasi: ${selectedDev.name}` : 'Pilih Perangkat'}</span>
+              <span id="label-inspect-selected">Konfigurasi Perangkat</span>
             </button>
 
-            <!-- Template Menu Dropdown -->
+            <!-- Template Menu -->
             <div class="dropdown relative inline-block">
-              <button id="btn-template-dropdown" class="px-2.5 sm:px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 font-mono text-[11px] sm:text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer">
+              <button id="btn-template-dropdown" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 font-mono text-xs font-bold rounded-xl transition-all flex items-center gap-1 cursor-pointer">
                 <span class="material-symbols-outlined text-[16px] text-indigo-600">folder_open</span>
-                <span>Template Lab</span>
+                <span>Template</span>
                 <span class="material-symbols-outlined text-[14px]">arrow_drop_down</span>
               </button>
               <div id="template-menu" class="hidden absolute right-0 mt-1.5 w-60 bg-white border border-slate-200 rounded-xl shadow-xl py-1.5 z-40 text-xs font-mono">
@@ -872,7 +815,7 @@ export function renderUnifiedWorkbench(container) {
                 <button id="btn-tpl-star" class="w-full text-left px-3.5 py-2 hover:bg-indigo-50 flex items-center gap-2 text-slate-700">
                   <span class="material-symbols-outlined text-emerald-600 text-[18px]">hub</span>
                   <div>
-                    <div class="font-bold">2. Lab Star LAN Sekolah</div>
+                    <div class="font-bold">2. Lab Star LAN</div>
                     <div class="text-[10px] text-slate-400">2 PC + Switch + Server</div>
                   </div>
                 </button>
@@ -887,8 +830,8 @@ export function renderUnifiedWorkbench(container) {
                 <button id="btn-tpl-clear" class="w-full text-left px-3.5 py-2 hover:bg-rose-50 flex items-center gap-2 text-rose-600">
                   <span class="material-symbols-outlined text-[18px]">delete_sweep</span>
                   <div>
-                    <div class="font-bold">Kanvas Kosong (Mulai Dari Awal)</div>
-                    <div class="text-[10px] text-rose-400">Bersihkan seluruh perangkat</div>
+                    <div class="font-bold">Bersihkan Kanvas (Mulai Dari Awal)</div>
+                    <div class="text-[10px] text-rose-400">Hapus semua perangkat</div>
                   </div>
                 </button>
               </div>
@@ -897,53 +840,31 @@ export function renderUnifiedWorkbench(container) {
           </div>
         </div>
 
-        <!-- Cisco Workspace Canvas Wrapper -->
-        <div class="relative w-full rounded-2xl overflow-hidden border border-slate-300 shadow-md bg-slate-900 select-none h-[320px] sm:h-[400px] md:h-[460px]" id="cisco-canvas-wrapper">
+        <!-- Canvas Workspace -->
+        <div class="relative w-full rounded-2xl overflow-hidden border border-slate-300 shadow-md bg-slate-900 select-none h-[340px] sm:h-[420px] md:h-[480px]" id="cisco-canvas-wrapper">
           <canvas id="cisco-canvas" class="w-full h-full block cursor-crosshair"></canvas>
 
-          <!-- Floating Instructions & Current Tool Pill -->
-          <div class="absolute top-2.5 sm:top-3 left-2.5 sm:left-3 flex items-center gap-2 z-10 flex-wrap">
-            <div class="bg-slate-900/90 backdrop-blur-md border border-slate-700 px-3 py-1.5 rounded-xl text-[11px] font-mono text-slate-200 flex items-center gap-2 shadow-lg">
-              <span class="w-2 h-2 rounded-full ${state.activeTool === 'select' ? 'bg-indigo-400' : (state.activeTool === 'delete' ? 'bg-rose-400' : (state.activeTool === 'pdu' ? 'bg-amber-400 animate-pulse' : 'bg-cyan-400'))}"></span>
-              <span>
-                ${state.activeTool === 'select' 
-                  ? 'Kursor: Klik perangkat untuk pilih &amp; geser, klik 2x untuk buka konfigurasi' 
-                  : (state.activeTool === 'pdu'
-                      ? (state.pduPendingSource ? `Klik perangkat target untuk kirim paket dari ${state.nodes[state.pduPendingSource]?.name || 'asal'}...` : 'Klik perangkat asal untuk kirim paket PDU...')
-                      : (state.activeTool === 'delete' 
-                          ? 'Alat Hapus: Klik perangkat atau kabel untuk menghapusnya' 
-                          : (state.cablePending ? `Kabel terpasang di ${state.nodes[state.cablePending.fromNodeId]?.name || ''} (${state.cablePending.fromPort}). Sekarang klik perangkat tujuan!` : 'Tarik Kabel: Klik perangkat asal untuk memilih port'))
-                  )}
-              </span>
+          <!-- Floating Guidance Banner -->
+          <div class="absolute top-3 left-3 flex items-center gap-2 z-10 flex-wrap pointer-events-none">
+            <div id="canvas-guidance-pill" class="bg-slate-900/90 backdrop-blur-md border border-slate-700 px-3 py-1.5 rounded-xl text-[11px] font-mono text-slate-200 flex items-center gap-2 shadow-lg">
+              <span class="w-2 h-2 rounded-full bg-indigo-400"></span>
+              <span id="canvas-guidance-text">Klik perangkat untuk memilih, seret untuk memindahkan posisi</span>
             </div>
-
-            ${selectedDev ? `
-              <button id="btn-quick-inspect-pill" class="bg-indigo-600/90 hover:bg-indigo-500 backdrop-blur-md border border-indigo-400 px-2.5 py-1.5 rounded-xl text-[11px] font-mono font-bold text-white flex items-center gap-1.5 shadow-lg cursor-pointer animate-scale-up">
-                <span class="material-symbols-outlined text-[14px]">tune</span>
-                <span>Buka ${selectedDev.name}</span>
-              </button>
-            ` : ''}
-          </div>
-
-          <!-- Top-Right Step Indicator -->
-          <div class="absolute top-2.5 sm:top-3 right-2.5 sm:right-3 bg-slate-900/90 backdrop-blur-md border border-amber-500/50 px-3 py-1.5 rounded-xl text-[11px] font-mono text-amber-300 flex items-center gap-2 shadow-xl z-10">
-            <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
-            <span>Langkah: <strong>${state.simulationSteps.length > 0 ? (state.currentStepIndex + 1) : 0} / ${state.simulationSteps.length}</strong></span>
           </div>
 
           <!-- Bottom-Right Cisco Status Card -->
-          <div class="absolute bottom-2.5 sm:bottom-3 right-2.5 sm:right-3 bg-slate-950/90 backdrop-blur-md border border-slate-700 px-3 py-2 rounded-xl text-left font-mono text-[10px] sm:text-[11px] shadow-2xl max-w-xs z-10">
+          <div class="absolute bottom-3 right-3 bg-slate-950/90 backdrop-blur-md border border-slate-700 px-3.5 py-2.5 rounded-xl text-left font-mono text-[10px] sm:text-[11px] shadow-2xl max-w-xs z-10">
             <div class="flex items-center justify-between border-b border-slate-800 pb-1 mb-1 gap-4">
               <span class="text-slate-400 font-bold uppercase tracking-wider">Cisco PDU Status</span>
-              <span class="px-1.5 py-0.5 rounded text-[9px] font-extrabold ${state.lastPduResult.status === 'Successful' ? 'bg-emerald-950 text-emerald-400 border border-emerald-500/40' : (state.lastPduResult.status === 'Failed' ? 'bg-rose-950 text-rose-400 border border-rose-500/40' : 'bg-slate-800 text-slate-300')}">
-                ${state.lastPduResult.status}
+              <span id="badge-pdu-status" class="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-emerald-950 text-emerald-400 border border-emerald-500/40">
+                Successful
               </span>
             </div>
-            <div class="text-slate-300 truncate">
-              <strong>${state.lastPduResult.source}</strong> ➔ <strong>${state.lastPduResult.target}</strong> (${state.lastPduResult.type})
+            <div id="text-pdu-route" class="text-slate-200 truncate font-bold">
+              PC0 ➔ Server0 (ICMP)
             </div>
-            <div class="text-slate-400 text-[10px] mt-0.5 leading-tight">
-              ${state.lastPduResult.message}
+            <div id="text-pdu-message" class="text-slate-400 text-[10px] mt-0.5 leading-tight">
+              Koneksi end-to-end normal (4 sent, 4 received, 0% loss).
             </div>
           </div>
         </div>
@@ -959,7 +880,7 @@ export function renderUnifiedWorkbench(container) {
               </h3>
             </div>
             <span class="text-[10px] sm:text-[11px] font-mono text-slate-500">
-              Klik ikon perangkat untuk menambahkannya ke kanvas bebas
+              Klik ikon untuk menambah perangkat atau memilih mode sambung kabel
             </span>
           </div>
 
@@ -970,15 +891,15 @@ export function renderUnifiedWorkbench(container) {
             <div class="lg:col-span-3 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
               <div class="text-[10px] font-mono font-bold text-slate-500 uppercase mb-1.5">Mode Kursor / Alat</div>
               <div class="grid grid-cols-3 gap-1.5">
-                <button id="tool-select" class="p-2 rounded-lg font-mono text-[11px] font-bold border transition-all flex flex-col items-center gap-1 cursor-pointer ${state.activeTool === 'select' ? 'bg-indigo-600 text-white border-indigo-700 shadow-xs' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'}">
+                <button id="tool-select" class="tool-btn p-2 rounded-lg font-mono text-[11px] font-bold border transition-all flex flex-col items-center gap-1 cursor-pointer bg-indigo-600 text-white border-indigo-700 shadow-xs" data-tool="select">
                   <span class="material-symbols-outlined text-[18px]">near_me</span>
                   <span class="text-[10px]">Pilih/Geser</span>
                 </button>
-                <button id="tool-pdu" class="p-2 rounded-lg font-mono text-[11px] font-bold border transition-all flex flex-col items-center gap-1 cursor-pointer ${state.activeTool === 'pdu' ? 'bg-amber-500 text-white border-amber-600 shadow-xs' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'}" title="Add Simple PDU: Uji Ping antar 2 perangkat di kanvas">
+                <button id="tool-pdu" class="tool-btn p-2 rounded-lg font-mono text-[11px] font-bold border transition-all flex flex-col items-center gap-1 cursor-pointer bg-white text-slate-700 border-slate-200 hover:bg-slate-100" data-tool="pdu" title="Pilih perangkat sumber lalu perangkat tujuan">
                   <span class="material-symbols-outlined text-[18px]">mail</span>
                   <span class="text-[10px]">Kirim PDU</span>
                 </button>
-                <button id="tool-delete" class="p-2 rounded-lg font-mono text-[11px] font-bold border transition-all flex flex-col items-center gap-1 cursor-pointer ${state.activeTool === 'delete' ? 'bg-rose-600 text-white border-rose-700 shadow-xs' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'}">
+                <button id="tool-delete" class="tool-btn p-2 rounded-lg font-mono text-[11px] font-bold border transition-all flex flex-col items-center gap-1 cursor-pointer bg-white text-slate-700 border-slate-200 hover:bg-slate-100" data-tool="delete" title="Klik perangkat atau kabel untuk menghapus">
                   <span class="material-symbols-outlined text-[18px]">delete</span>
                   <span class="text-[10px]">Hapus</span>
                 </button>
@@ -987,14 +908,14 @@ export function renderUnifiedWorkbench(container) {
 
             <!-- Category 2: Kabel Jaringan -->
             <div class="lg:col-span-3 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
-              <div class="text-[10px] font-mono font-bold text-slate-500 uppercase mb-1.5">Kabel Jaringan</div>
+              <div class="text-[10px] font-mono font-bold text-slate-500 uppercase mb-1.5">Sambung Kabel Jaringan</div>
               <div class="grid grid-cols-2 gap-1.5">
-                <button id="tool-cable-straight" class="p-2 rounded-lg font-mono text-[11px] font-bold border transition-all flex flex-col items-center gap-1 cursor-pointer ${state.activeTool === 'cable-straight' ? 'bg-cyan-600 text-white border-cyan-700 shadow-xs' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'}" title="Kabel Straight-Through: PC ke Switch atau Switch ke Router">
-                  <span class="material-symbols-outlined text-[18px]">horizontal_rule</span>
-                  <span class="text-[10px]">Straight</span>
+                <button id="tool-cable-straight" class="tool-btn p-2 rounded-lg font-mono text-[11px] font-bold border transition-all flex flex-col items-center gap-1 cursor-pointer bg-white text-slate-700 border-slate-200 hover:bg-slate-100" data-tool="cable-straight" title="Klik perangkat 1 lalu klik perangkat 2 untuk menyambungkan">
+                  <span class="material-symbols-outlined text-[18px] text-cyan-600">horizontal_rule</span>
+                  <span class="text-[10px]">Straight-Through</span>
                 </button>
-                <button id="tool-cable-cross" class="p-2 rounded-lg font-mono text-[11px] font-bold border transition-all flex flex-col items-center gap-1 cursor-pointer ${state.activeTool === 'cable-cross' ? 'bg-amber-600 text-white border-amber-700 shadow-xs' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'}" title="Kabel Cross-Over: PC ke PC atau Switch ke Switch">
-                  <span class="material-symbols-outlined text-[18px]">linear_scale</span>
+                <button id="tool-cable-cross" class="tool-btn p-2 rounded-lg font-mono text-[11px] font-bold border transition-all flex flex-col items-center gap-1 cursor-pointer bg-white text-slate-700 border-slate-200 hover:bg-slate-100" data-tool="cable-cross" title="Koneksi perangkat sejenis (PC-PC, Switch-Switch)">
+                  <span class="material-symbols-outlined text-[18px] text-amber-600">linear_scale</span>
                   <span class="text-[10px]">Cross-Over</span>
                 </button>
               </div>
@@ -1034,7 +955,7 @@ export function renderUnifiedWorkbench(container) {
           </div>
         </div>
 
-        <!-- Cisco Packet Tracer Event List Panel -->
+        <!-- Event List Panel -->
         <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
           <div class="p-3.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
             <div class="flex items-center gap-2">
@@ -1044,7 +965,7 @@ export function renderUnifiedWorkbench(container) {
                 <span>Daftar Peristiwa Transmisi (Cisco Event List Panel)</span>
               </h3>
             </div>
-            <span class="text-[11px] font-mono text-slate-500">Klik baris untuk membuka <strong>PDU Information (OSI 7 Layers)</strong></span>
+            <span class="text-[11px] font-mono text-slate-500">Klik baris peristiwa untuk membedah <strong>Model OSI 7-Layer</strong></span>
           </div>
 
           <div class="overflow-x-auto max-h-56 overflow-y-auto font-mono text-xs">
@@ -1060,102 +981,175 @@ export function renderUnifiedWorkbench(container) {
                   <th class="py-2 px-3 w-28 text-center">Detail PDU</th>
                 </tr>
               </thead>
-              <tbody class="divide-y divide-slate-100">
-                ${state.simulationSteps.length === 0 ? `
-                  <tr>
-                    <td colspan="7" class="py-6 text-center text-slate-400 font-sans text-xs">
-                      Belum ada paket yang dikirim. Tekan tombol <strong>Kirim Simple PDU (Ping)</strong> atau gunakan <strong>Alat Kirim PDU (Amplop)</strong>.
-                    </td>
-                  </tr>
-                ` : state.simulationSteps.map((s, idx) => {
-                  const isActive = idx === state.currentStepIndex;
-                  const isPast = idx <= state.currentStepIndex;
-                  return `
-                    <tr class="transition-colors cursor-pointer hover:bg-indigo-50/50 event-row ${isActive ? 'bg-indigo-50 font-bold text-indigo-950 border-l-4 border-l-indigo-600' : ''}" data-step="${idx}">
-                      <td class="py-2 px-3 text-center">
-                        <span class="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] ${isPast ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400'}">
-                          ${isPast ? '✓' : idx + 1}
-                        </span>
-                      </td>
-                      <td class="py-2 px-3 text-slate-500">${s.time}</td>
-                      <td class="py-2 px-3 font-semibold text-slate-800">${s.lastDevice}</td>
-                      <td class="py-2 px-3 font-semibold text-slate-800">${s.atDevice}</td>
-                      <td class="py-2 px-3">
-                        <span class="px-2 py-0.5 rounded text-[10px] font-bold" style="background-color: ${s.color}20; color: ${s.color}; border: 1px solid ${s.color}40;">
-                          ${s.type}
-                        </span>
-                      </td>
-                      <td class="py-2 px-3 text-slate-700 truncate max-w-xs">${s.info}</td>
-                      <td class="py-2 px-3 text-center">
-                        <button class="px-2 py-1 bg-white hover:bg-slate-100 border border-slate-200 rounded text-[10px] text-indigo-600 font-bold flex items-center justify-center gap-1 mx-auto cursor-pointer">
-                          <span>Envelope</span>
-                          <span class="material-symbols-outlined text-[13px]">mail</span>
-                        </button>
-                      </td>
-                    </tr>
-                  `;
-                }).join("")}
+              <tbody id="event-list-tbody" class="divide-y divide-slate-100">
+                <!-- Dynamically updated -->
               </tbody>
             </table>
           </div>
         </div>
 
-        <!-- Dedicated Port Selection Modal -->
-        <div id="cisco-port-modal" class="hidden fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4">
-        </div>
-
-        <!-- Cisco PDU Information Window -->
-        <div id="cisco-pdu-modal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-        </div>
-
-        <!-- Cisco Device Inspector Modal -->
-        <div id="cisco-device-modal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-        </div>
+        <!-- Modals -->
+        <div id="cisco-pdu-modal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4"></div>
+        <div id="cisco-device-modal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4"></div>
 
       </div>
     `;
 
-    setupEvents();
-    initCanvas();
+    setupEventListeners();
+    setupCanvas();
+    loadStandardTemplate();
+    updateDomStatus();
+    updateEventListDom();
   }
 
   // --------------------------------------------------------------------------
-  // Event Listeners Setup
+  // Update DOM Elements without Destroying Canvas / Page
   // --------------------------------------------------------------------------
-  function setupEvents() {
+  function updateDomStatus() {
+    const badge = document.getElementById("badge-pdu-status");
+    const route = document.getElementById("text-pdu-route");
+    const msg = document.getElementById("text-pdu-message");
+    const inspectBtn = document.getElementById("label-inspect-selected");
+
+    if (badge) {
+      badge.textContent = state.lastPduResult.status;
+      badge.className = `px-1.5 py-0.5 rounded text-[9px] font-extrabold ${state.lastPduResult.status === 'Successful' ? 'bg-emerald-950 text-emerald-400 border border-emerald-500/40' : (state.lastPduResult.status === 'Failed' ? 'bg-rose-950 text-rose-400 border border-rose-500/40' : 'bg-slate-800 text-slate-300')}`;
+    }
+    if (route) route.textContent = `${state.lastPduResult.source} ➔ ${state.lastPduResult.target} (${state.lastPduResult.type})`;
+    if (msg) msg.textContent = state.lastPduResult.message;
+
+    if (inspectBtn) {
+      const dev = state.nodes[state.selectedDeviceId];
+      inspectBtn.textContent = dev ? `Konfigurasi: ${dev.name}` : "Konfigurasi Perangkat";
+    }
+
+    // Populate dropdowns
+    const selSrc = document.getElementById("sel-pdu-source");
+    const selDst = document.getElementById("sel-pdu-target");
+    if (selSrc && selDst) {
+      const nodeIds = Object.keys(state.nodes);
+      selSrc.innerHTML = nodeIds.map(id => `<option value="${id}" ${id === state.pduSourceNodeId ? 'selected' : ''}>${state.nodes[id].name}</option>`).join("");
+      selDst.innerHTML = nodeIds.map(id => `<option value="${id}" ${id === state.pduTargetNodeId ? 'selected' : ''}>${state.nodes[id].name}</option>`).join("");
+    }
+  }
+
+  function updateActiveToolDom() {
+    container.querySelectorAll(".tool-btn").forEach(btn => {
+      const t = btn.dataset.tool;
+      if (t === state.activeTool) {
+        btn.className = "tool-btn p-2 rounded-lg font-mono text-[11px] font-bold border transition-all flex flex-col items-center gap-1 cursor-pointer bg-indigo-600 text-white border-indigo-700 shadow-xs";
+      } else {
+        btn.className = "tool-btn p-2 rounded-lg font-mono text-[11px] font-bold border transition-all flex flex-col items-center gap-1 cursor-pointer bg-white text-slate-700 border-slate-200 hover:bg-slate-100";
+      }
+    });
+
+    const guideText = document.getElementById("canvas-guidance-text");
+    if (guideText) {
+      if (state.activeTool === "select") {
+        guideText.textContent = "Kursor: Klik perangkat untuk memilih, seret untuk memindahkan posisi, klik 2x untuk membuka konfigurasi";
+      } else if (state.activeTool === "cable-straight" || state.activeTool === "cable-cross") {
+        if (!state.cableSourceNodeId) {
+          guideText.textContent = `Sambung Kabel: Klik perangkat PERTAMA (asal) yang ingin disambungkan kabel ${state.activeTool === 'cable-cross' ? 'Cross-Over' : 'Straight'}`;
+        } else {
+          guideText.textContent = `Kabel terpasang di ${state.nodes[state.cableSourceNodeId]?.name}. Sekarang klik perangkat KEDUA (tujuan) untuk menyambungkan!`;
+        }
+      } else if (state.activeTool === "pdu") {
+        guideText.textContent = "Kirim PDU: Klik perangkat sumber pengirim, lalu klik perangkat target penerima";
+      } else if (state.activeTool === "delete") {
+        guideText.textContent = "Alat Hapus: Klik perangkat atau kabel untuk menghapusnya dari kanvas";
+      }
+    }
+  }
+
+  function updateEventListDom() {
+    const tbody = document.getElementById("event-list-tbody");
+    if (!tbody) return;
+
+    if (state.simulationSteps.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="7" class="py-6 text-center text-slate-400 font-sans text-xs">
+            Belum ada paket yang dikirim. Tekan tombol <strong>Kirim Simple PDU (Ping)</strong> di atas untuk memulai transmisi.
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    tbody.innerHTML = state.simulationSteps.map((s, idx) => {
+      const isActive = idx === state.currentStepIndex;
+      const isPast = idx <= state.currentStepIndex;
+      return `
+        <tr class="transition-colors cursor-pointer hover:bg-indigo-50/50 event-row ${isActive ? 'bg-indigo-50 font-bold text-indigo-950 border-l-4 border-l-indigo-600' : ''}" data-step="${idx}">
+          <td class="py-2 px-3 text-center">
+            <span class="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] ${isPast ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400'}">
+              ${isPast ? '✓' : idx + 1}
+            </span>
+          </td>
+          <td class="py-2 px-3 text-slate-500">${s.time}</td>
+          <td class="py-2 px-3 font-semibold text-slate-800">${s.lastDevice}</td>
+          <td class="py-2 px-3 font-semibold text-slate-800">${s.atDevice}</td>
+          <td class="py-2 px-3">
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold" style="background-color: ${s.color}20; color: ${s.color}; border: 1px solid ${s.color}40;">
+              ${s.type}
+            </span>
+          </td>
+          <td class="py-2 px-3 text-slate-700 truncate max-w-xs">${s.info}</td>
+          <td class="py-2 px-3 text-center">
+            <button class="px-2 py-1 bg-white hover:bg-slate-100 border border-slate-200 rounded text-[10px] text-indigo-600 font-bold flex items-center justify-center gap-1 mx-auto cursor-pointer">
+              <span>Envelope</span>
+              <span class="material-symbols-outlined text-[13px]">mail</span>
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join("");
+
+    tbody.querySelectorAll(".event-row").forEach(row => {
+      row.addEventListener("click", () => {
+        const stepIdx = parseInt(row.dataset.step, 10);
+        openPduModal(stepIdx);
+      });
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // Event Listeners
+  // --------------------------------------------------------------------------
+  function setupEventListeners() {
     // Mode toggles
     document.getElementById("btn-mode-realtime")?.addEventListener("click", () => {
       state.mode = "realtime";
-      stopSimulationLoop();
-      render();
+      document.getElementById("btn-mode-realtime")?.classList.add("bg-indigo-600", "text-white");
+      document.getElementById("btn-mode-simulation")?.classList.remove("bg-indigo-600", "text-white");
+      sound.click();
     });
 
     document.getElementById("btn-mode-simulation")?.addEventListener("click", () => {
       state.mode = "simulation";
-      render();
+      document.getElementById("btn-mode-simulation")?.classList.add("bg-indigo-600", "text-white");
+      document.getElementById("btn-mode-realtime")?.classList.remove("bg-indigo-600", "text-white");
+      sound.click();
     });
 
-    // Quick Ping Button
-    document.getElementById("btn-quick-ping")?.addEventListener("click", () => {
-      triggerQuickPing();
+    // Send PDU button
+    document.getElementById("btn-action-send-pdu")?.addEventListener("click", () => {
+      sendPacket();
     });
 
-    // Simulation playback
-    document.getElementById("btn-sim-play")?.addEventListener("click", () => {
-      if (state.simState === "playing") {
-        pauseSimulation();
-      } else {
-        playSimulation();
-      }
+    // Source & Target Selectors
+    document.getElementById("sel-pdu-source")?.addEventListener("change", (e) => {
+      state.pduSourceNodeId = e.target.value;
+      updateDomStatus();
+    });
+    document.getElementById("sel-pdu-target")?.addEventListener("change", (e) => {
+      state.pduTargetNodeId = e.target.value;
+      updateDomStatus();
     });
 
-    document.getElementById("btn-sim-step")?.addEventListener("click", () => {
-      pauseSimulation();
-      stepForward();
-    });
-
-    document.getElementById("btn-sim-reset")?.addEventListener("click", () => {
-      resetSimulation();
+    // Inspect selected
+    document.getElementById("btn-inspect-selected")?.addEventListener("click", () => {
+      if (state.selectedDeviceId) openDeviceModal(state.selectedDeviceId);
     });
 
     // Template Dropdown
@@ -1172,121 +1166,50 @@ export function renderUnifiedWorkbench(container) {
     document.getElementById("btn-tpl-standard")?.addEventListener("click", () => {
       loadStandardTemplate();
       sound.success();
-      render();
+      updateDomStatus();
+      updateEventListDom();
     });
 
     document.getElementById("btn-tpl-star")?.addEventListener("click", () => {
       loadStarLanTemplate();
       sound.success();
-      render();
+      updateDomStatus();
+      updateEventListDom();
     });
 
     document.getElementById("btn-tpl-p2p")?.addEventListener("click", () => {
       loadPeerToPeerTemplate();
       sound.success();
-      render();
+      updateDomStatus();
+      updateEventListDom();
     });
 
     document.getElementById("btn-tpl-clear")?.addEventListener("click", () => {
       clearCanvas();
       sound.click();
-      render();
-    });
-
-    // Inspect buttons
-    document.getElementById("btn-inspect-selected")?.addEventListener("click", () => {
-      if (state.selectedDeviceId) {
-        openDeviceModal(state.selectedDeviceId);
-      }
-    });
-
-    document.getElementById("btn-quick-inspect-pill")?.addEventListener("click", () => {
-      if (state.selectedDeviceId) {
-        openDeviceModal(state.selectedDeviceId);
-      }
+      updateDomStatus();
+      updateEventListDom();
     });
 
     // Tool Buttons
-    document.getElementById("tool-select")?.addEventListener("click", () => {
-      state.activeTool = "select";
-      state.cablePending = null;
-      state.pduPendingSource = null;
-      sound.click();
-      render();
-    });
-
-    document.getElementById("tool-pdu")?.addEventListener("click", () => {
-      state.activeTool = "pdu";
-      state.cablePending = null;
-      state.pduPendingSource = null;
-      sound.click();
-      render();
-    });
-
-    document.getElementById("tool-delete")?.addEventListener("click", () => {
-      state.activeTool = "delete";
-      state.cablePending = null;
-      state.pduPendingSource = null;
-      sound.click();
-      render();
-    });
-
-    document.getElementById("tool-cable-straight")?.addEventListener("click", () => {
-      state.activeTool = "cable-straight";
-      state.cablePending = null;
-      state.pduPendingSource = null;
-      sound.click();
-      render();
-    });
-
-    document.getElementById("tool-cable-cross")?.addEventListener("click", () => {
-      state.activeTool = "cable-cross";
-      state.cablePending = null;
-      state.pduPendingSource = null;
-      sound.click();
-      render();
+    container.querySelectorAll(".tool-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        state.activeTool = btn.dataset.tool;
+        state.cableSourceNodeId = null;
+        sound.click();
+        updateActiveToolDom();
+      });
     });
 
     // Add device buttons
     container.querySelectorAll(".btn-add-device").forEach(btn => {
       btn.addEventListener("click", () => {
-        const type = btn.dataset.type;
-        addDeviceToCanvas(type);
-      });
-    });
-
-    // Event row click -> open PDU Modal
-    container.querySelectorAll(".event-row").forEach(row => {
-      row.addEventListener("click", () => {
-        const stepIdx = parseInt(row.dataset.step, 10);
-        openPduModal(stepIdx);
+        addDevice(btn.dataset.type);
       });
     });
   }
 
-  // --------------------------------------------------------------------------
-  // Trigger Quick Ping
-  // --------------------------------------------------------------------------
-  function triggerQuickPing() {
-    sound.click();
-    const pcNode = Object.values(state.nodes).find(n => n.type === "pc" || n.type === "laptop") || Object.values(state.nodes)[0];
-    const targetNode = Object.values(state.nodes).find(n => n.id !== pcNode?.id);
-
-    if (pcNode && targetNode) {
-      runPduPathfinding(pcNode.id, targetNode.id, true);
-      render();
-      if (state.mode === "simulation") {
-        playSimulation();
-      }
-    } else {
-      alert("Harap tambahkan setidaknya 2 perangkat (contoh: PC dan Server) ke kanvas untuk menguji Ping.");
-    }
-  }
-
-  // --------------------------------------------------------------------------
-  // Add Device Functionality
-  // --------------------------------------------------------------------------
-  function addDeviceToCanvas(type) {
+  function addDevice(type) {
     const spec = DEVICE_TYPES[type];
     if (!spec) return;
 
@@ -1296,8 +1219,8 @@ export function renderUnifiedWorkbench(container) {
     const name = `${spec.prefix}${count}`;
 
     const currentCount = Object.keys(state.nodes).length;
-    const posX = 100 + (currentCount % 5) * 115;
-    const posY = 100 + Math.floor(currentCount / 5) * 125;
+    const posX = 110 + (currentCount % 5) * 120;
+    const posY = 100 + Math.floor(currentCount / 5) * 130;
 
     const baseOctet = 10 + currentCount;
     const ip = type === "router" ? "192.168.1.1" : (type === "server" ? "10.10.20.50" : `192.168.1.${baseOctet}`);
@@ -1321,179 +1244,402 @@ export function renderUnifiedWorkbench(container) {
 
     initCliHistories();
     state.selectedDeviceId = newId;
-    render();
+    updateDomStatus();
   }
 
   // --------------------------------------------------------------------------
-  // Simulation Playback Loop
+  // Canvas Engine with 60FPS Flight Animation Loop
   // --------------------------------------------------------------------------
-  function playSimulation() {
-    if (state.simulationSteps.length === 0) {
-      triggerQuickPing();
-      return;
+  function setupCanvas() {
+    const canvas = document.getElementById("cisco-canvas");
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+
+    let isDragging = false;
+    let draggedNodeId = null;
+    let dragOffsetX = 0;
+    let dragOffsetY = 0;
+
+    const resize = () => {
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width;
+      canvas.height = rect.height;
+    };
+    resize();
+    window.addEventListener("resize", resize);
+
+    function getCoords(e) {
+      const rect = canvas.getBoundingClientRect();
+      const cx = e.touches ? e.touches[0].clientX : e.clientX;
+      const cy = e.touches ? e.touches[0].clientY : e.clientY;
+      return {
+        x: (cx - rect.left) * (canvas.width / rect.width),
+        y: (cy - rect.top) * (canvas.height / rect.height)
+      };
     }
 
-    state.simState = "playing";
-    sound.success();
-    render();
-
-    if (simInterval) clearInterval(simInterval);
-    simInterval = setInterval(() => {
-      if (state.currentStepIndex < state.simulationSteps.length - 1) {
-        state.currentStepIndex++;
-        render();
-      } else {
-        pauseSimulation();
+    function findNodeAt(x, y) {
+      const hitRadius = 45;
+      for (const node of Object.values(state.nodes)) {
+        const dx = x - node.x;
+        const dy = y - node.y;
+        if (Math.sqrt(dx * dx + dy * dy) < hitRadius) return node;
       }
-    }, 1800 / state.playbackSpeed);
-  }
-
-  function pauseSimulation() {
-    state.simState = "paused";
-    if (simInterval) clearInterval(simInterval);
-    render();
-  }
-
-  function stepForward() {
-    sound.click();
-    if (state.simulationSteps.length === 0) {
-      triggerQuickPing();
-      return;
+      return null;
     }
 
-    if (state.currentStepIndex < state.simulationSteps.length - 1) {
-      state.currentStepIndex++;
-    } else {
-      state.currentStepIndex = 0;
-    }
-    render();
-  }
+    // Pointer Down
+    const handleDown = (e) => {
+      const pos = getCoords(e);
+      const clicked = findNodeAt(pos.x, pos.y);
 
-  function resetSimulation() {
-    sound.click();
-    state.simState = "idle";
-    state.currentStepIndex = 0;
-    if (simInterval) clearInterval(simInterval);
-    render();
-  }
+      // 1. DELETE TOOL
+      if (state.activeTool === "delete") {
+        if (clicked) {
+          sound.click();
+          state.links = state.links.filter(l => l.fromNode !== clicked.id && l.toNode !== clicked.id);
+          delete state.nodes[clicked.id];
+          if (state.selectedDeviceId === clicked.id) state.selectedDeviceId = null;
+          updateDomStatus();
+        }
+        return;
+      }
 
-  function stopSimulationLoop() {
-    state.simState = "idle";
-    if (simInterval) clearInterval(simInterval);
-  }
+      // 2. CABLE TOOLS (Straight / Cross)
+      if (state.activeTool === "cable-straight" || state.activeTool === "cable-cross") {
+        if (clicked) {
+          if (!state.cableSourceNodeId) {
+            // Step 1: Select source device
+            state.cableSourceNodeId = clicked.id;
+            sound.click();
+            updateActiveToolDom();
+          } else {
+            // Step 2: Connect to destination device!
+            connectCable(state.cableSourceNodeId, clicked.id, state.activeTool === "cable-cross" ? "cross" : "straight");
+          }
+        }
+        return;
+      }
 
-  // --------------------------------------------------------------------------
-  // Port Selection Modal (Interactive Wiring Dialog)
-  // --------------------------------------------------------------------------
-  function openPortSelectionModal(node) {
-    const modal = document.getElementById("cisco-port-modal");
-    if (!modal) return;
+      // 3. PDU TOOL (Choose source & target on canvas)
+      if (state.activeTool === "pdu") {
+        if (clicked) {
+          if (!state.cableSourceNodeId) {
+            state.pduSourceNodeId = clicked.id;
+            state.cableSourceNodeId = clicked.id;
+            sound.click();
+            const guide = document.getElementById("canvas-guidance-text");
+            if (guide) guide.textContent = `Sumber: ${clicked.name}. Sekarang klik perangkat tujuan untuk mengirim paket!`;
+            updateDomStatus();
+          } else {
+            state.pduTargetNodeId = clicked.id;
+            state.cableSourceNodeId = null;
+            state.activeTool = "select";
+            updateActiveToolDom();
+            sendPacket(state.pduSourceNodeId, clicked.id);
+          }
+        }
+        return;
+      }
 
-    const cableKind = state.activeTool === "cable-cross" ? "cross" : "straight";
-
-    const portUsage = {};
-    state.links.forEach(l => {
-      if (l.fromNode === node.id) portUsage[l.fromPort] = state.nodes[l.toNode]?.name || "Perangkat";
-      if (l.toNode === node.id) portUsage[l.toPort] = state.nodes[l.fromNode]?.name || "Perangkat";
-    });
-
-    const isSelectingSource = !state.cablePending;
-
-    modal.classList.remove("hidden");
-    modal.innerHTML = `
-      <div class="bg-white rounded-2xl border border-slate-200 max-w-md w-full p-5 shadow-2xl space-y-4 animate-scale-up text-left font-mono">
-        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-          <div class="flex items-center gap-2.5">
-            <span class="w-8 h-8 rounded-lg ${isSelectingSource ? 'bg-cyan-50 text-cyan-600 border border-cyan-200' : 'bg-emerald-50 text-emerald-600 border border-emerald-200'} flex items-center justify-center">
-              <span class="material-symbols-outlined text-[18px]">settings_ethernet</span>
-            </span>
-            <div>
-              <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                ${isSelectingSource ? 'Langkah 1: Pilih Port Asal' : 'Langkah 2: Hubungkan ke Port Tujuan'}
-              </span>
-              <h3 class="text-sm font-bold text-slate-900">${node.name} (${node.model})</h3>
-            </div>
-          </div>
-          <button id="btn-close-port-modal" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 cursor-pointer">
-            <span class="material-symbols-outlined text-[18px]">close</span>
-          </button>
-        </div>
-
-        <p class="text-xs text-slate-600 font-sans">
-          ${isSelectingSource 
-            ? `Pilih salah satu port fisik pada <strong>${node.name}</strong> untuk mencolokkan kabel <strong>${cableKind === 'cross' ? 'Cross-Over' : 'Straight-Through'}</strong>:` 
-            : `Hubungkan kabel dari <strong>${state.nodes[state.cablePending.fromNodeId]?.name || ''} (${state.cablePending.fromPort})</strong> ke salah satu port tersedia pada <strong>${node.name}</strong>:`}
-        </p>
-
-        <div class="space-y-1.5 max-h-60 overflow-y-auto">
-          ${node.ports.map(portName => {
-            const connectedTo = portUsage[portName];
-            const isOccupied = !!connectedTo;
-            return `
-              <button class="w-full text-left p-2.5 rounded-xl border text-xs font-mono flex items-center justify-between transition-all ${isOccupied ? 'opacity-50 bg-slate-50 border-slate-200 text-slate-400 cursor-not-allowed' : 'bg-white border-slate-300 hover:border-indigo-500 hover:bg-indigo-50/50 text-slate-800 cursor-pointer shadow-2xs'}" data-port="${portName}" ${isOccupied ? 'disabled' : ''}>
-                <div class="flex items-center gap-2">
-                  <span class="w-2 h-2 rounded-full ${isOccupied ? 'bg-rose-500' : 'bg-emerald-500'}"></span>
-                  <span class="font-bold">${portName}</span>
-                </div>
-                <span class="text-[10px] px-2 py-0.5 rounded font-sans ${isOccupied ? 'bg-rose-50 text-rose-600 border border-rose-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}">
-                  ${isOccupied ? `Terhubung: ${connectedTo}` : 'Tersedia'}
-                </span>
-              </button>
-            `;
-          }).join("")}
-        </div>
-
-        <button id="btn-cancel-port-modal" class="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer">
-          Batal
-        </button>
-      </div>
-    `;
-
-    const closeModal = () => {
-      modal.classList.add("hidden");
+      // 4. SELECT TOOL (Drag to Move & Select)
+      if (clicked) {
+        state.selectedDeviceId = clicked.id;
+        isDragging = true;
+        draggedNodeId = clicked.id;
+        dragOffsetX = pos.x - clicked.x;
+        dragOffsetY = pos.y - clicked.y;
+        updateDomStatus();
+      } else {
+        state.selectedDeviceId = null;
+        updateDomStatus();
+      }
     };
 
-    document.getElementById("btn-close-port-modal")?.addEventListener("click", closeModal);
-    document.getElementById("btn-cancel-port-modal")?.addEventListener("click", closeModal);
+    // Pointer Move
+    const handleMove = (e) => {
+      const pos = getCoords(e);
+      state.pointerPos.x = pos.x;
+      state.pointerPos.y = pos.y;
+      state.pointerPos.active = true;
 
-    modal.querySelectorAll("button[data-port]").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const selectedPort = btn.dataset.port;
-        closeModal();
+      if (isDragging && draggedNodeId && state.nodes[draggedNodeId]) {
+        state.nodes[draggedNodeId].x = Math.max(45, Math.min(canvas.width - 45, pos.x - dragOffsetX));
+        state.nodes[draggedNodeId].y = Math.max(45, Math.min(canvas.height - 45, pos.y - dragOffsetY));
+      }
+    };
 
-        if (isSelectingSource) {
-          sound.click();
-          state.cablePending = {
-            fromNodeId: node.id,
-            fromPort: selectedPort,
-            cableType: cableKind
-          };
-          render();
-        } else {
-          if (node.id === state.cablePending.fromNodeId) {
-            alert("Tidak dapat menghubungkan kabel ke perangkat yang sama.");
-            state.cablePending = null;
-            render();
-            return;
-          }
+    // Pointer Up
+    const handleUp = () => {
+      isDragging = false;
+      draggedNodeId = null;
+    };
 
-          sound.success();
-          state.links.push({
-            id: `link_${Date.now().toString(36)}`,
-            fromNode: state.cablePending.fromNodeId,
-            fromPort: state.cablePending.fromPort,
-            toNode: node.id,
-            toPort: selectedPort,
-            cableType: state.cablePending.cableType,
-            status: "up"
-          });
-
-          state.cablePending = null;
-          state.activeTool = "select";
-          render();
-        }
-      });
+    canvas.addEventListener("dblclick", (e) => {
+      const pos = getCoords(e);
+      const clicked = findNodeAt(pos.x, pos.y);
+      if (clicked) openDeviceModal(clicked.id);
     });
+
+    canvas.addEventListener("mousedown", handleDown);
+    canvas.addEventListener("mousemove", handleMove);
+    window.addEventListener("mouseup", handleUp);
+
+    canvas.addEventListener("touchstart", (e) => {
+      e.preventDefault();
+      handleDown(e);
+    }, { passive: false });
+
+    canvas.addEventListener("touchmove", (e) => {
+      e.preventDefault();
+      handleMove(e);
+    }, { passive: false });
+
+    window.addEventListener("touchend", handleUp);
+
+    // ------------------------------------------------------------------------
+    // 60FPS Animation Rendering Loop
+    // ------------------------------------------------------------------------
+    function animationLoop() {
+      renderCanvasFrame(ctx, canvas.width, canvas.height);
+      animFrameId = requestAnimationFrame(animationLoop);
+    }
+    animationLoop();
+  }
+
+  // --------------------------------------------------------------------------
+  // Render Canvas Frame (Draws background, cables, devices, and flying packet)
+  // --------------------------------------------------------------------------
+  function renderCanvasFrame(ctx, w, h) {
+    ctx.clearRect(0, 0, w, h);
+
+    // 1. Cisco Blueprint Grid
+    ctx.fillStyle = "#0a0f1d";
+    ctx.fillRect(0, 0, w, h);
+
+    ctx.strokeStyle = "rgba(56, 189, 248, 0.08)";
+    ctx.lineWidth = 1;
+    for (let x = 0; x < w; x += 28) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, h);
+      ctx.stroke();
+    }
+    for (let y = 0; y < h; y += 28) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(w, y);
+      ctx.stroke();
+    }
+
+    // 2. Cables
+    state.links.forEach(l => {
+      const n1 = state.nodes[l.fromNode];
+      const n2 = state.nodes[l.toNode];
+      if (n1 && n2) {
+        drawCableLine(ctx, n1.x, n1.y, n2.x, n2.y, l.cableType, l.fromPort, l.toPort);
+      }
+    });
+
+    // 3. Live Rubberband Cable (while dragging cable to connect)
+    if (state.cableSourceNodeId && (state.activeTool === "cable-straight" || state.activeTool === "cable-cross")) {
+      const srcNode = state.nodes[state.cableSourceNodeId];
+      if (srcNode && state.pointerPos.active) {
+        ctx.save();
+        ctx.strokeStyle = state.activeTool === "cable-cross" ? "#f59e0b" : "#38bdf8";
+        ctx.lineWidth = 2.5;
+        ctx.setLineDash([6, 4]);
+        ctx.beginPath();
+        ctx.moveTo(srcNode.x, srcNode.y);
+        ctx.lineTo(state.pointerPos.x, state.pointerPos.y);
+        ctx.stroke();
+
+        ctx.strokeStyle = "#38bdf8";
+        ctx.beginPath();
+        ctx.arc(srcNode.x, srcNode.y, 48, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+
+    // 4. Hardware Devices
+    Object.values(state.nodes).forEach(n => {
+      drawDeviceBox(ctx, n.x, n.y, n);
+    });
+
+    // 5. Flying Packet Animation
+    if (state.flight.active) {
+      updateAndDrawPacketFlight(ctx);
+    }
+  }
+
+  function drawCableLine(ctx, x1, y1, x2, y2, cableType, port1, port2) {
+    ctx.save();
+    const isCross = cableType === "cross";
+    ctx.strokeStyle = isCross ? "#f59e0b" : "#38bdf8";
+    ctx.lineWidth = 2.5;
+    ctx.setLineDash(isCross ? [8, 5] : []);
+
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+
+    // Link Lights
+    ctx.fillStyle = "#10b981";
+    drawLinkTriangle(ctx, x1 + (x2 - x1) * 0.16, y1 + (y2 - y1) * 0.16, true);
+    drawLinkTriangle(ctx, x2 - (x2 - x1) * 0.16, y2 - (y2 - y1) * 0.16, false);
+
+    // Port tags
+    ctx.fillStyle = "#94a3b8";
+    ctx.font = "9px monospace";
+    ctx.textAlign = "center";
+    ctx.fillText(port1 || "", x1 + (x2 - x1) * 0.22, y1 + (y2 - y1) * 0.22 - 6);
+    ctx.fillText(port2 || "", x2 - (x2 - x1) * 0.22, y2 - (y2 - y1) * 0.22 - 6);
+    ctx.restore();
+  }
+
+  function drawLinkTriangle(ctx, x, y, isForward) {
+    ctx.beginPath();
+    if (isForward) {
+      ctx.moveTo(x - 4, y - 4);
+      ctx.lineTo(x + 4, y);
+      ctx.lineTo(x - 4, y + 4);
+    } else {
+      ctx.moveTo(x + 4, y - 4);
+      ctx.lineTo(x - 4, y);
+      ctx.lineTo(x + 4, y + 4);
+    }
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  function drawDeviceBox(ctx, x, y, node) {
+    ctx.save();
+
+    const isSelected = node.id === state.selectedDeviceId;
+    const isCableSource = state.cableSourceNodeId === node.id;
+    const isPduTarget = state.pduTargetNodeId === node.id;
+
+    const cardW = 88;
+    const cardH = 76;
+    const halfW = cardW / 2;
+    const halfH = cardH / 2;
+    const radius = 10;
+
+    if (isSelected || isCableSource || isPduTarget) {
+      ctx.shadowColor = isCableSource ? "#38bdf8" : (isPduTarget ? "#10b981" : "#6366f1");
+      ctx.shadowBlur = 16;
+    }
+
+    ctx.fillStyle = "rgba(15, 23, 42, 0.94)";
+    ctx.strokeStyle = isCableSource ? "#38bdf8" : (isPduTarget ? "#10b981" : (isSelected ? "#6366f1" : "rgba(148, 163, 184, 0.35)"));
+    ctx.lineWidth = isSelected || isCableSource ? 2.5 : 1.5;
+
+    ctx.beginPath();
+    ctx.roundRect ? ctx.roundRect(x - halfW, y - halfH, cardW, cardH, radius) : ctx.rect(x - halfW, y - halfH, cardW, cardH);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.shadowBlur = 0;
+
+    // Power LED
+    ctx.fillStyle = node.poweredOn ? "#10b981" : "#ef4444";
+    ctx.beginPath();
+    ctx.arc(x + 33, y - 25, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Device Glyph Icon
+    ctx.fillStyle = "#38bdf8";
+    ctx.font = "bold 18px monospace";
+    ctx.textAlign = "center";
+    const symbol = node.type === "switch" ? "☵" : (node.type === "router" ? "⨁" : (node.type === "server" ? "🗄️" : (node.type === "laptop" ? "💻" : "🖥️")));
+    ctx.fillText(symbol, x, y - 4);
+
+    // Device Name
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 10px monospace";
+    ctx.textAlign = "center";
+    ctx.fillText(node.name, x, y + 15);
+
+    // IP Address
+    ctx.fillStyle = "#94a3b8";
+    ctx.font = "9px monospace";
+    ctx.fillText(node.ip, x, y + 26);
+
+    ctx.restore();
+  }
+
+  // --------------------------------------------------------------------------
+  // Update and Draw Packet Flight (60FPS Interpolation along path)
+  // --------------------------------------------------------------------------
+  function updateAndDrawPacketFlight(ctx) {
+    const f = state.flight;
+    if (f.pathNodes.length < 2) {
+      f.active = false;
+      return;
+    }
+
+    const n1 = state.nodes[f.pathNodes[f.legIndex]];
+    const n2 = state.nodes[f.pathNodes[f.legIndex + 1]];
+
+    if (!n1 || !n2) {
+      f.active = false;
+      return;
+    }
+
+    // Step progress
+    f.progress += f.speed;
+
+    if (f.progress >= 1.0) {
+      f.progress = 0;
+      f.legIndex++;
+
+      // Update step index in Event List
+      state.currentStepIndex = Math.min(state.simulationSteps.length - 1, f.legIndex);
+      updateEventListDom();
+
+      // Check if finished
+      if (f.legIndex >= f.pathNodes.length - 1) {
+        f.active = false;
+        sound.success();
+        return;
+      }
+    }
+
+    // Interpolate current position
+    const currentX = n1.x + (n2.x - n1.x) * f.progress;
+    const currentY = n1.y + (n2.y - n1.y) * f.progress;
+
+    // Draw glowing flying envelope
+    ctx.save();
+    ctx.translate(currentX, currentY - 32);
+
+    ctx.shadowColor = f.color;
+    ctx.shadowBlur = 16;
+
+    const envW = 38;
+    const envH = 24;
+
+    ctx.fillStyle = f.color;
+    ctx.fillRect(-envW / 2, -envH / 2, envW, envH);
+
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(-envW / 2, -envH / 2, envW, envH);
+
+    ctx.beginPath();
+    ctx.moveTo(-envW / 2, -envH / 2);
+    ctx.lineTo(0, 3);
+    ctx.lineTo(envW / 2, -envH / 2);
+    ctx.stroke();
+
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 9px monospace";
+    ctx.textAlign = "center";
+    ctx.fillText(f.label, 0, 7);
+
+    ctx.restore();
   }
 
   // --------------------------------------------------------------------------
@@ -1508,7 +1654,7 @@ export function renderUnifiedWorkbench(container) {
 
     modal.classList.remove("hidden");
     modal.innerHTML = `
-      <div class="bg-white rounded-2xl border border-slate-200 max-w-2xl w-full p-4 sm:p-6 shadow-2xl space-y-4 animate-scale-up text-left font-mono max-h-[88vh] overflow-y-auto">
+      <div class="bg-white rounded-2xl border border-slate-200 max-w-2xl w-full p-5 shadow-2xl space-y-4 animate-scale-up text-left font-mono max-h-[88vh] overflow-y-auto">
         <div class="flex items-center justify-between border-b border-slate-100 pb-3">
           <div class="flex items-center gap-3">
             <span class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-200 flex items-center justify-center shrink-0">
@@ -1519,7 +1665,7 @@ export function renderUnifiedWorkbench(container) {
                 <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">LANGKAH ${s.step} DARI ${state.simulationSteps.length}</span>
                 <span class="text-xs text-slate-500">${s.time}</span>
               </div>
-              <h3 class="text-sm font-bold text-slate-900 mt-0.5">PDU Information at Device: ${s.atDevice} (${s.type})</h3>
+              <h3 class="text-sm font-bold text-slate-900 mt-0.5">PDU Information: ${s.atDevice} (${s.type})</h3>
             </div>
           </div>
           <button id="btn-close-pdu-modal" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 cursor-pointer">
@@ -1559,21 +1705,17 @@ export function renderUnifiedWorkbench(container) {
         </div>
 
         <button id="btn-close-pdu-modal-bottom" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-mono font-bold text-xs rounded-xl shadow cursor-pointer transition-all">
-          Tutup &amp; Lanjutkan Simulasi
+          Tutup
         </button>
       </div>
     `;
 
-    document.getElementById("btn-close-pdu-modal")?.addEventListener("click", () => {
-      modal.classList.add("hidden");
-    });
-    document.getElementById("btn-close-pdu-modal-bottom")?.addEventListener("click", () => {
-      modal.classList.add("hidden");
-    });
+    document.getElementById("btn-close-pdu-modal")?.addEventListener("click", () => modal.classList.add("hidden"));
+    document.getElementById("btn-close-pdu-modal-bottom")?.addEventListener("click", () => modal.classList.add("hidden"));
   }
 
   // --------------------------------------------------------------------------
-  // Cisco Device Inspector Modal (Desktop, Config, CLI, Physical)
+  // Cisco Device Inspector Modal
   // --------------------------------------------------------------------------
   function openDeviceModal(deviceId) {
     const dev = state.nodes[deviceId];
@@ -1646,9 +1788,7 @@ export function renderUnifiedWorkbench(container) {
       </div>
     `;
 
-    document.getElementById("btn-close-dev-modal")?.addEventListener("click", () => {
-      modal.classList.add("hidden");
-    });
+    document.getElementById("btn-close-dev-modal")?.addEventListener("click", () => modal.classList.add("hidden"));
 
     document.getElementById("dev-tab-desktop")?.addEventListener("click", () => {
       state.deviceActiveTab = "desktop";
@@ -1671,7 +1811,7 @@ export function renderUnifiedWorkbench(container) {
       dev.poweredOn = !dev.poweredOn;
       sound.click();
       renderDeviceModalContent();
-      render();
+      updateDomStatus();
     });
 
     document.getElementById("btn-app-ipconfig")?.addEventListener("click", () => {
@@ -1701,15 +1841,7 @@ export function renderUnifiedWorkbench(container) {
       sound.success();
       alert(`Konfigurasi IP untuk ${dev.name} berhasil disimpan!`);
       renderDeviceModalContent();
-      render();
-    });
-
-    document.getElementById("btn-preset-ip")?.addEventListener("click", () => {
-      dev.ip = dev.type === "server" ? "10.10.20.50" : "192.168.1.10";
-      dev.mask = "255.255.255.0";
-      dev.gateway = dev.type === "server" ? "10.10.20.1" : "192.168.1.1";
-      sound.click();
-      renderDeviceModalContent();
+      updateDomStatus();
     });
 
     document.getElementById("btn-browser-go")?.addEventListener("click", () => {
@@ -1763,9 +1895,6 @@ export function renderUnifiedWorkbench(container) {
       <div class="p-4 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-3 font-sans">
         <div class="flex items-center justify-between border-b border-slate-200 pb-2">
           <div class="font-mono font-bold text-slate-800">FastEthernet0 IP Configuration</div>
-          <button id="btn-preset-ip" class="px-2.5 py-1 bg-white hover:bg-indigo-50 text-indigo-600 border border-slate-200 rounded font-mono text-[10px] font-bold cursor-pointer">
-            ✨ Auto IP Preset
-          </button>
         </div>
 
         <div class="grid grid-cols-2 gap-3 font-mono">
@@ -1808,7 +1937,7 @@ export function renderUnifiedWorkbench(container) {
         <div id="browser-viewport" class="p-6 min-h-[160px] flex flex-col items-center justify-center text-center space-y-2 bg-slate-50">
           <span class="material-symbols-outlined text-[36px] text-slate-300">public</span>
           <p class="text-xs text-slate-500 font-mono">
-            Ketik alamat IP Server Web (misal: <code>http://10.10.20.50</code>) lalu tekan <strong>Go</strong> untuk menguji koneksi HTTP.
+            Ketik alamat IP Server Web (contoh: <code>http://10.10.20.50</code>) lalu tekan <strong>Go</strong> untuk menguji koneksi HTTP.
           </p>
         </div>
       </div>
@@ -1934,8 +2063,7 @@ export function renderUnifiedWorkbench(container) {
             `Reply from ${targetDev.ip}: bytes=32 time=0.81ms TTL=63`,
             `Reply from ${targetDev.ip}: bytes=32 time=0.85ms TTL=63`,
             "",
-            `Ping statistics for ${targetDev.ip}:`,
-            `    Packets: Sent = 4, Received = 4, Lost = 0 (0% loss)`
+            `Ping statistics for ${targetDev.ip}: Packets: Sent = 4, Received = 4, Lost = 0 (0% loss)`
           );
           sound.success();
           return;
@@ -1948,8 +2076,7 @@ export function renderUnifiedWorkbench(container) {
         "Request timed out.",
         "Request timed out.",
         "",
-        `Ping statistics for ${targetQuery}:`,
-        `    Packets: Sent = 4, Received = 0, Lost = 4 (100% loss)`
+        `Ping statistics for ${targetQuery}: Packets: Sent = 4, Received = 0, Lost = 4 (100% loss)`
       );
       sound.error();
       return;
@@ -2076,380 +2203,6 @@ export function renderUnifiedWorkbench(container) {
     `;
   }
 
-  // --------------------------------------------------------------------------
-  // Canvas Workspace Engine & Touch Dragging
-  // --------------------------------------------------------------------------
-  function initCanvas() {
-    const canvas = document.getElementById("cisco-canvas");
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-
-    let isDragging = false;
-    let draggedNodeId = null;
-    let dragOffsetX = 0;
-    let dragOffsetY = 0;
-
-    const resize = () => {
-      const rect = canvas.getBoundingClientRect();
-      canvas.width = rect.width;
-      canvas.height = rect.height;
-      draw(ctx, canvas.width, canvas.height);
-    };
-
-    resize();
-    window.addEventListener("resize", resize);
-
-    function getCanvasCoords(e) {
-      const rect = canvas.getBoundingClientRect();
-      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-      return {
-        x: (clientX - rect.left) * (canvas.width / rect.width),
-        y: (clientY - rect.top) * (canvas.height / rect.height)
-      };
-    }
-
-    function findNodeAt(cx, cy) {
-      const hitRadius = 42;
-      for (const node of Object.values(state.nodes)) {
-        const dx = cx - node.x;
-        const dy = cy - node.y;
-        if (Math.sqrt(dx * dx + dy * dy) < hitRadius) {
-          return node;
-        }
-      }
-      return null;
-    }
-
-    // Pointer Down
-    const handleDown = (e) => {
-      const pos = getCanvasCoords(e);
-      const clickedNode = findNodeAt(pos.x, pos.y);
-
-      // Tool: DELETE
-      if (state.activeTool === "delete") {
-        if (clickedNode) {
-          sound.click();
-          state.links = state.links.filter(l => l.fromNode !== clickedNode.id && l.toNode !== clickedNode.id);
-          delete state.nodes[clickedNode.id];
-          if (state.selectedDeviceId === clickedNode.id) {
-            state.selectedDeviceId = null;
-          }
-          render();
-        }
-        return;
-      }
-
-      // Tool: CABLE (Straight / Cross)
-      if (state.activeTool === "cable-straight" || state.activeTool === "cable-cross") {
-        if (clickedNode) {
-          sound.click();
-          openPortSelectionModal(clickedNode);
-        }
-        return;
-      }
-
-      // Tool: PDU (Envelope Ping)
-      if (state.activeTool === "pdu") {
-        if (clickedNode) {
-          sound.click();
-          if (!state.pduPendingSource) {
-            state.pduPendingSource = clickedNode.id;
-            state.lastPduResult = {
-              status: "In Progress",
-              source: clickedNode.name,
-              target: "?",
-              type: "ICMP",
-              time: "0.00 ms",
-              message: `Pilih perangkat target untuk mengirim paket dari ${clickedNode.name}...`
-            };
-            render();
-          } else {
-            const srcId = state.pduPendingSource;
-            const dstId = clickedNode.id;
-            state.pduPendingSource = null;
-            state.activeTool = "select";
-            runPduPathfinding(srcId, dstId, true);
-            render();
-          }
-        }
-        return;
-      }
-
-      // Tool: SELECT (Move / Tap)
-      if (clickedNode) {
-        state.selectedDeviceId = clickedNode.id;
-        isDragging = true;
-        draggedNodeId = clickedNode.id;
-        dragOffsetX = pos.x - clickedNode.x;
-        dragOffsetY = pos.y - clickedNode.y;
-
-        const inspectBtn = document.getElementById("btn-inspect-selected");
-        if (inspectBtn) {
-          inspectBtn.removeAttribute("disabled");
-          inspectBtn.classList.remove("bg-slate-100", "text-slate-400", "cursor-not-allowed");
-          inspectBtn.classList.add("bg-indigo-600", "text-white", "hover:bg-indigo-700");
-          inspectBtn.innerHTML = `
-            <span class="material-symbols-outlined text-[16px]">settings</span>
-            <span>Konfigurasi: ${clickedNode.name}</span>
-          `;
-        }
-
-        draw(ctx, canvas.width, canvas.height);
-      } else {
-        state.selectedDeviceId = null;
-        draw(ctx, canvas.width, canvas.height);
-      }
-    };
-
-    // Pointer Move
-    const handleMove = (e) => {
-      const pos = getCanvasCoords(e);
-      state.pointerPos.x = pos.x;
-      state.pointerPos.y = pos.y;
-      state.pointerPos.active = true;
-
-      if (isDragging && draggedNodeId && state.nodes[draggedNodeId]) {
-        state.nodes[draggedNodeId].x = Math.max(40, Math.min(canvas.width - 40, pos.x - dragOffsetX));
-        state.nodes[draggedNodeId].y = Math.max(40, Math.min(canvas.height - 40, pos.y - dragOffsetY));
-        draw(ctx, canvas.width, canvas.height);
-      } else if (state.cablePending) {
-        draw(ctx, canvas.width, canvas.height);
-      }
-    };
-
-    // Pointer Up
-    const handleUp = () => {
-      if (isDragging) {
-        isDragging = false;
-        draggedNodeId = null;
-      }
-    };
-
-    // Double-click to open inspector
-    canvas.addEventListener("dblclick", (e) => {
-      const pos = getCanvasCoords(e);
-      const clickedNode = findNodeAt(pos.x, pos.y);
-      if (clickedNode) {
-        openDeviceModal(clickedNode.id);
-      }
-    });
-
-    canvas.addEventListener("mousedown", handleDown);
-    canvas.addEventListener("mousemove", handleMove);
-    window.addEventListener("mouseup", handleUp);
-
-    canvas.addEventListener("touchstart", (e) => {
-      e.preventDefault();
-      handleDown(e);
-    }, { passive: false });
-
-    canvas.addEventListener("touchmove", (e) => {
-      e.preventDefault();
-      handleMove(e);
-    }, { passive: false });
-
-    window.addEventListener("touchend", handleUp);
-  }
-
-  // --------------------------------------------------------------------------
-  // Canvas Drawing Engine (Nodes, Cables, Rubberband, and Glowing Envelope)
-  // --------------------------------------------------------------------------
-  function draw(ctx, w, h) {
-    ctx.clearRect(0, 0, w, h);
-
-    // Cisco Blueprint Grid Background
-    ctx.fillStyle = "#0a0f1d";
-    ctx.fillRect(0, 0, w, h);
-
-    ctx.strokeStyle = "rgba(56, 189, 248, 0.07)";
-    ctx.lineWidth = 1;
-    for (let x = 0; x < w; x += 28) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, h);
-      ctx.stroke();
-    }
-    for (let y = 0; y < h; y += 28) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(w, y);
-      ctx.stroke();
-    }
-
-    // 1. Draw Links (Cables)
-    state.links.forEach(link => {
-      const n1 = state.nodes[link.fromNode];
-      const n2 = state.nodes[link.toNode];
-      if (n1 && n2) {
-        drawCable(ctx, n1.x, n1.y, n2.x, n2.y, link.cableType, link.fromPort, link.toPort);
-      }
-    });
-
-    // 2. Draw In-Progress Rubberband Cable
-    if (state.cablePending && state.pointerPos.active) {
-      const fromN = state.nodes[state.cablePending.fromNodeId];
-      if (fromN) {
-        ctx.save();
-        ctx.strokeStyle = "#38bdf8";
-        ctx.lineWidth = 2.5;
-        ctx.setLineDash([6, 4]);
-        ctx.beginPath();
-        ctx.moveTo(fromN.x, fromN.y);
-        ctx.lineTo(state.pointerPos.x, state.pointerPos.y);
-        ctx.stroke();
-
-        ctx.strokeStyle = "#38bdf8";
-        ctx.beginPath();
-        ctx.arc(fromN.x, fromN.y, 48, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.restore();
-      }
-    }
-
-    // 3. Draw Nodes (Hardware Devices)
-    Object.values(state.nodes).forEach(node => {
-      drawDevice(ctx, node.x, node.y, node);
-    });
-
-    // 4. Draw Active PDU Flight Animation
-    const s = state.simulationSteps[state.currentStepIndex];
-    if (s && state.nodes) {
-      const activeDev = Object.values(state.nodes).find(n => n.name === s.atDevice);
-      if (activeDev) {
-        ctx.save();
-        ctx.translate(activeDev.x, activeDev.y - 44);
-
-        ctx.shadowColor = s.color || "#f59e0b";
-        ctx.shadowBlur = 14;
-
-        const envW = 40;
-        const envH = 26;
-
-        ctx.fillStyle = s.color || "#f59e0b";
-        ctx.fillRect(-envW / 2, -envH / 2, envW, envH);
-
-        ctx.strokeStyle = "#ffffff";
-        ctx.lineWidth = 1.5;
-        ctx.strokeRect(-envW / 2, -envH / 2, envW, envH);
-
-        ctx.beginPath();
-        ctx.moveTo(-envW / 2, -envH / 2);
-        ctx.lineTo(0, 4);
-        ctx.lineTo(envW / 2, -envH / 2);
-        ctx.stroke();
-
-        ctx.fillStyle = "#ffffff";
-        ctx.font = "bold 9px monospace";
-        ctx.textAlign = "center";
-        ctx.fillText(s.type || "PDU", 0, 8);
-
-        ctx.restore();
-      }
-    }
-  }
-
-  function drawCable(ctx, x1, y1, x2, y2, cableType, port1, port2) {
-    ctx.save();
-
-    const isCross = cableType === "cross";
-    ctx.strokeStyle = isCross ? "#f59e0b" : "#38bdf8";
-    ctx.lineWidth = 2.5;
-
-    if (isCross) {
-      ctx.setLineDash([8, 5]);
-    } else {
-      ctx.setLineDash([]);
-    }
-
-    ctx.beginPath();
-    ctx.moveTo(x1, y1);
-    ctx.lineTo(x2, y2);
-    ctx.stroke();
-
-    ctx.fillStyle = "#10b981";
-    drawLinkLight(ctx, x1 + (x2 - x1) * 0.16, y1 + (y2 - y1) * 0.16, true);
-    drawLinkLight(ctx, x2 - (x2 - x1) * 0.16, y2 - (y2 - y1) * 0.16, false);
-
-    ctx.fillStyle = "#94a3b8";
-    ctx.font = "9px monospace";
-    ctx.textAlign = "center";
-    ctx.fillText(port1 || "", x1 + (x2 - x1) * 0.22, y1 + (y2 - y1) * 0.22 - 6);
-    ctx.fillText(port2 || "", x2 - (x2 - x1) * 0.22, y2 - (y2 - y1) * 0.22 - 6);
-
-    ctx.restore();
-  }
-
-  function drawLinkLight(ctx, x, y, isForward) {
-    ctx.beginPath();
-    if (isForward) {
-      ctx.moveTo(x - 4, y - 4);
-      ctx.lineTo(x + 4, y);
-      ctx.lineTo(x - 4, y + 4);
-    } else {
-      ctx.moveTo(x + 4, y - 4);
-      ctx.lineTo(x - 4, y);
-      ctx.lineTo(x + 4, y + 4);
-    }
-    ctx.closePath();
-    ctx.fill();
-  }
-
-  function drawDevice(ctx, x, y, node) {
-    ctx.save();
-
-    const isSelected = node.id === state.selectedDeviceId;
-    const isPduSource = node.id === state.pduPendingSource;
-    const isCableSource = state.cablePending && state.cablePending.fromNodeId === node.id;
-
-    const cardW = 88;
-    const cardH = 76;
-    const halfW = cardW / 2;
-    const halfH = cardH / 2;
-    const radius = 10;
-
-    if (isSelected || isPduSource || isCableSource) {
-      ctx.shadowColor = isPduSource ? "#f59e0b" : (isCableSource ? "#38bdf8" : "#6366f1");
-      ctx.shadowBlur = 16;
-    }
-
-    ctx.fillStyle = "rgba(15, 23, 42, 0.94)";
-    ctx.strokeStyle = isPduSource ? "#f59e0b" : (isCableSource ? "#38bdf8" : (isSelected ? "#6366f1" : "rgba(148, 163, 184, 0.35)"));
-    ctx.lineWidth = isSelected || isPduSource || isCableSource ? 2.5 : 1.5;
-
-    ctx.beginPath();
-    ctx.roundRect ? ctx.roundRect(x - halfW, y - halfH, cardW, cardH, radius) : ctx.rect(x - halfW, y - halfH, cardW, cardH);
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.shadowBlur = 0;
-
-    ctx.fillStyle = node.poweredOn ? "#10b981" : "#ef4444";
-    ctx.beginPath();
-    ctx.arc(x + 33, y - 25, 3.5, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = "#38bdf8";
-    ctx.font = "bold 18px monospace";
-    ctx.textAlign = "center";
-    const symbol = node.type === "switch" ? "☵" : (node.type === "router" ? "⨁" : (node.type === "server" ? "🗄️" : (node.type === "laptop" ? "💻" : "🖥️")));
-    ctx.fillText(symbol, x, y - 4);
-
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 10px monospace";
-    ctx.textAlign = "center";
-    ctx.fillText(node.name, x, y + 15);
-
-    ctx.fillStyle = "#94a3b8";
-    ctx.font = "9px monospace";
-    ctx.fillText(node.ip, x, y + 26);
-
-    ctx.restore();
-  }
-
-  // --------------------------------------------------------------------------
-  // Initial Boot
-  // --------------------------------------------------------------------------
-  loadStandardTemplate();
-  render();
+  // Initial Mount
+  mountUI();
 }
