@@ -1202,16 +1202,16 @@ export function initNetQuestCityGame(containerEl, options = {}) {
       if (isCourierPrompt && !gameState.isModalOpen) {
         promptEl.classList.remove("hidden");
         promptEl.innerHTML = `
-          <div class="px-5 py-3 rounded-2xl bg-slate-900/90 text-white border border-amber-400 shadow-2xl flex items-center gap-3.5 backdrop-blur-md animate-bounce">
-            <div class="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-400/40 flex items-center justify-center shrink-0">
-              <span class="material-symbols-outlined text-[24px]">local_shipping</span>
+          <div class="w-[92vw] max-w-sm sm:max-w-md px-3 sm:px-5 py-2.5 sm:py-3 rounded-2xl bg-slate-900/95 text-white border border-amber-400 shadow-2xl flex items-center gap-2.5 sm:gap-3.5 backdrop-blur-md animate-bounce">
+            <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-400/40 flex items-center justify-center shrink-0">
+              <span class="material-symbols-outlined text-[20px] sm:text-[24px]">local_shipping</span>
             </div>
-            <div class="text-left font-mono">
-              <span class="block text-xs font-bold text-amber-300">${curMission.title}</span>
-              <span class="block text-[11px] text-slate-300">Tiba di ${curMission.targetName} • Tekan [E] atau Klik untuk Serahkan Paket!</span>
+            <div class="text-left font-mono min-w-0 flex-1">
+              <span class="block text-xs font-bold text-amber-300 truncate">${curMission.title}</span>
+              <span class="block text-[10px] sm:text-[11px] text-slate-300 truncate">Tiba di ${curMission.targetName}</span>
             </div>
-            <button class="ml-2 px-4 py-2 bg-amber-600 hover:bg-amber-500 active:scale-95 text-white font-mono font-bold text-xs rounded-xl cursor-pointer shadow-md transition-all flex items-center gap-1.5" id="btn-prompt-enter-action">
-              <span>Serahkan Paket</span>
+            <button class="px-3 sm:px-4 py-2 bg-amber-600 hover:bg-amber-500 active:scale-95 text-white font-mono font-bold text-xs rounded-xl cursor-pointer shadow-md transition-all shrink-0 flex items-center gap-1" id="btn-prompt-enter-action">
+              <span>Kirim</span>
               <span class="material-symbols-outlined text-[16px]">done_all</span>
             </button>
           </div>
@@ -1223,16 +1223,16 @@ export function initNetQuestCityGame(containerEl, options = {}) {
         const solvedInfo = gameState.solvedStations.get(promptTarget.config.id);
         promptEl.classList.remove("hidden");
         promptEl.innerHTML = `
-          <div class="px-5 py-3 rounded-2xl bg-slate-900/90 text-white border border-indigo-400/60 shadow-2xl flex items-center gap-3.5 backdrop-blur-md animate-bounce">
-            <div class="w-10 h-10 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-400/40 flex items-center justify-center shrink-0">
-              <span class="material-symbols-outlined text-[24px]">${promptTarget.config.icon}</span>
+          <div class="w-[92vw] max-w-sm sm:max-w-md px-3 sm:px-5 py-2.5 sm:py-3 rounded-2xl bg-slate-900/95 text-white border border-indigo-400/60 shadow-2xl flex items-center gap-2.5 sm:gap-3.5 backdrop-blur-md animate-bounce">
+            <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-400/40 flex items-center justify-center shrink-0">
+              <span class="material-symbols-outlined text-[20px] sm:text-[24px]">${promptTarget.config.icon}</span>
             </div>
-            <div class="text-left font-mono">
-              <span class="block text-xs font-bold text-indigo-300">${promptTarget.config.title}</span>
-              <span class="block text-[11px] text-slate-300">${solvedInfo ? `Pos Tuntas: ${solvedInfo.score}/5 Benar (Klik untuk Ulangi)` : "Tantangan 5 Soal HOTS • Tekan [E] atau Klik untuk Mulai!"}</span>
+            <div class="text-left font-mono min-w-0 flex-1">
+              <span class="block text-xs font-bold text-indigo-300 truncate">${promptTarget.config.title}</span>
+              <span class="block text-[10px] sm:text-[11px] text-slate-300 truncate">${solvedInfo ? `Pos Tuntas: ${solvedInfo.score}/5 Benar` : "Tantangan 5 Soal HOTS"}</span>
             </div>
-            <button class="ml-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-mono font-bold text-xs rounded-xl cursor-pointer shadow-md transition-all flex items-center gap-1.5" id="btn-prompt-enter-action">
-              <span>Masuk Pos</span>
+            <button class="px-3 sm:px-4 py-2 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-mono font-bold text-xs rounded-xl cursor-pointer shadow-md transition-all shrink-0 flex items-center gap-1" id="btn-prompt-enter-action">
+              <span>Masuk</span>
               <span class="material-symbols-outlined text-[16px]">play_arrow</span>
             </button>
           </div>

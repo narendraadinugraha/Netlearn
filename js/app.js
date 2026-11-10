@@ -2961,44 +2961,45 @@ function renderMiniGame(container) {
   container.innerHTML = `
     <div class="max-w-6xl mx-auto space-y-4 w-full">
       <!-- Top Control Bar -->
-      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div class="flex items-center gap-3">
-          <button class="h-9 px-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-mono text-xs font-bold rounded-lg border border-slate-200 flex items-center gap-1.5 transition-colors cursor-pointer" id="btn-game-back-to-quizzes">
+      <div class="bg-white p-3 sm:p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
+        <div class="flex items-center gap-2.5 sm:gap-3">
+          <button class="h-9 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-mono text-xs font-bold rounded-lg border border-slate-200 flex items-center gap-1.5 transition-colors cursor-pointer shrink-0" id="btn-game-back-to-quizzes">
             <span class="material-symbols-outlined text-[17px]">arrow_back</span>
-            <span>${isId ? "Kembali ke Asesmen" : "Back to Assessments"}</span>
+            <span class="hidden sm:inline">${isId ? "Kembali ke Asesmen" : "Back to Assessments"}</span>
+            <span class="sm:hidden">${isId ? "Kembali" : "Back"}</span>
           </button>
-          <div>
-            <h1 class="text-base sm:text-lg font-bold text-slate-900 font-display flex items-center gap-2">
+          <div class="min-w-0">
+            <h1 class="text-sm sm:text-lg font-bold text-slate-900 font-display flex items-center gap-2 flex-wrap">
               <span>NetDrive 3D: Network Quest City</span>
-              <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold">METROPOLITAN QUEST</span>
+              <span class="px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-mono bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold">METROPOLITAN QUEST</span>
             </h1>
-            <p class="text-[11px] text-slate-500 font-mono">
+            <p class="text-[10px] sm:text-[11px] text-slate-500 font-mono line-clamp-1 sm:line-clamp-none">
               ${isId ? "Kendalikan kendaraan jaringan, antar paket data TCP/UDP ke server tujuan, kumpulkan token protokol, dan pecahkan kuis HOTS!" : "Drive your network vehicle, deliver TCP/UDP data packets, collect protocol tokens, and solve HOTS challenges across districts!"}
             </p>
           </div>
         </div>
 
         <!-- HUD Quick Stats & Actions -->
-        <div class="flex items-center gap-3 flex-wrap">
-          <div class="flex items-center gap-2 font-mono text-xs">
-            <div class="px-3 py-1.5 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold flex items-center gap-1.5">
-              <span class="material-symbols-outlined text-[16px]">stars</span>
+        <div class="flex items-center gap-2 sm:gap-3 flex-wrap">
+          <div class="flex items-center gap-1.5 sm:gap-2 font-mono text-[11px] sm:text-xs">
+            <div class="px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold flex items-center gap-1 sm:gap-1.5">
+              <span class="material-symbols-outlined text-[15px] sm:text-[16px]">stars</span>
               <span>Skor: <strong id="hud-game-score">0</strong></span>
             </div>
-            <div class="px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold flex items-center gap-1.5">
-              <span class="material-symbols-outlined text-[16px]">verified</span>
-              <span>Pos Tuntas: <strong id="hud-game-progress">0 / 6</strong></span>
+            <div class="px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold flex items-center gap-1 sm:gap-1.5">
+              <span class="material-symbols-outlined text-[15px] sm:text-[16px]">verified</span>
+              <span>Pos: <strong id="hud-game-progress">0 / 6</strong></span>
             </div>
-            <div class="px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 font-bold flex items-center gap-1.5">
-              <span class="material-symbols-outlined text-[16px]">local_shipping</span>
-              <span>Kurir Paket: <strong id="hud-courier-progress">0</strong></span>
+            <div class="px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 font-bold flex items-center gap-1 sm:gap-1.5">
+              <span class="material-symbols-outlined text-[15px] sm:text-[16px]">local_shipping</span>
+              <span>Kurir: <strong id="hud-courier-progress">0</strong></span>
             </div>
           </div>
 
           <!-- Car Model Selector -->
           <div class="flex items-center gap-1.5">
-            <label class="text-[11px] font-mono text-slate-500 font-bold">${isId ? "Mobil:" : "Car:"}</label>
-            <select id="select-game-car-model" class="h-8 px-2.5 rounded-lg bg-slate-50 border border-slate-200 font-mono text-xs text-slate-800 focus:outline-none focus:border-indigo-500 cursor-pointer font-bold">
+            <label class="text-[11px] font-mono text-slate-500 font-bold hidden sm:inline">${isId ? "Mobil:" : "Car:"}</label>
+            <select id="select-game-car-model" class="h-8 px-2 sm:px-2.5 rounded-lg bg-slate-50 border border-slate-200 font-mono text-xs text-slate-800 focus:outline-none focus:border-indigo-500 cursor-pointer font-bold max-w-[150px] sm:max-w-none">
               <option value="delivery">📦 Mobil Kurir Paket Data</option>
               <option value="race-future">🏎️ Cyber Future Supercar</option>
               <option value="sedan-sports">🏎️ Sports Sedan Turbo</option>
@@ -3012,7 +3013,7 @@ function renderMiniGame(container) {
             </select>
           </div>
 
-          <button class="h-8 px-2.5 bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 rounded-lg text-xs font-mono font-medium flex items-center gap-1 cursor-pointer transition-colors" id="btn-game-reset-pos" title="Kembalikan mobil ke titik awal (R)">
+          <button class="h-8 px-2 sm:px-2.5 bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 rounded-lg text-xs font-mono font-medium flex items-center gap-1 cursor-pointer transition-colors" id="btn-game-reset-pos" title="Kembalikan mobil ke titik awal (R)">
             <span class="material-symbols-outlined text-[15px]">restart_alt</span>
             <span>Reset (R)</span>
           </button>
@@ -3020,105 +3021,111 @@ function renderMiniGame(container) {
       </div>
 
       <!-- 3D Canvas Stage & Floating HUD (Responsive Viewport) -->
-      <div class="relative w-full rounded-2xl overflow-hidden border border-slate-300 shadow-md bg-slate-900 select-none h-[380px] sm:h-[480px] md:h-[600px]" id="netgame-viewport">
+      <div class="relative w-full rounded-2xl overflow-hidden border border-slate-300 shadow-md bg-slate-900 select-none h-[420px] sm:h-[500px] md:h-[620px]" id="netgame-viewport">
         <!-- Three.js Canvas Container -->
         <div id="netgame-canvas-mount" class="w-full h-full"></div>
 
         <!-- Floating Top-Left: Active Data Courier Mission HUD -->
-        <div id="netgame-courier-card" class="absolute top-4 left-4 bg-slate-900/90 backdrop-blur-md border border-amber-500/50 rounded-xl p-3 shadow-xl max-w-sm pointer-events-none flex items-center gap-3">
-          <div class="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/40 flex items-center justify-center shrink-0">
-            <span class="material-symbols-outlined text-[22px]">local_shipping</span>
+        <div id="netgame-courier-card" class="absolute top-3 left-3 sm:top-4 sm:left-4 bg-slate-900/90 backdrop-blur-md border border-amber-500/50 rounded-xl p-2 sm:p-2.5 shadow-xl max-w-[170px] sm:max-w-xs pointer-events-none flex items-center gap-2 sm:gap-2.5 z-10">
+          <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/40 flex items-center justify-center shrink-0">
+            <span class="material-symbols-outlined text-[18px] sm:text-[22px]">local_shipping</span>
           </div>
-          <div class="font-mono text-left">
-            <div class="flex items-center gap-2">
-              <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/30 text-amber-300 border border-amber-400/50 uppercase">KURIR DATA</span>
-              <span id="courier-target-type" class="text-[10px] text-cyan-300 font-bold">[TCP HTTPS:443]</span>
+          <div class="font-mono text-left min-w-0 flex-1">
+            <div class="flex items-center gap-1">
+              <span class="text-[8px] sm:text-[9px] font-bold px-1 py-0.5 rounded bg-amber-500/30 text-amber-300 border border-amber-400/50 uppercase leading-none">KURIR</span>
+              <span id="courier-target-type" class="text-[9px] sm:text-[10px] text-cyan-300 font-bold truncate">[TCP:443]</span>
             </div>
-            <div id="courier-target-name" class="text-xs font-bold text-white mt-0.5 truncate max-w-[210px]">Tujuan: Bank Sentral Siber</div>
-            <div class="flex items-center gap-3 text-[10px] text-slate-300 mt-0.5">
-              <span id="courier-target-dist">Jarak: -- m</span>
-              <span id="courier-ping" class="text-emerald-400 font-bold">Ping: 18 ms</span>
+            <div id="courier-target-name" class="text-[10px] sm:text-xs font-bold text-white mt-0.5 truncate">Tujuan: Bank Sentral</div>
+            <div class="flex items-center gap-2 text-[9px] text-slate-300 mt-0.5">
+              <span id="courier-target-dist">-- m</span>
+              <span id="courier-ping" class="text-emerald-400 font-bold">18 ms</span>
             </div>
           </div>
         </div>
 
         <!-- Floating Top-Center: Token Collection Toast Banner -->
-        <div id="netgame-token-toast" class="absolute top-4 left-1/2 -translate-x-1/2 bg-slate-900/95 backdrop-blur-md border border-emerald-500/60 text-white rounded-xl px-4 py-2 shadow-2xl flex items-center gap-2 font-mono text-xs pointer-events-none transition-all duration-300 opacity-0 -translate-y-2 z-30">
-          <span class="material-symbols-outlined text-emerald-400 text-[18px]">bolt</span>
+        <div id="netgame-token-toast" class="absolute top-3 sm:top-4 left-1/2 -translate-x-1/2 bg-slate-900/95 backdrop-blur-md border border-emerald-500/60 text-white rounded-xl px-3 py-1.5 sm:px-4 sm:py-2 shadow-2xl flex items-center gap-2 font-mono text-[10px] sm:text-xs pointer-events-none transition-all duration-300 opacity-0 -translate-y-2 z-30">
+          <span class="material-symbols-outlined text-emerald-400 text-[16px] sm:text-[18px]">bolt</span>
           <span id="netgame-token-text">+30 XP! Token Protokol Ditemukan</span>
         </div>
 
         <!-- Floating Top-Right: Minimap Radar -->
-        <div class="absolute top-4 right-4 bg-slate-900/85 backdrop-blur-md border border-sky-500/40 rounded-xl p-2.5 shadow-xl flex flex-col items-center pointer-events-none">
-          <div class="flex items-center justify-between w-full pb-1 border-b border-sky-500/20 text-[10px] font-mono text-sky-300 font-bold uppercase tracking-wider">
+        <div class="absolute top-3 right-3 sm:top-4 sm:right-4 bg-slate-900/85 backdrop-blur-md border border-sky-500/40 rounded-xl p-2 sm:p-2.5 shadow-xl flex flex-col items-center pointer-events-none z-10">
+          <div class="flex items-center justify-between w-full pb-1 border-b border-sky-500/20 text-[9px] sm:text-[10px] font-mono text-sky-300 font-bold uppercase tracking-wider">
             <span>Radar Kota 3D</span>
             <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
           </div>
-          <canvas id="netgame-radar-canvas" width="110" height="110" class="mt-1"></canvas>
-          <div class="flex items-center gap-2 pt-1 text-[9px] font-mono text-slate-300">
+          <canvas id="netgame-radar-canvas" width="95" height="95" class="mt-1"></canvas>
+          <div class="flex items-center gap-2 pt-1 text-[8.5px] sm:text-[9px] font-mono text-slate-300">
             <span class="flex items-center gap-0.5"><span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> Pos</span>
             <span class="flex items-center gap-0.5"><span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span> Kurir</span>
             <span class="flex items-center gap-0.5"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Tuntas</span>
           </div>
         </div>
 
-        <!-- Floating Bottom-Right: Speedometer, Nitro & Controls Hint -->
-        <div class="absolute bottom-4 right-4 bg-slate-900/85 backdrop-blur-md border border-slate-700/80 rounded-xl p-3 shadow-xl text-right pointer-events-none space-y-1.5 min-w-[210px]">
-          <div class="flex items-center justify-between">
-            <div class="text-[10px] font-mono text-slate-400 uppercase tracking-wider text-left">Kecepatan</div>
-            <div class="text-2xl font-black font-mono text-emerald-400" id="netgame-speed-gauge">0 km/h</div>
-          </div>
+        <!-- Floating Center Bottom: Speedometer, Nitro & Desktop Controls Hint -->
+        <div class="absolute bottom-3 sm:bottom-4 left-1/2 -translate-x-1/2 bg-slate-900/85 backdrop-blur-md border border-slate-700/80 rounded-2xl px-3 py-2 sm:px-4 sm:py-2.5 shadow-2xl text-center pointer-events-none z-10 min-w-[130px] sm:min-w-[210px]">
+          <div class="text-[9px] font-mono text-slate-400 uppercase tracking-wider">Kecepatan</div>
+          <div class="text-xl sm:text-2xl font-black font-mono text-emerald-400 leading-tight" id="netgame-speed-gauge">0 km/h</div>
           
           <!-- Nitro Gauge -->
-          <div class="space-y-0.5">
-            <div class="flex items-center justify-between text-[9px] font-mono text-slate-400">
-              <span class="flex items-center gap-1 text-cyan-300"><span class="material-symbols-outlined text-[13px]">bolt</span> NITRO BOOST</span>
+          <div class="mt-1 space-y-0.5">
+            <div class="flex items-center justify-between text-[8px] font-mono text-slate-300">
+              <span class="flex items-center gap-0.5 text-cyan-300"><span class="material-symbols-outlined text-[11px]">bolt</span> NITRO</span>
               <span id="netgame-nitro-text" class="text-cyan-300 font-bold">100%</span>
             </div>
-            <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+            <div class="w-24 sm:w-36 h-1.5 bg-slate-800 rounded-full overflow-hidden border border-slate-700 mx-auto">
               <div id="netgame-nitro-bar" class="h-full bg-gradient-to-r from-cyan-400 to-indigo-500 rounded-full transition-all duration-75" style="width: 100%;"></div>
             </div>
           </div>
 
-          <div class="pt-1 border-t border-slate-800 text-[9.5px] font-mono text-slate-300 space-y-0.5 text-left">
-            <div><strong class="text-indigo-400">W/↑</strong> Gas &bull; <strong class="text-indigo-400">S/↓</strong> Rem/Mundur &bull; <strong class="text-cyan-400">Shift</strong> Nitro</div>
-            <div><strong class="text-indigo-400">A/D</strong> Belok &bull; <strong class="text-indigo-400">Spasi</strong> Drift &bull; <strong class="text-indigo-400">E</strong> Interaksi</div>
+          <div class="hidden sm:block pt-1.5 mt-1 border-t border-slate-800 text-[9.5px] font-mono text-slate-300 space-y-0.5 text-left">
+            <div><strong class="text-indigo-400">W/↑</strong> Gas &bull; <strong class="text-indigo-400">S/↓</strong> Mundur &bull; <strong class="text-cyan-400">Shift</strong> Nitro</div>
+            <div><strong class="text-indigo-400">A/D</strong> Belok &bull; <strong class="text-indigo-400">Spasi</strong> Rem &bull; <strong class="text-indigo-400">E</strong> Interaksi</div>
           </div>
         </div>
 
-        <!-- Floating Bottom-Left: On-Screen Touch Controls (Mobile / Tablet / Mouse) -->
-        <div class="absolute bottom-4 left-4 flex items-end gap-2.5 pointer-events-auto">
-          <!-- Steering Buttons -->
-          <div class="grid grid-cols-2 gap-1.5">
-            <button class="w-11 h-11 rounded-xl bg-slate-900/80 hover:bg-slate-800 active:bg-indigo-600 text-white border border-slate-700 flex items-center justify-center font-bold text-sm shadow cursor-pointer transition-all" id="btn-touch-left">
-              <span class="material-symbols-outlined">arrow_back</span>
-            </button>
-            <button class="w-11 h-11 rounded-xl bg-slate-900/80 hover:bg-slate-800 active:bg-indigo-600 text-white border border-slate-700 flex items-center justify-center font-bold text-sm shadow cursor-pointer transition-all" id="btn-touch-right">
-              <span class="material-symbols-outlined">arrow_forward</span>
-            </button>
-          </div>
+        <!-- Floating Bottom-Left: On-Screen Touch Controls (Kiri & Kanan - Left Hand Steering) -->
+        <div class="absolute bottom-3 left-3 sm:bottom-4 sm:left-4 z-20 flex items-center gap-2 pointer-events-auto select-none touch-none">
+          <button class="w-[52px] h-[52px] sm:w-[58px] sm:h-[58px] rounded-2xl bg-slate-900/90 active:bg-indigo-600 active:scale-95 text-white border border-slate-700/80 shadow-lg flex flex-col items-center justify-center cursor-pointer transition-all touch-none select-none" id="btn-touch-left" title="Belok Kiri (A / ←)">
+            <span class="material-symbols-outlined text-[24px]">arrow_back</span>
+            <span class="text-[9px] font-mono font-bold text-slate-300 tracking-wider">KIRI</span>
+          </button>
+          <button class="w-[52px] h-[52px] sm:w-[58px] sm:h-[58px] rounded-2xl bg-slate-900/90 active:bg-indigo-600 active:scale-95 text-white border border-slate-700/80 shadow-lg flex flex-col items-center justify-center cursor-pointer transition-all touch-none select-none" id="btn-touch-right" title="Belok Kanan (D / →)">
+            <span class="material-symbols-outlined text-[24px]">arrow_forward</span>
+            <span class="text-[9px] font-mono font-bold text-slate-300 tracking-wider">KANAN</span>
+          </button>
+        </div>
 
-          <!-- Gas / Brake / Nitro Buttons -->
+        <!-- Floating Bottom-Right: On-Screen Touch Controls (Maju, Mundur, Rem, Nitro - Right Hand Drive) -->
+        <div class="absolute bottom-3 right-3 sm:bottom-4 sm:right-4 z-20 flex items-end gap-2 pointer-events-auto select-none touch-none">
+          <!-- Auxiliary: Nitro & Rem -->
           <div class="flex flex-col gap-1.5">
-            <div class="flex items-center gap-1.5">
-              <button class="w-12 h-11 rounded-xl bg-emerald-600/90 hover:bg-emerald-500 active:bg-emerald-400 text-white border border-emerald-400 font-mono text-xs font-bold flex items-center justify-center gap-1 shadow cursor-pointer transition-all" id="btn-touch-gas">
-                <span class="material-symbols-outlined text-[18px]">keyboard_arrow_up</span>
-                <span>GAS</span>
-              </button>
-              <button class="w-12 h-11 rounded-xl bg-cyan-600/90 hover:bg-cyan-500 active:bg-cyan-400 text-white border border-cyan-400 font-mono text-[10px] font-bold flex items-center justify-center gap-0.5 shadow cursor-pointer transition-all" id="btn-touch-nitro">
-                <span class="material-symbols-outlined text-[14px]">bolt</span>
-                <span>NITRO</span>
-              </button>
-            </div>
-            <button class="w-full h-8 rounded-xl bg-rose-600/90 hover:bg-rose-500 active:bg-rose-400 text-white border border-rose-400 font-mono text-xs font-bold flex items-center justify-center gap-1 shadow cursor-pointer transition-all" id="btn-touch-brake">
-              <span class="material-symbols-outlined text-[15px]">pause</span>
+            <button class="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-cyan-600/90 active:bg-cyan-400 active:scale-95 text-white border border-cyan-400/80 font-mono text-[9px] font-bold flex flex-col items-center justify-center gap-0.5 shadow-md cursor-pointer transition-all touch-none select-none" id="btn-touch-nitro" title="Nitro Boost (Shift)">
+              <span class="material-symbols-outlined text-[16px]">bolt</span>
+              <span>NITRO</span>
+            </button>
+            <button class="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-rose-600/90 active:bg-rose-400 active:scale-95 text-white border border-rose-400/80 font-mono text-[9px] font-bold flex flex-col items-center justify-center gap-0.5 shadow-md cursor-pointer transition-all touch-none select-none" id="btn-touch-brake" title="Rem / Drift (Spasi)">
+              <span class="material-symbols-outlined text-[16px]">front_hand</span>
               <span>REM</span>
             </button>
           </div>
+
+          <!-- Main Pedals: Gas (Maju) & Mundur (Reverse) -->
+          <div class="flex flex-col gap-1.5">
+            <button class="w-[52px] h-[52px] sm:w-[58px] sm:h-[58px] rounded-2xl bg-emerald-600/90 active:bg-emerald-400 active:scale-95 text-white border border-emerald-400/80 font-mono text-[10px] font-bold flex flex-col items-center justify-center gap-0.5 shadow-lg cursor-pointer transition-all touch-none select-none" id="btn-touch-gas" title="Maju / Gas (W / ↑)">
+              <span class="material-symbols-outlined text-[24px]">keyboard_arrow_up</span>
+              <span>MAJU</span>
+            </button>
+            <button class="w-[52px] h-[52px] sm:w-[58px] sm:h-[58px] rounded-2xl bg-amber-600/90 active:bg-amber-400 active:scale-95 text-white border border-amber-400/80 font-mono text-[10px] font-bold flex flex-col items-center justify-center gap-0.5 shadow-lg cursor-pointer transition-all touch-none select-none" id="btn-touch-reverse" title="Mundur / Reverse (S / ↓)">
+              <span class="material-symbols-outlined text-[24px]">keyboard_arrow_down</span>
+              <span>MUNDUR</span>
+            </button>
+          </div>
         </div>
 
-        <!-- Floating Center Bottom: Proximity Prompt -->
-        <div id="netgame-prompt-container" class="hidden absolute bottom-5 left-1/2 -translate-x-1/2 z-20 pointer-events-auto">
+        <!-- Floating Center Above Dashboard: Proximity Prompt -->
+        <div id="netgame-prompt-container" class="hidden absolute bottom-24 sm:bottom-28 left-1/2 -translate-x-1/2 z-30 pointer-events-auto">
         </div>
 
         <!-- Floating Boundary Warning Notification -->
@@ -3198,15 +3205,26 @@ function renderMiniGame(container) {
   const bindTouch = (id, code) => {
     const el = document.getElementById(id);
     if (!el) return;
-    el.addEventListener("mousedown", () => simulateKey(code, true));
-    el.addEventListener("mouseup", () => simulateKey(code, false));
-    el.addEventListener("touchstart", (e) => { e.preventDefault(); simulateKey(code, true); }, { passive: false });
-    el.addEventListener("touchend", (e) => { e.preventDefault(); simulateKey(code, false); }, { passive: false });
+    const startHandler = (e) => {
+      if (e.cancelable && e.type && e.type.startsWith("touch")) e.preventDefault();
+      simulateKey(code, true);
+    };
+    const endHandler = (e) => {
+      if (e.cancelable && e.type && e.type.startsWith("touch")) e.preventDefault();
+      simulateKey(code, false);
+    };
+    el.addEventListener("mousedown", startHandler);
+    el.addEventListener("mouseup", endHandler);
+    el.addEventListener("mouseleave", endHandler);
+    el.addEventListener("touchstart", startHandler, { passive: false });
+    el.addEventListener("touchend", endHandler, { passive: false });
+    el.addEventListener("touchcancel", endHandler, { passive: false });
   };
 
   bindTouch("btn-touch-left", "KeyA");
   bindTouch("btn-touch-right", "KeyD");
   bindTouch("btn-touch-gas", "KeyW");
+  bindTouch("btn-touch-reverse", "KeyS");
   bindTouch("btn-touch-brake", "Space");
   bindTouch("btn-touch-nitro", "ShiftLeft");
 
