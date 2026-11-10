@@ -120,9 +120,6 @@
 </head>
 <body class="bg-surface font-sans text-on-surface antialiased min-h-screen flex flex-col relative selection:bg-primary/20 selection:text-primary">
 
-  <!-- Mobile Overlay Backdrop -->
-  <div id="sidebar-backdrop" class="sidebar-backdrop" aria-hidden="true"></div>
-
   <!-- Standalone Dedicated Authentication Screen (Completely Separated from App Framework) -->
   <div id="auth-screen" class="min-h-screen w-full flex items-center justify-center bg-surface p-4 sm:p-6 lg:p-8 relative z-20" style="display: none;">
     <!-- Rendered dynamically by renderAuth() -->
@@ -227,8 +224,11 @@
       </div>
     </header>
 
+    <!-- Mobile Overlay Backdrop (Inside app-root to share identical stacking context) -->
+    <div id="sidebar-backdrop" class="sidebar-backdrop" aria-hidden="true"></div>
+
     <!-- Mobile Slide-out Drawer (Visible on screens below lg) -->
-    <aside id="app-sidebar" class="fixed left-0 top-0 h-full w-64 bg-surface-container-lowest z-50 flex flex-col justify-between border-r border-outline-variant -translate-x-full transition-transform duration-200 lg:hidden">
+    <aside id="app-sidebar" class="fixed left-0 top-0 h-full w-72 max-w-[85vw] bg-surface-container-lowest z-[60] flex flex-col justify-between border-r border-outline-variant shadow-2xl lg:hidden">
       <div class="flex flex-col flex-1 overflow-y-auto">
         <div class="h-16 px-4 flex items-center justify-between border-b border-outline-variant shrink-0">
           <div class="flex items-center gap-2">
