@@ -1,7 +1,7 @@
 // NetQuest - Cisco Packet Tracer Style Interactive Virtual Network Lab
-// Complete Drag-and-Drop Canvas, Device Palette, Interactive Wiring,
+// Complete Drag-and-Drop Canvas, Device Palette, Interactive Wiring Modal,
 // In-depth Device Inspector (PC Desktop IP Config / Command Prompt / Web Browser, Cisco IOS CLI),
-// Dynamic Pathfinding & Packet Tracer Simulation with OSI 7-Layer PDU Dissector!
+// Dynamic Pathfinding & Packet Tracer Simulation with OSI 7-Layer PDU Dissector & Fullscreen Support!
 
 import { sound } from "./gamification.js";
 
@@ -18,51 +18,52 @@ export function renderUnifiedWorkbench(container) {
   // Application State
   // --------------------------------------------------------------------------
   const state = {
-    mode: "simulation", // "realtime" | "simulation"
+    mode: "realtime", // "realtime" | "simulation"
     simState: "idle", // "idle" | "playing" | "paused" | "finished"
     currentStepIndex: 0,
     playbackSpeed: 1,
 
     // Active tool: "select" | "cable-straight" | "cable-cross" | "delete" | "pdu"
     activeTool: "select",
-    cablePending: null, // { fromNodeId, fromPort }
+    cablePending: null, // { fromNodeId, fromPort, cableType }
     pduPendingSource: null, // nodeId
 
-    selectedDeviceId: null,
+    selectedDeviceId: "pc0",
     deviceModalOpen: false,
     deviceActiveTab: "desktop", // "desktop" | "config" | "cli" | "physical"
     activeDesktopApp: "ipconfig", // "ipconfig" | "cmd" | "browser"
     pduModalOpen: false,
     activePduStep: null,
 
-    // Port selection popover state
-    portModal: null, // { nodeId, portList, x, y, isTarget, fromNodeId, fromPort, cableType }
+    // Port selection modal state
+    portModal: null,
 
-    // Last PDU Transaction status (Cisco Packet Tracer Bottom-Right Status Bar)
+    // Last PDU Transaction status
     lastPduResult: {
       status: "Successful",
       source: "PC0",
       target: "Server0",
       type: "ICMP",
       time: "0.82 ms",
-      message: "Ping berhasil! Paket diterima dan dibalas (4 sent, 4 received, 0% loss)."
+      message: "Ping sukses! Koneksi end-to-end normal (4 sent, 4 received, 0% loss)."
     },
 
     // Dynamic Nodes & Links
     nodes: {},
     links: [],
 
-    // CLI History & Shell State per device
+    // CLI History & Context per device
     cliHistory: {},
-    cliState: {}, // Stores CLI context per device (e.g. { mode: 'user'|'priv'|'config'|'if', iface: '' })
+    cliState: {},
 
-    // Dynamic Simulation Steps for active PDU run
-    simulationSteps: []
+    // Dynamic Simulation Steps
+    simulationSteps: [],
+
+    // Pointer cursor coordinates for cable rubberband
+    pointerPos: { x: 0, y: 0, active: false }
   };
 
   let simInterval = null;
-  let animFrameId = null;
-  let nextIdCounter = 1;
 
   // --------------------------------------------------------------------------
   // Device Hardware Specifications
@@ -148,7 +149,7 @@ export function renderUnifiedWorkbench(container) {
   };
 
   // --------------------------------------------------------------------------
-  // Template Initializers
+  // Pre-configured Topologies
   // --------------------------------------------------------------------------
   function loadStandardTemplate() {
     state.nodes = {
@@ -165,8 +166,8 @@ export function renderUnifiedWorkbench(container) {
         dns: "8.8.8.8",
         mac: "00:AA:11:22:33:01",
         poweredOn: true,
-        x: 90,
-        y: 160
+        x: 95,
+        y: 170
       },
       sw0: {
         id: "sw0",
@@ -181,8 +182,8 @@ export function renderUnifiedWorkbench(container) {
         dns: "8.8.8.8",
         mac: "00:SW:99:88:77:01",
         poweredOn: true,
-        x: 270,
-        y: 160
+        x: 285,
+        y: 170
       },
       rt0: {
         id: "rt0",
@@ -191,15 +192,15 @@ export function renderUnifiedWorkbench(container) {
         model: DEVICE_TYPES.router.model,
         icon: DEVICE_TYPES.router.icon,
         ports: [...DEVICE_TYPES.router.ports],
-        ip: "192.168.1.1", // Gi0/0/0
-        ip2: "10.10.20.1", // Gi0/0/1
+        ip: "192.168.1.1",
+        ip2: "10.10.20.1",
         mask: "255.255.255.0",
         gateway: "0.0.0.0",
         dns: "8.8.8.8",
         mac: "00:RT:55:44:33:01",
         poweredOn: true,
-        x: 450,
-        y: 160
+        x: 475,
+        y: 170
       },
       srv0: {
         id: "srv0",
@@ -214,8 +215,8 @@ export function renderUnifiedWorkbench(container) {
         dns: "8.8.8.8",
         mac: "00:BB:44:55:66:02",
         poweredOn: true,
-        x: 630,
-        y: 160
+        x: 665,
+        y: 170
       }
     };
 
@@ -241,14 +242,15 @@ export function renderUnifiedWorkbench(container) {
       {
         id: "link-3",
         fromNode: "rt0",
-        toNode: "srv0",
         fromPort: "GigabitEthernet0/0/1",
+        toNode: "srv0",
         toPort: "FastEthernet0",
         cableType: "straight",
         status: "up"
       }
     ];
 
+    state.selectedDeviceId = "pc0";
     initCliHistories();
     runPduPathfinding("pc0", "srv0", false);
   }
@@ -268,7 +270,7 @@ export function renderUnifiedWorkbench(container) {
         dns: "8.8.8.8",
         mac: "00:AA:11:22:33:01",
         poweredOn: true,
-        x: 180,
+        x: 200,
         y: 170
       },
       pc1: {
@@ -284,7 +286,7 @@ export function renderUnifiedWorkbench(container) {
         dns: "8.8.8.8",
         mac: "00:AA:11:22:33:02",
         poweredOn: true,
-        x: 520,
+        x: 540,
         y: 170
       }
     };
@@ -301,6 +303,7 @@ export function renderUnifiedWorkbench(container) {
       }
     ];
 
+    state.selectedDeviceId = "pc0";
     initCliHistories();
     runPduPathfinding("pc0", "pc1", false);
   }
@@ -320,7 +323,7 @@ export function renderUnifiedWorkbench(container) {
         dns: "8.8.8.8",
         mac: "00:SW:99:88:77:01",
         poweredOn: true,
-        x: 360,
+        x: 380,
         y: 170
       },
       pc0: {
@@ -336,8 +339,8 @@ export function renderUnifiedWorkbench(container) {
         dns: "8.8.8.8",
         mac: "00:AA:11:22:33:01",
         poweredOn: true,
-        x: 140,
-        y: 80
+        x: 150,
+        y: 90
       },
       pc1: {
         id: "pc1",
@@ -352,8 +355,8 @@ export function renderUnifiedWorkbench(container) {
         dns: "8.8.8.8",
         mac: "00:AA:11:22:33:02",
         poweredOn: true,
-        x: 140,
-        y: 260
+        x: 150,
+        y: 250
       },
       srv0: {
         id: "srv0",
@@ -368,7 +371,7 @@ export function renderUnifiedWorkbench(container) {
         dns: "8.8.8.8",
         mac: "00:BB:44:55:66:01",
         poweredOn: true,
-        x: 580,
+        x: 610,
         y: 170
       }
     };
@@ -403,6 +406,7 @@ export function renderUnifiedWorkbench(container) {
       }
     ];
 
+    state.selectedDeviceId = "pc0";
     initCliHistories();
     runPduPathfinding("pc0", "srv0", false);
   }
@@ -412,13 +416,15 @@ export function renderUnifiedWorkbench(container) {
     state.links = [];
     state.simulationSteps = [];
     state.selectedDeviceId = null;
+    state.cablePending = null;
+    state.pduPendingSource = null;
     state.lastPduResult = {
       status: "Idle",
       source: "-",
       target: "-",
       type: "-",
       time: "-",
-      message: "Kanvas kosong. Tarik atau tambahkan perangkat dari panel bawah untuk memulai simulasi."
+      message: "Kanvas kosong. Tambahkan perangkat dari panel bawah lalu hubungkan kabel untuk mulai berpraktik."
     };
   }
 
@@ -431,7 +437,7 @@ export function renderUnifiedWorkbench(container) {
             "Microsoft Windows [Version 10.0.19045.3803]",
             "(c) Cisco Packet Tracer Emulation Suite. All rights reserved.",
             "",
-            `C:\\> rem Perangkat: ${dev.name} (${dev.model})`,
+            `C:\\> rem Perangkat Aktif: ${dev.name} (${dev.model})`,
             "C:\\> ipconfig",
             `   IPv4 Address. . . . . . . . . . . : ${dev.ip}`,
             `   Subnet Mask . . . . . . . . . . . : ${dev.mask}`,
@@ -452,8 +458,8 @@ export function renderUnifiedWorkbench(container) {
           ];
         } else if (dev.type === "switch") {
           state.cliHistory[id] = [
-            `Cisco IOS Software, C2960 Software (C2960-LANBASEK9-M), Version 15.0(2)SE4`,
-            `Technical Support: http://www.cisco.com/techsupport`,
+            "Cisco IOS Software, C2960 Software (C2960-LANBASEK9-M), Version 15.0(2)SE4",
+            "Technical Support: http://www.cisco.com/techsupport",
             "",
             "Switch> enable",
             "Switch# show mac address-table",
@@ -470,8 +476,8 @@ export function renderUnifiedWorkbench(container) {
           state.cliState[id] = { mode: "priv", iface: "" };
         } else if (dev.type === "router") {
           state.cliHistory[id] = [
-            `Cisco IOS Software, 2900 Software (C2900-UNIVERSALK9-M), Version 15.1(4)M4`,
-            `Technical Support: http://www.cisco.com/techsupport`,
+            "Cisco IOS Software, 2900 Software (C2900-UNIVERSALK9-M), Version 15.1(4)M4",
+            "Technical Support: http://www.cisco.com/techsupport",
             "",
             "Router> enable",
             "Router# show ip interface brief",
@@ -481,8 +487,8 @@ export function renderUnifiedWorkbench(container) {
             "",
             "Router# show ip route",
             "Codes: C - connected, S - static, R - RIP",
-            `C    192.168.1.0/24 is directly connected, GigabitEthernet0/0/0`,
-            `C    10.10.20.0/24 is directly connected, GigabitEthernet0/0/1`,
+            "C    192.168.1.0/24 is directly connected, GigabitEthernet0/0/0",
+            "C    10.10.20.0/24 is directly connected, GigabitEthernet0/0/1",
             "",
             "Router# _"
           ];
@@ -493,7 +499,7 @@ export function renderUnifiedWorkbench(container) {
   }
 
   // --------------------------------------------------------------------------
-  // Dynamic Network Pathfinding & Simulation Step Generator
+  // Network Pathfinding & Simulation Engine
   // --------------------------------------------------------------------------
   function findPathBetween(srcId, dstId) {
     if (srcId === dstId) return [srcId];
@@ -506,7 +512,6 @@ export function renderUnifiedWorkbench(container) {
 
       if (curr === dstId) return path;
 
-      // Find all neighbors connected via links
       const neighbors = [];
       state.links.forEach(l => {
         if (l.fromNode === curr && !visited.has(l.toNode)) {
@@ -555,7 +560,7 @@ export function renderUnifiedWorkbench(container) {
         target: dst.name,
         type: "ICMP",
         time: "0.00 ms",
-        message: `Gagal: Perangkat sumber (${src.name}) dalam kondisi daya mati (Power OFF).`
+        message: `Gagal: Perangkat sumber (${src.name}) dalam kondisi mati (Power OFF). Nyalakan daya di Device Inspector.`
       };
       if (triggerSound) sound.error();
       return;
@@ -568,7 +573,7 @@ export function renderUnifiedWorkbench(container) {
         target: dst.name,
         type: "ICMP",
         time: "0.00 ms",
-        message: `Gagal: Perangkat tujuan (${dst.name}) dalam kondisi daya mati (Power OFF).`
+        message: `Gagal: Perangkat tujuan (${dst.name}) dalam kondisi mati (Power OFF). Nyalakan daya di Device Inspector.`
       };
       if (triggerSound) sound.error();
       return;
@@ -585,11 +590,10 @@ export function renderUnifiedWorkbench(container) {
         message: `Gagal: Tidak ada jalur kabel fisik yang menghubungkan ${src.name} dengan ${dst.name}.`
       };
       if (triggerSound) sound.error();
-      generateFailedSteps(src, dst, "Kabel Terputus / Tidak Terhubung");
+      generateFailedSteps(src, dst, "Kabel Terputus / Belum Dihubungkan");
       return;
     }
 
-    // Check subnet compatibility
     const sameSub = isSameSubnet(src.ip, dst.ip, src.mask);
     const hasRouter = path.some(nid => state.nodes[nid]?.type === "router");
 
@@ -600,14 +604,13 @@ export function renderUnifiedWorkbench(container) {
         target: dst.name,
         type: "ICMP",
         time: "0.00 ms",
-        message: `Gagal: ${src.name} (${src.ip}) dan ${dst.name} (${dst.ip}) berada di subnet berbeda tanpa Router.`
+        message: `Gagal: ${src.name} (${src.ip}) dan ${dst.name} (${dst.ip}) berbeda subnet tanpa Router.`
       };
       if (triggerSound) sound.error();
       generateFailedSteps(src, dst, "Destination Host Unreachable (Beda Subnet & Tiada Router)");
       return;
     }
 
-    // Check gateway if routing needed
     if (!sameSub && hasRouter) {
       const routerNode = state.nodes[path.find(nid => state.nodes[nid]?.type === "router")];
       if (src.gateway !== routerNode.ip && src.gateway !== routerNode.ip2) {
@@ -617,7 +620,7 @@ export function renderUnifiedWorkbench(container) {
           target: dst.name,
           type: "ICMP",
           time: "0.00 ms",
-          message: `Gagal: Default Gateway pada ${src.name} (${src.gateway}) tidak cocok dengan IP Router.`
+          message: `Gagal: Default Gateway pada ${src.name} (${src.gateway}) tidak mengarah ke IP Router.`
         };
         if (triggerSound) sound.error();
         generateFailedSteps(src, dst, "Default Gateway Mismatch / Routing Error");
@@ -630,7 +633,6 @@ export function renderUnifiedWorkbench(container) {
     let stepNum = 1;
     let t = 0.0;
 
-    // Phase 1: ARP Broadcast (if same subnet or ARP to Gateway)
     const firstHop = state.nodes[path[1]];
     steps.push({
       step: stepNum++,
@@ -649,7 +651,7 @@ export function renderUnifiedWorkbench(container) {
         l2: `Ethernet II: Src MAC ${src.mac} -> Dst MAC FF:FF:FF:FF:FF:FF (Broadcast)`,
         l1: "Physical: Tx Frame to copper cable"
       },
-      explanation: `${src.name} ingin mengirim paket ke ${sameSub ? dst.name : 'Gateway'}, namun belum mengetahui alamat MAC fisik tujuannya. Dibuat ARP Request broadcast.`
+      explanation: `${src.name} ingin mengirim paket ke ${sameSub ? dst.name : 'Gateway'}, namun belum mengetahui MAC address fisiknya. Dibuat paket ARP Request broadcast.`
     });
 
     t += 0.004;
@@ -661,7 +663,7 @@ export function renderUnifiedWorkbench(container) {
       targetDevice: firstHop.name,
       type: "ARP",
       color: "#06b6d4",
-      info: `${firstHop.name} menerima ARP frame, memperbarui tabel MAC, dan membalas ARP Reply unicast`,
+      info: `${firstHop.name} menerima ARP frame, mencatat MAC, dan membalas ARP Reply unicast`,
       pduLayer: 2,
       osiInfo: {
         l7: "Application: N/A",
@@ -670,10 +672,10 @@ export function renderUnifiedWorkbench(container) {
         l2: `Ethernet II: Src MAC ${firstHop.mac} -> Dst MAC ${src.mac}`,
         l1: "Physical: FastEthernet / Gigabit Rx/Tx"
       },
-      explanation: `${firstHop.name} mencatat port asal frame dan membalas alamat MAC unicast ke ${src.name}.`
+      explanation: `${firstHop.name} mencatat port frame dan membalas alamat MAC unicast ke ${src.name}.`
     });
 
-    // Phase 2: Forward Path (ICMP Echo Request)
+    // Forward Path (Echo Request)
     for (let i = 0; i < path.length - 1; i++) {
       t += 0.008;
       const curr = state.nodes[path[i]];
@@ -689,7 +691,7 @@ export function renderUnifiedWorkbench(container) {
         type: "ICMP",
         color: "#f59e0b",
         info: isRouter
-          ? `Router memproses tabel rute (Routing Table Lookup) -> Dekremen TTL=127 -> Kirim ke ${next.name}`
+          ? `Router mencari tabel rute -> Dekremen TTL=127 -> Meneruskan ke ${next.name}`
           : `ICMP Echo Request (Type 8): Src ${src.ip} -> Dst ${dst.ip} (TTL=128)`,
         pduLayer: 3,
         osiInfo: {
@@ -697,13 +699,13 @@ export function renderUnifiedWorkbench(container) {
           l4: "Transport: ICMP Control Message (Type 8 Echo Request)",
           l3: `Network: IPv4 Header (Src: ${src.ip}, Dst: ${dst.ip}, Protocol: 1 ICMP, TTL: ${isRouter ? 127 : 128})`,
           l2: `Ethernet II: Src MAC ${curr.mac} -> Dst MAC ${next.mac}`,
-          l1: "Physical: Transmission via Copper Interface"
+          l1: "Physical: Copper Interface Transmission"
         },
-        explanation: `${curr.name} meneruskan paket ICMP Echo Request menuju ${next.name} sepanjang kabel yang terpasang.`
+        explanation: `${curr.name} meneruskan paket ICMP Echo Request ke hop berikutnya (${next.name}).`
       });
     }
 
-    // Phase 3: Destination Processing & Echo Reply Generation
+    // Destination Echo Reply
     t += 0.006;
     steps.push({
       step: stepNum++,
@@ -713,7 +715,7 @@ export function renderUnifiedWorkbench(container) {
       targetDevice: dst.name,
       type: "ICMP",
       color: "#10b981",
-      info: `${dst.name} menerima Echo Request dan membangkitkan balasan ICMP Echo Reply (Type 0, Code 0)`,
+      info: `${dst.name} menerima Echo Request dan membalas dengan ICMP Echo Reply (Type 0, Code 0)`,
       pduLayer: 4,
       osiInfo: {
         l7: "Application: ICMP Daemon / Web Stack",
@@ -722,10 +724,10 @@ export function renderUnifiedWorkbench(container) {
         l2: `Ethernet II: Src MAC ${dst.mac} -> Dst MAC ${src.mac}`,
         l1: "Physical: Rx / Tx Packet Frame"
       },
-      explanation: `Target ${dst.name} sukses memproses paket ping dan segera membalas kembali ke ${src.name}.`
+      explanation: `Target ${dst.name} memproses paket ping dan segera membalas kembali ke ${src.name}.`
     });
 
-    // Phase 4: Reverse Return Path (Echo Reply return)
+    // Return Path
     for (let i = path.length - 1; i > 0; i--) {
       t += 0.008;
       const curr = state.nodes[path[i]];
@@ -744,15 +746,15 @@ export function renderUnifiedWorkbench(container) {
           : `Meneruskan balasan Echo Reply: dari ${curr.name} ke ${prev.name}`,
         pduLayer: prev.id === src.id ? 7 : 3,
         osiInfo: {
-          l7: prev.id === src.id ? "Application: Ping Finished: 4 sent, 4 received (100% SUCCESS)" : "Application: Transit",
+          l7: prev.id === src.id ? "Application: Ping Selesai: 4 terkirim, 4 diterima (100% SUKSES)" : "Application: Transit",
           l4: "Transport: ICMP Reply Completed",
           l3: `Network: IPv4 Header (Src: ${dst.ip}, Dst: ${src.ip}, TTL: 63)`,
-          l2: `Ethernet II: Frame Accepted at ${prev.name}`,
+          l2: `Ethernet II: Frame Diterima di ${prev.name}`,
           l1: "Physical: FastEthernet / Gigabit Rx"
         },
         explanation: prev.id === src.id
-          ? `Laptop/PC Siswa (${src.name}) telah menerima paket Echo Reply lengkap. Pengujian konektivitas Cisco PDU terbukti BERHASIL 100%! 🎉`
-          : `Paket balasan bergerak mundur melalui ${prev.name}.`
+          ? `${src.name} telah menerima balasan paket ping secara lengkap. Transmisi PDU BERHASIL 100%! 🎉`
+          : `Paket balasan bergerak mundur menuju sumber melalui ${prev.name}.`
       });
     }
 
@@ -766,6 +768,7 @@ export function renderUnifiedWorkbench(container) {
       time: "0.82 ms",
       message: `Ping Sukses! ${src.name} <-> ${dst.name} terhubung normal melalui ${path.length - 1} hop kabel.`
     };
+
     if (triggerSound) sound.success();
   }
 
@@ -798,10 +801,12 @@ export function renderUnifiedWorkbench(container) {
   // Main Render Routine
   // --------------------------------------------------------------------------
   function render() {
+    const selectedDev = state.nodes[state.selectedDeviceId];
+
     container.innerHTML = `
       <div class="space-y-4">
         
-        <!-- Cisco Packet Tracer Style Top Control Bar -->
+        <!-- Cisco Packet Tracer Style Top Control Toolbar -->
         <div class="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-2.5 sm:gap-3">
           
           <!-- Mode Selector & Simulation Playback -->
@@ -812,18 +817,24 @@ export function renderUnifiedWorkbench(container) {
                 ⚡ Realtime
               </button>
               <button id="btn-mode-simulation" class="px-2.5 sm:px-3 py-1 sm:py-1.5 text-[11px] sm:text-xs font-mono font-bold rounded-lg transition-all cursor-pointer ${state.mode === 'simulation' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}">
-                ⏱️ Simulasi (Step-by-Step)
+                ⏱️ Simulasi (Step)
               </button>
             </div>
 
-            <!-- Simulation Controls -->
+            <!-- Fast Action: Realtime Ping Button -->
+            <button id="btn-quick-ping" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-mono text-[11px] sm:text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer">
+              <span class="material-symbols-outlined text-[16px]">send</span>
+              <span>Kirim Simple PDU (Ping)</span>
+            </button>
+
+            <!-- Simulation Step Controls -->
             ${state.mode === 'simulation' ? `
               <div class="flex items-center gap-1">
                 <button id="btn-sim-play" class="px-2.5 sm:px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-mono text-[11px] sm:text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-1 cursor-pointer">
                   <span class="material-symbols-outlined text-[15px] sm:text-[16px]">${state.simState === 'playing' ? 'pause' : 'play_arrow'}</span>
                   <span>${state.simState === 'playing' ? 'Jeda' : 'Auto Play'}</span>
                 </button>
-                <button id="btn-sim-step" class="px-2.5 sm:px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 active:scale-95 text-indigo-700 border border-indigo-200 font-mono text-[11px] sm:text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-1 cursor-pointer" title="Maju 1 Langkah (Capture / Forward)">
+                <button id="btn-sim-step" class="px-2.5 sm:px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 active:scale-95 text-indigo-700 border border-indigo-200 font-mono text-[11px] sm:text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-1 cursor-pointer" title="Maju 1 Langkah">
                   <span class="material-symbols-outlined text-[15px] sm:text-[16px]">step_over</span>
                   <span>Step</span>
                 </button>
@@ -834,12 +845,20 @@ export function renderUnifiedWorkbench(container) {
             ` : ''}
           </div>
 
-          <!-- Top Right Presets & Canvas Actions -->
+          <!-- Top Right Presets & Quick Inspector -->
           <div class="flex items-center gap-1.5 flex-wrap">
+            
+            <!-- Quick Inspect Button -->
+            <button id="btn-inspect-selected" class="px-3 py-1.5 ${selectedDev ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-slate-100 text-slate-400 cursor-not-allowed'} font-mono text-[11px] sm:text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-xs cursor-pointer" ${!selectedDev ? 'disabled' : ''}>
+              <span class="material-symbols-outlined text-[16px]">settings</span>
+              <span>${selectedDev ? `Konfigurasi: ${selectedDev.name}` : 'Pilih Perangkat'}</span>
+            </button>
+
+            <!-- Template Menu Dropdown -->
             <div class="dropdown relative inline-block">
               <button id="btn-template-dropdown" class="px-2.5 sm:px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 font-mono text-[11px] sm:text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer">
                 <span class="material-symbols-outlined text-[16px] text-indigo-600">folder_open</span>
-                <span>Muat Topologi Lab</span>
+                <span>Template Lab</span>
                 <span class="material-symbols-outlined text-[14px]">arrow_drop_down</span>
               </button>
               <div id="template-menu" class="hidden absolute right-0 mt-1.5 w-60 bg-white border border-slate-200 rounded-xl shadow-xl py-1.5 z-40 text-xs font-mono">
@@ -869,45 +888,50 @@ export function renderUnifiedWorkbench(container) {
                   <span class="material-symbols-outlined text-[18px]">delete_sweep</span>
                   <div>
                     <div class="font-bold">Kanvas Kosong (Mulai Dari Awal)</div>
-                    <div class="text-[10px] text-rose-400">Bersihkan semua perangkat</div>
+                    <div class="text-[10px] text-rose-400">Bersihkan seluruh perangkat</div>
                   </div>
                 </button>
               </div>
             </div>
 
-            <!-- Inspect Selected Device Button -->
-            <button id="btn-inspect-selected" class="px-2.5 sm:px-3 py-1.5 bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 font-mono text-[11px] sm:text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50" ${!state.selectedDeviceId ? 'disabled' : ''}>
-              <span class="material-symbols-outlined text-[16px]">settings</span>
-              <span>Inspeksi Perangkat</span>
-            </button>
           </div>
         </div>
 
-        <!-- Cisco Workspace Canvas & Interactive Drag-and-Drop Area -->
-        <div class="relative w-full rounded-2xl overflow-hidden border border-slate-300 shadow-md bg-slate-900 select-none h-[300px] sm:h-[380px] md:h-[440px]" id="cisco-canvas-wrapper">
+        <!-- Cisco Workspace Canvas Wrapper -->
+        <div class="relative w-full rounded-2xl overflow-hidden border border-slate-300 shadow-md bg-slate-900 select-none h-[320px] sm:h-[400px] md:h-[460px]" id="cisco-canvas-wrapper">
           <canvas id="cisco-canvas" class="w-full h-full block cursor-crosshair"></canvas>
 
-          <!-- Floating Help Hint & Active Tool Badge -->
-          <div class="absolute top-2.5 sm:top-3 left-2.5 sm:left-3 flex items-center gap-2 z-10">
+          <!-- Floating Instructions & Current Tool Pill -->
+          <div class="absolute top-2.5 sm:top-3 left-2.5 sm:left-3 flex items-center gap-2 z-10 flex-wrap">
             <div class="bg-slate-900/90 backdrop-blur-md border border-slate-700 px-3 py-1.5 rounded-xl text-[11px] font-mono text-slate-200 flex items-center gap-2 shadow-lg">
-              <span class="w-2 h-2 rounded-full ${state.activeTool === 'select' ? 'bg-indigo-400' : (state.activeTool === 'delete' ? 'bg-rose-400' : (state.activeTool === 'pdu' ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400'))}"></span>
-              <span>Alat Aktif: <strong>${
-                state.activeTool === 'select' ? 'Kursor Seleksi / Geser Perangkat' :
-                state.activeTool === 'cable-straight' ? 'Tarik Kabel Straight-Through (Klik Port Asal -> Port Tujuan)' :
-                state.activeTool === 'cable-cross' ? 'Tarik Kabel Cross-Over' :
-                state.activeTool === 'pdu' ? 'Add Simple PDU (Klik Perangkat Asal -> Perangkat Tujuan)' :
-                'Alat Hapus (Klik perangkat / kabel untuk hapus)'
-              }</strong></span>
+              <span class="w-2 h-2 rounded-full ${state.activeTool === 'select' ? 'bg-indigo-400' : (state.activeTool === 'delete' ? 'bg-rose-400' : (state.activeTool === 'pdu' ? 'bg-amber-400 animate-pulse' : 'bg-cyan-400'))}"></span>
+              <span>
+                ${state.activeTool === 'select' 
+                  ? 'Kursor: Klik perangkat untuk pilih &amp; geser, klik 2x untuk buka konfigurasi' 
+                  : (state.activeTool === 'pdu'
+                      ? (state.pduPendingSource ? `Klik perangkat target untuk kirim paket dari ${state.nodes[state.pduPendingSource]?.name || 'asal'}...` : 'Klik perangkat asal untuk kirim paket PDU...')
+                      : (state.activeTool === 'delete' 
+                          ? 'Alat Hapus: Klik perangkat atau kabel untuk menghapusnya' 
+                          : (state.cablePending ? `Kabel terpasang di ${state.nodes[state.cablePending.fromNodeId]?.name || ''} (${state.cablePending.fromPort}). Sekarang klik perangkat tujuan!` : 'Tarik Kabel: Klik perangkat asal untuk memilih port'))
+                  )}
+              </span>
             </div>
+
+            ${selectedDev ? `
+              <button id="btn-quick-inspect-pill" class="bg-indigo-600/90 hover:bg-indigo-500 backdrop-blur-md border border-indigo-400 px-2.5 py-1.5 rounded-xl text-[11px] font-mono font-bold text-white flex items-center gap-1.5 shadow-lg cursor-pointer animate-scale-up">
+                <span class="material-symbols-outlined text-[14px]">tune</span>
+                <span>Buka ${selectedDev.name}</span>
+              </button>
+            ` : ''}
           </div>
 
-          <!-- Top-Right Step / Status Indicator -->
+          <!-- Top-Right Step Indicator -->
           <div class="absolute top-2.5 sm:top-3 right-2.5 sm:right-3 bg-slate-900/90 backdrop-blur-md border border-amber-500/50 px-3 py-1.5 rounded-xl text-[11px] font-mono text-amber-300 flex items-center gap-2 shadow-xl z-10">
             <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
             <span>Langkah: <strong>${state.simulationSteps.length > 0 ? (state.currentStepIndex + 1) : 0} / ${state.simulationSteps.length}</strong></span>
           </div>
 
-          <!-- Bottom-Right Cisco Packet Tracer Live Status Box -->
+          <!-- Bottom-Right Cisco Status Card -->
           <div class="absolute bottom-2.5 sm:bottom-3 right-2.5 sm:right-3 bg-slate-950/90 backdrop-blur-md border border-slate-700 px-3 py-2 rounded-xl text-left font-mono text-[10px] sm:text-[11px] shadow-2xl max-w-xs z-10">
             <div class="flex items-center justify-between border-b border-slate-800 pb-1 mb-1 gap-4">
               <span class="text-slate-400 font-bold uppercase tracking-wider">Cisco PDU Status</span>
@@ -922,14 +946,9 @@ export function renderUnifiedWorkbench(container) {
               ${state.lastPduResult.message}
             </div>
           </div>
-
-          <!-- Floating Port Selection Modal (when drawing cable) -->
-          <div id="cisco-port-popover" class="hidden absolute z-30 bg-slate-950/95 border-2 border-indigo-500 rounded-xl p-3 shadow-2xl text-white font-mono text-xs backdrop-blur-md min-w-[200px]">
-            <!-- Dynamic port list populated on device click during cable drawing -->
-          </div>
         </div>
 
-        <!-- Cisco Device Palette Box (Kotak Perangkat & Alat Cisco Packet Tracer) -->
+        <!-- Cisco Device Palette Box -->
         <div class="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3">
           <div class="flex items-center justify-between border-b border-slate-100 pb-2">
             <div class="flex items-center gap-2">
@@ -944,10 +963,10 @@ export function renderUnifiedWorkbench(container) {
             </span>
           </div>
 
-          <!-- Palette Sections: Tools, End Devices, Network Devices, Connections -->
+          <!-- Palette Grid -->
           <div class="grid grid-cols-1 lg:grid-cols-12 gap-3 items-center">
             
-            <!-- Category 1: Editing & PDU Tools (3 cols) -->
+            <!-- Category 1: Kursor & Alat PDU -->
             <div class="lg:col-span-3 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
               <div class="text-[10px] font-mono font-bold text-slate-500 uppercase mb-1.5">Mode Kursor / Alat</div>
               <div class="grid grid-cols-3 gap-1.5">
@@ -966,22 +985,22 @@ export function renderUnifiedWorkbench(container) {
               </div>
             </div>
 
-            <!-- Category 2: Connections / Cables (3 cols) -->
+            <!-- Category 2: Kabel Jaringan -->
             <div class="lg:col-span-3 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
-              <div class="text-[10px] font-mono font-bold text-slate-500 uppercase mb-1.5">Kabel Jaringan (Connections)</div>
+              <div class="text-[10px] font-mono font-bold text-slate-500 uppercase mb-1.5">Kabel Jaringan</div>
               <div class="grid grid-cols-2 gap-1.5">
-                <button id="tool-cable-straight" class="p-2 rounded-lg font-mono text-[11px] font-bold border transition-all flex flex-col items-center gap-1 cursor-pointer ${state.activeTool === 'cable-straight' ? 'bg-cyan-600 text-white border-cyan-700 shadow-xs' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'}" title="Kabel Straight-Through: Menghubungkan PC ke Switch atau Switch ke Router">
+                <button id="tool-cable-straight" class="p-2 rounded-lg font-mono text-[11px] font-bold border transition-all flex flex-col items-center gap-1 cursor-pointer ${state.activeTool === 'cable-straight' ? 'bg-cyan-600 text-white border-cyan-700 shadow-xs' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'}" title="Kabel Straight-Through: PC ke Switch atau Switch ke Router">
                   <span class="material-symbols-outlined text-[18px]">horizontal_rule</span>
-                  <span class="text-[10px]">Straight-Through</span>
+                  <span class="text-[10px]">Straight</span>
                 </button>
-                <button id="tool-cable-cross" class="p-2 rounded-lg font-mono text-[11px] font-bold border transition-all flex flex-col items-center gap-1 cursor-pointer ${state.activeTool === 'cable-cross' ? 'bg-amber-600 text-white border-amber-700 shadow-xs' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'}" title="Kabel Cross-Over: Menghubungkan perangkat sejenis (PC ke PC, Switch ke Switch)">
+                <button id="tool-cable-cross" class="p-2 rounded-lg font-mono text-[11px] font-bold border transition-all flex flex-col items-center gap-1 cursor-pointer ${state.activeTool === 'cable-cross' ? 'bg-amber-600 text-white border-amber-700 shadow-xs' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'}" title="Kabel Cross-Over: PC ke PC atau Switch ke Switch">
                   <span class="material-symbols-outlined text-[18px]">linear_scale</span>
                   <span class="text-[10px]">Cross-Over</span>
                 </button>
               </div>
             </div>
 
-            <!-- Category 3: Hardware Nodes Palette (6 cols) -->
+            <!-- Category 3: Hardware Nodes Palette -->
             <div class="lg:col-span-6 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
               <div class="text-[10px] font-mono font-bold text-slate-500 uppercase mb-1.5">Tambah Perangkat Cisco &amp; Host</div>
               <div class="grid grid-cols-6 gap-1.5">
@@ -1015,7 +1034,7 @@ export function renderUnifiedWorkbench(container) {
           </div>
         </div>
 
-        <!-- Cisco Packet Tracer Simulation Panel (Event List) -->
+        <!-- Cisco Packet Tracer Event List Panel -->
         <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
           <div class="p-3.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
             <div class="flex items-center gap-2">
@@ -1045,7 +1064,7 @@ export function renderUnifiedWorkbench(container) {
                 ${state.simulationSteps.length === 0 ? `
                   <tr>
                     <td colspan="7" class="py-6 text-center text-slate-400 font-sans text-xs">
-                      Belum ada paket yang dikirim. Klik <strong>Kirim PDU (Alat Amplop)</strong> atau tombol <strong>Kirim Simple PDU</strong> untuk memulai transmisi.
+                      Belum ada paket yang dikirim. Tekan tombol <strong>Kirim Simple PDU (Ping)</strong> atau gunakan <strong>Alat Kirim PDU (Amplop)</strong>.
                     </td>
                   </tr>
                 ` : state.simulationSteps.map((s, idx) => {
@@ -1081,11 +1100,15 @@ export function renderUnifiedWorkbench(container) {
           </div>
         </div>
 
-        <!-- Cisco PDU Information Window (Envelope Modal) -->
+        <!-- Dedicated Port Selection Modal -->
+        <div id="cisco-port-modal" class="hidden fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4">
+        </div>
+
+        <!-- Cisco PDU Information Window -->
         <div id="cisco-pdu-modal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
         </div>
 
-        <!-- Cisco Device Inspector Modal (Desktop, Config, CLI Terminal, Physical) -->
+        <!-- Cisco Device Inspector Modal -->
         <div id="cisco-device-modal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
         </div>
 
@@ -1097,7 +1120,7 @@ export function renderUnifiedWorkbench(container) {
   }
 
   // --------------------------------------------------------------------------
-  // Event Handlers Setup
+  // Event Listeners Setup
   // --------------------------------------------------------------------------
   function setupEvents() {
     // Mode toggles
@@ -1110,6 +1133,11 @@ export function renderUnifiedWorkbench(container) {
     document.getElementById("btn-mode-simulation")?.addEventListener("click", () => {
       state.mode = "simulation";
       render();
+    });
+
+    // Quick Ping Button
+    document.getElementById("btn-quick-ping")?.addEventListener("click", () => {
+      triggerQuickPing();
     });
 
     // Simulation playback
@@ -1130,7 +1158,7 @@ export function renderUnifiedWorkbench(container) {
       resetSimulation();
     });
 
-    // Template Dropdown Toggle
+    // Template Dropdown
     const tplDropdownBtn = document.getElementById("btn-template-dropdown");
     const tplMenu = document.getElementById("template-menu");
     tplDropdownBtn?.addEventListener("click", (e) => {
@@ -1165,21 +1193,21 @@ export function renderUnifiedWorkbench(container) {
       render();
     });
 
-    // Inspect Selected Device Button
+    // Inspect buttons
     document.getElementById("btn-inspect-selected")?.addEventListener("click", () => {
       if (state.selectedDeviceId) {
         openDeviceModal(state.selectedDeviceId);
       }
     });
 
-    // Tool selectors
-    const toolSelectBtn = document.getElementById("tool-select");
-    const toolPduBtn = document.getElementById("tool-pdu");
-    const toolDeleteBtn = document.getElementById("tool-delete");
-    const toolCableStraightBtn = document.getElementById("tool-cable-straight");
-    const toolCableCrossBtn = document.getElementById("tool-cable-cross");
+    document.getElementById("btn-quick-inspect-pill")?.addEventListener("click", () => {
+      if (state.selectedDeviceId) {
+        openDeviceModal(state.selectedDeviceId);
+      }
+    });
 
-    toolSelectBtn?.addEventListener("click", () => {
+    // Tool Buttons
+    document.getElementById("tool-select")?.addEventListener("click", () => {
       state.activeTool = "select";
       state.cablePending = null;
       state.pduPendingSource = null;
@@ -1187,7 +1215,7 @@ export function renderUnifiedWorkbench(container) {
       render();
     });
 
-    toolPduBtn?.addEventListener("click", () => {
+    document.getElementById("tool-pdu")?.addEventListener("click", () => {
       state.activeTool = "pdu";
       state.cablePending = null;
       state.pduPendingSource = null;
@@ -1195,7 +1223,7 @@ export function renderUnifiedWorkbench(container) {
       render();
     });
 
-    toolDeleteBtn?.addEventListener("click", () => {
+    document.getElementById("tool-delete")?.addEventListener("click", () => {
       state.activeTool = "delete";
       state.cablePending = null;
       state.pduPendingSource = null;
@@ -1203,7 +1231,7 @@ export function renderUnifiedWorkbench(container) {
       render();
     });
 
-    toolCableStraightBtn?.addEventListener("click", () => {
+    document.getElementById("tool-cable-straight")?.addEventListener("click", () => {
       state.activeTool = "cable-straight";
       state.cablePending = null;
       state.pduPendingSource = null;
@@ -1211,7 +1239,7 @@ export function renderUnifiedWorkbench(container) {
       render();
     });
 
-    toolCableCrossBtn?.addEventListener("click", () => {
+    document.getElementById("tool-cable-cross")?.addEventListener("click", () => {
       state.activeTool = "cable-cross";
       state.cablePending = null;
       state.pduPendingSource = null;
@@ -1237,6 +1265,25 @@ export function renderUnifiedWorkbench(container) {
   }
 
   // --------------------------------------------------------------------------
+  // Trigger Quick Ping
+  // --------------------------------------------------------------------------
+  function triggerQuickPing() {
+    sound.click();
+    const pcNode = Object.values(state.nodes).find(n => n.type === "pc" || n.type === "laptop") || Object.values(state.nodes)[0];
+    const targetNode = Object.values(state.nodes).find(n => n.id !== pcNode?.id);
+
+    if (pcNode && targetNode) {
+      runPduPathfinding(pcNode.id, targetNode.id, true);
+      render();
+      if (state.mode === "simulation") {
+        playSimulation();
+      }
+    } else {
+      alert("Harap tambahkan setidaknya 2 perangkat (contoh: PC dan Server) ke kanvas untuk menguji Ping.");
+    }
+  }
+
+  // --------------------------------------------------------------------------
   // Add Device Functionality
   // --------------------------------------------------------------------------
   function addDeviceToCanvas(type) {
@@ -1248,10 +1295,9 @@ export function renderUnifiedWorkbench(container) {
     const newId = `${type}_${Date.now().toString(36).slice(-4)}`;
     const name = `${spec.prefix}${count}`;
 
-    // Compute pleasant position on canvas
     const currentCount = Object.keys(state.nodes).length;
-    const posX = 100 + (currentCount % 5) * 110;
-    const posY = 100 + Math.floor(currentCount / 5) * 120;
+    const posX = 100 + (currentCount % 5) * 115;
+    const posY = 100 + Math.floor(currentCount / 5) * 125;
 
     const baseOctet = 10 + currentCount;
     const ip = type === "router" ? "192.168.1.1" : (type === "server" ? "10.10.20.50" : `192.168.1.${baseOctet}`);
@@ -1283,14 +1329,8 @@ export function renderUnifiedWorkbench(container) {
   // --------------------------------------------------------------------------
   function playSimulation() {
     if (state.simulationSteps.length === 0) {
-      // Auto-trigger PDU if nodes available
-      const pcNode = Object.values(state.nodes).find(n => n.type === "pc" || n.type === "laptop");
-      const targetNode = Object.values(state.nodes).find(n => n.id !== pcNode?.id);
-      if (pcNode && targetNode) {
-        runPduPathfinding(pcNode.id, targetNode.id, false);
-      } else {
-        return;
-      }
+      triggerQuickPing();
+      return;
     }
 
     state.simState = "playing";
@@ -1317,11 +1357,8 @@ export function renderUnifiedWorkbench(container) {
   function stepForward() {
     sound.click();
     if (state.simulationSteps.length === 0) {
-      const pcNode = Object.values(state.nodes).find(n => n.type === "pc" || n.type === "laptop");
-      const targetNode = Object.values(state.nodes).find(n => n.id !== pcNode?.id);
-      if (pcNode && targetNode) {
-        runPduPathfinding(pcNode.id, targetNode.id, false);
-      }
+      triggerQuickPing();
+      return;
     }
 
     if (state.currentStepIndex < state.simulationSteps.length - 1) {
@@ -1346,6 +1383,120 @@ export function renderUnifiedWorkbench(container) {
   }
 
   // --------------------------------------------------------------------------
+  // Port Selection Modal (Interactive Wiring Dialog)
+  // --------------------------------------------------------------------------
+  function openPortSelectionModal(node) {
+    const modal = document.getElementById("cisco-port-modal");
+    if (!modal) return;
+
+    const cableKind = state.activeTool === "cable-cross" ? "cross" : "straight";
+
+    const portUsage = {};
+    state.links.forEach(l => {
+      if (l.fromNode === node.id) portUsage[l.fromPort] = state.nodes[l.toNode]?.name || "Perangkat";
+      if (l.toNode === node.id) portUsage[l.toPort] = state.nodes[l.fromNode]?.name || "Perangkat";
+    });
+
+    const isSelectingSource = !state.cablePending;
+
+    modal.classList.remove("hidden");
+    modal.innerHTML = `
+      <div class="bg-white rounded-2xl border border-slate-200 max-w-md w-full p-5 shadow-2xl space-y-4 animate-scale-up text-left font-mono">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div class="flex items-center gap-2.5">
+            <span class="w-8 h-8 rounded-lg ${isSelectingSource ? 'bg-cyan-50 text-cyan-600 border border-cyan-200' : 'bg-emerald-50 text-emerald-600 border border-emerald-200'} flex items-center justify-center">
+              <span class="material-symbols-outlined text-[18px]">settings_ethernet</span>
+            </span>
+            <div>
+              <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                ${isSelectingSource ? 'Langkah 1: Pilih Port Asal' : 'Langkah 2: Hubungkan ke Port Tujuan'}
+              </span>
+              <h3 class="text-sm font-bold text-slate-900">${node.name} (${node.model})</h3>
+            </div>
+          </div>
+          <button id="btn-close-port-modal" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 cursor-pointer">
+            <span class="material-symbols-outlined text-[18px]">close</span>
+          </button>
+        </div>
+
+        <p class="text-xs text-slate-600 font-sans">
+          ${isSelectingSource 
+            ? `Pilih salah satu port fisik pada <strong>${node.name}</strong> untuk mencolokkan kabel <strong>${cableKind === 'cross' ? 'Cross-Over' : 'Straight-Through'}</strong>:` 
+            : `Hubungkan kabel dari <strong>${state.nodes[state.cablePending.fromNodeId]?.name || ''} (${state.cablePending.fromPort})</strong> ke salah satu port tersedia pada <strong>${node.name}</strong>:`}
+        </p>
+
+        <div class="space-y-1.5 max-h-60 overflow-y-auto">
+          ${node.ports.map(portName => {
+            const connectedTo = portUsage[portName];
+            const isOccupied = !!connectedTo;
+            return `
+              <button class="w-full text-left p-2.5 rounded-xl border text-xs font-mono flex items-center justify-between transition-all ${isOccupied ? 'opacity-50 bg-slate-50 border-slate-200 text-slate-400 cursor-not-allowed' : 'bg-white border-slate-300 hover:border-indigo-500 hover:bg-indigo-50/50 text-slate-800 cursor-pointer shadow-2xs'}" data-port="${portName}" ${isOccupied ? 'disabled' : ''}>
+                <div class="flex items-center gap-2">
+                  <span class="w-2 h-2 rounded-full ${isOccupied ? 'bg-rose-500' : 'bg-emerald-500'}"></span>
+                  <span class="font-bold">${portName}</span>
+                </div>
+                <span class="text-[10px] px-2 py-0.5 rounded font-sans ${isOccupied ? 'bg-rose-50 text-rose-600 border border-rose-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}">
+                  ${isOccupied ? `Terhubung: ${connectedTo}` : 'Tersedia'}
+                </span>
+              </button>
+            `;
+          }).join("")}
+        </div>
+
+        <button id="btn-cancel-port-modal" class="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer">
+          Batal
+        </button>
+      </div>
+    `;
+
+    const closeModal = () => {
+      modal.classList.add("hidden");
+    };
+
+    document.getElementById("btn-close-port-modal")?.addEventListener("click", closeModal);
+    document.getElementById("btn-cancel-port-modal")?.addEventListener("click", closeModal);
+
+    modal.querySelectorAll("button[data-port]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const selectedPort = btn.dataset.port;
+        closeModal();
+
+        if (isSelectingSource) {
+          sound.click();
+          state.cablePending = {
+            fromNodeId: node.id,
+            fromPort: selectedPort,
+            cableType: cableKind
+          };
+          render();
+        } else {
+          if (node.id === state.cablePending.fromNodeId) {
+            alert("Tidak dapat menghubungkan kabel ke perangkat yang sama.");
+            state.cablePending = null;
+            render();
+            return;
+          }
+
+          sound.success();
+          state.links.push({
+            id: `link_${Date.now().toString(36)}`,
+            fromNode: state.cablePending.fromNodeId,
+            fromPort: state.cablePending.fromPort,
+            toNode: node.id,
+            toPort: selectedPort,
+            cableType: state.cablePending.cableType,
+            status: "up"
+          });
+
+          state.cablePending = null;
+          state.activeTool = "select";
+          render();
+        }
+      });
+    });
+  }
+
+  // --------------------------------------------------------------------------
   // Cisco PDU Information Window (Modal)
   // --------------------------------------------------------------------------
   function openPduModal(stepIdx) {
@@ -1358,7 +1509,6 @@ export function renderUnifiedWorkbench(container) {
     modal.classList.remove("hidden");
     modal.innerHTML = `
       <div class="bg-white rounded-2xl border border-slate-200 max-w-2xl w-full p-4 sm:p-6 shadow-2xl space-y-4 animate-scale-up text-left font-mono max-h-[88vh] overflow-y-auto">
-        <!-- Header -->
         <div class="flex items-center justify-between border-b border-slate-100 pb-3">
           <div class="flex items-center gap-3">
             <span class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-200 flex items-center justify-center shrink-0">
@@ -1377,12 +1527,10 @@ export function renderUnifiedWorkbench(container) {
           </button>
         </div>
 
-        <!-- Explanatory Banner -->
         <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700 font-sans">
           <strong>Analisis Paket:</strong> ${s.explanation}
         </div>
 
-        <!-- OSI Model 7-Layer Stack Breakdown (Cisco Packet Tracer Style) -->
         <div class="space-y-1.5">
           <div class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Model OSI 7-Layer (Inbound / Outbound PDU Stack)</div>
           
@@ -1437,7 +1585,6 @@ export function renderUnifiedWorkbench(container) {
     if (!modal) return;
     modal.classList.remove("hidden");
 
-    // If device is PC/Laptop/Server, default to Desktop tab; otherwise CLI/Physical
     if (dev.type === "pc" || dev.type === "laptop" || dev.type === "server") {
       state.deviceActiveTab = "desktop";
     } else {
@@ -1454,7 +1601,6 @@ export function renderUnifiedWorkbench(container) {
 
     modal.innerHTML = `
       <div class="bg-white rounded-2xl border border-slate-200 max-w-3xl w-full p-4 sm:p-6 shadow-2xl space-y-4 animate-scale-up text-left font-mono max-h-[90vh] overflow-y-auto">
-        <!-- Header -->
         <div class="flex items-center justify-between border-b border-slate-100 pb-3">
           <div class="flex items-center gap-3">
             <span class="w-10 h-10 rounded-xl bg-slate-900 text-indigo-400 border border-slate-700 flex items-center justify-center shrink-0">
@@ -1474,7 +1620,6 @@ export function renderUnifiedWorkbench(container) {
           </button>
         </div>
 
-        <!-- Tabs Navigation -->
         <div class="flex items-center gap-2 border-b border-slate-200 pb-2">
           ${(dev.type === 'pc' || dev.type === 'laptop' || dev.type === 'server') ? `
             <button id="dev-tab-desktop" class="px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all ${state.deviceActiveTab === 'desktop' ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:text-slate-900'}">
@@ -1492,7 +1637,6 @@ export function renderUnifiedWorkbench(container) {
           </button>
         </div>
 
-        <!-- Tab Body -->
         <div class="min-h-[280px]">
           ${state.deviceActiveTab === 'desktop' ? renderDesktopTab(dev) : ''}
           ${state.deviceActiveTab === 'cli' ? renderCliTab(dev) : ''}
@@ -1523,7 +1667,6 @@ export function renderUnifiedWorkbench(container) {
       renderDeviceModalContent();
     });
 
-    // Handle Power Toggle
     document.getElementById("btn-toggle-power")?.addEventListener("click", () => {
       dev.poweredOn = !dev.poweredOn;
       sound.click();
@@ -1531,7 +1674,6 @@ export function renderUnifiedWorkbench(container) {
       render();
     });
 
-    // Handle Desktop Sub-apps
     document.getElementById("btn-app-ipconfig")?.addEventListener("click", () => {
       state.activeDesktopApp = "ipconfig";
       renderDeviceModalContent();
@@ -1545,7 +1687,6 @@ export function renderUnifiedWorkbench(container) {
       renderDeviceModalContent();
     });
 
-    // Handle Save IP Config
     document.getElementById("btn-save-ip-config")?.addEventListener("click", () => {
       const ipVal = document.getElementById("input-ip")?.value.trim();
       const maskVal = document.getElementById("input-mask")?.value.trim();
@@ -1563,13 +1704,19 @@ export function renderUnifiedWorkbench(container) {
       render();
     });
 
-    // Handle Browser Navigate
+    document.getElementById("btn-preset-ip")?.addEventListener("click", () => {
+      dev.ip = dev.type === "server" ? "10.10.20.50" : "192.168.1.10";
+      dev.mask = "255.255.255.0";
+      dev.gateway = dev.type === "server" ? "10.10.20.1" : "192.168.1.1";
+      sound.click();
+      renderDeviceModalContent();
+    });
+
     document.getElementById("btn-browser-go")?.addEventListener("click", () => {
       const urlInput = document.getElementById("browser-url-input")?.value.trim();
       handleBrowserNavigate(urlInput);
     });
 
-    // Handle CLI Execution
     const cliInput = document.getElementById("dev-cli-input");
     if (cliInput) {
       cliInput.focus();
@@ -1584,13 +1731,9 @@ export function renderUnifiedWorkbench(container) {
     }
   }
 
-  // --------------------------------------------------------------------------
-  // Tab 1: PC Desktop Apps (IP Config, Command Prompt, Web Browser)
-  // --------------------------------------------------------------------------
   function renderDesktopTab(dev) {
     return `
       <div class="space-y-4">
-        <!-- Desktop App Launcher Icons -->
         <div class="flex items-center gap-3 p-3 bg-slate-100 rounded-xl border border-slate-200">
           <button id="btn-app-ipconfig" class="px-3 py-2 rounded-xl border flex items-center gap-2 cursor-pointer transition-all ${state.activeDesktopApp === 'ipconfig' ? 'bg-white shadow-xs border-indigo-500 text-indigo-700 font-bold' : 'bg-transparent text-slate-600 hover:bg-white'}">
             <span class="material-symbols-outlined text-[18px]">settings_ethernet</span>
@@ -1606,7 +1749,6 @@ export function renderUnifiedWorkbench(container) {
           </button>
         </div>
 
-        <!-- Active App Frame -->
         <div>
           ${state.activeDesktopApp === 'ipconfig' ? renderDesktopIpConfig(dev) : ''}
           ${state.activeDesktopApp === 'cmd' ? renderCliTab(dev) : ''}
@@ -1621,7 +1763,9 @@ export function renderUnifiedWorkbench(container) {
       <div class="p-4 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-3 font-sans">
         <div class="flex items-center justify-between border-b border-slate-200 pb-2">
           <div class="font-mono font-bold text-slate-800">FastEthernet0 IP Configuration</div>
-          <span class="text-[11px] text-slate-500 font-mono">MAC: ${dev.mac}</span>
+          <button id="btn-preset-ip" class="px-2.5 py-1 bg-white hover:bg-indigo-50 text-indigo-600 border border-slate-200 rounded font-mono text-[10px] font-bold cursor-pointer">
+            ✨ Auto IP Preset
+          </button>
         </div>
 
         <div class="grid grid-cols-2 gap-3 font-mono">
@@ -1653,7 +1797,6 @@ export function renderUnifiedWorkbench(container) {
   function renderDesktopBrowser(dev) {
     return `
       <div class="bg-white rounded-xl border border-slate-200 overflow-hidden text-xs">
-        <!-- Browser URL Bar -->
         <div class="p-2.5 bg-slate-100 border-b border-slate-200 flex items-center gap-2">
           <span class="text-slate-400 font-mono text-xs">URL:</span>
           <input id="browser-url-input" type="text" placeholder="http://10.10.20.50 atau http://192.168.1.100" class="flex-1 px-3 py-1 bg-white border border-slate-300 rounded-md font-mono text-xs focus:outline-none focus:border-indigo-500" />
@@ -1662,7 +1805,6 @@ export function renderUnifiedWorkbench(container) {
           </button>
         </div>
 
-        <!-- Browser Render View -->
         <div id="browser-viewport" class="p-6 min-h-[160px] flex flex-col items-center justify-center text-center space-y-2 bg-slate-50">
           <span class="material-symbols-outlined text-[36px] text-slate-300">public</span>
           <p class="text-xs text-slate-500 font-mono">
@@ -1708,7 +1850,7 @@ export function renderUnifiedWorkbench(container) {
             <span>Request Time Out (404 / Connection Failed)</span>
           </div>
           <p class="text-xs text-slate-700 leading-relaxed">
-            Tidak dapat terhubung ke alamat IP <code>${cleanIp}</code>. Periksa apakah perangkat target ada, kabel sudah terpasang, dan daya (Power) menyala.
+            Tidak dapat terhubung ke alamat IP <code>${cleanIp}</code>. Periksa apakah perangkat target terhubung ke jaringan dan menyala.
           </p>
         </div>
       `;
@@ -1716,9 +1858,6 @@ export function renderUnifiedWorkbench(container) {
     }
   }
 
-  // --------------------------------------------------------------------------
-  // Tab 2: CLI Terminal (Cisco IOS & Command Prompt)
-  // --------------------------------------------------------------------------
   function renderCliTab(dev) {
     const hist = state.cliHistory[dev.id] || [];
     const isCisco = dev.type === "switch" || dev.type === "router";
@@ -1768,7 +1907,7 @@ export function renderUnifiedWorkbench(container) {
           "Command Prompt Commands:",
           "  ipconfig              - Menampilkan konfigurasi IP dasar",
           "  ipconfig /all         - Menampilkan konfigurasi IP & MAC lengkap",
-          "  ping <ip>             - Menguji konektivitas ICMP ke target",
+          "  ping <ip_or_name>     - Menguji konektivitas ICMP ke target",
           "  cls                   - Bersihkan layar"
         );
       }
@@ -1777,26 +1916,25 @@ export function renderUnifiedWorkbench(container) {
 
     if (lower.startsWith("ping")) {
       const parts = rawCmd.split(" ");
-      const targetIp = parts[1];
-      if (!targetIp) {
-        hist.push("Usage: ping <target_ip>");
+      const targetQuery = parts[1];
+      if (!targetQuery) {
+        hist.push("Usage: ping <target_ip_or_name>");
         return;
       }
 
-      hist.push(`Pinging ${targetIp} with 32 bytes of data:`);
-      // Find device with that IP
-      const targetDev = Object.values(state.nodes).find(n => n.ip === targetIp || n.ip2 === targetIp);
+      hist.push(`Pinging ${targetQuery} with 32 bytes of data:`);
+      const targetDev = Object.values(state.nodes).find(n => n.ip === targetQuery || n.ip2 === targetQuery || n.name.toLowerCase() === targetQuery.toLowerCase());
+      
       if (targetDev && targetDev.poweredOn) {
-        // Run path check
         const path = findPathBetween(dev.id, targetDev.id);
         if (path) {
           hist.push(
-            `Reply from ${targetIp}: bytes=32 time=0.82ms TTL=63`,
-            `Reply from ${targetIp}: bytes=32 time=0.79ms TTL=63`,
-            `Reply from ${targetIp}: bytes=32 time=0.81ms TTL=63`,
-            `Reply from ${targetIp}: bytes=32 time=0.85ms TTL=63`,
+            `Reply from ${targetDev.ip}: bytes=32 time=0.82ms TTL=63`,
+            `Reply from ${targetDev.ip}: bytes=32 time=0.79ms TTL=63`,
+            `Reply from ${targetDev.ip}: bytes=32 time=0.81ms TTL=63`,
+            `Reply from ${targetDev.ip}: bytes=32 time=0.85ms TTL=63`,
             "",
-            `Ping statistics for ${targetIp}:`,
+            `Ping statistics for ${targetDev.ip}:`,
             `    Packets: Sent = 4, Received = 4, Lost = 0 (0% loss)`
           );
           sound.success();
@@ -1810,7 +1948,7 @@ export function renderUnifiedWorkbench(container) {
         "Request timed out.",
         "Request timed out.",
         "",
-        `Ping statistics for ${targetIp}:`,
+        `Ping statistics for ${targetQuery}:`,
         `    Packets: Sent = 4, Received = 0, Lost = 4 (100% loss)`
       );
       sound.error();
@@ -1822,7 +1960,6 @@ export function renderUnifiedWorkbench(container) {
         "Windows IP Configuration",
         "",
         "Ethernet adapter Ethernet0:",
-        `   Connection-specific DNS Suffix  . : localdomain`,
         `   IPv4 Address. . . . . . . . . . . : ${dev.ip}`,
         `   Subnet Mask . . . . . . . . . . . : ${dev.mask}`,
         `   Default Gateway . . . . . . . . . : ${dev.gateway}`
@@ -1879,9 +2016,6 @@ export function renderUnifiedWorkbench(container) {
     hist.push(`Perintah '${rawCmd}' tidak dikenali. Ketik 'help' untuk daftar perintah.`);
   }
 
-  // --------------------------------------------------------------------------
-  // Tab 3: Quick Config Tab
-  // --------------------------------------------------------------------------
   function renderConfigTab(dev) {
     return `
       <div class="space-y-3 p-4 bg-slate-50 rounded-xl border border-slate-200 text-xs">
@@ -1907,13 +2041,9 @@ export function renderUnifiedWorkbench(container) {
     `;
   }
 
-  // --------------------------------------------------------------------------
-  // Tab 4: Physical Chassis Tab
-  // --------------------------------------------------------------------------
   function renderPhysicalTab(dev) {
     return `
       <div class="space-y-4">
-        <!-- Chassis Visual Rackmount Panel -->
         <div class="p-6 rounded-2xl bg-slate-950 border-2 border-slate-800 shadow-inner flex flex-col justify-between min-h-[180px] text-white">
           <div class="flex items-center justify-between border-b border-slate-800 pb-3">
             <div class="flex items-center gap-2">
@@ -1921,13 +2051,11 @@ export function renderUnifiedWorkbench(container) {
               <span class="text-xs font-bold text-slate-300">${dev.model}</span>
             </div>
             
-            <!-- Interactive Power Switch -->
             <button id="btn-toggle-power" class="px-3 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${dev.poweredOn ? 'bg-emerald-950/80 text-emerald-400 border-emerald-500/50 hover:bg-emerald-900' : 'bg-rose-950/80 text-rose-400 border-rose-500/50 hover:bg-rose-900'}">
               Power: ${dev.poweredOn ? 'ON' : 'OFF'}
             </button>
           </div>
 
-          <!-- Port Row Interface Visuals -->
           <div class="py-4 flex items-center justify-around gap-2 flex-wrap">
             ${dev.ports.slice(0, 4).map(p => `
               <div class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-center space-y-1 min-w-[70px]">
@@ -1949,7 +2077,7 @@ export function renderUnifiedWorkbench(container) {
   }
 
   // --------------------------------------------------------------------------
-  // Cisco 2D Canvas Workspace Rendering & Drag-and-Drop Interaction
+  // Canvas Workspace Engine & Touch Dragging
   // --------------------------------------------------------------------------
   function initCanvas() {
     const canvas = document.getElementById("cisco-canvas");
@@ -1977,14 +2105,12 @@ export function renderUnifiedWorkbench(container) {
       const clientY = e.touches ? e.touches[0].clientY : e.clientY;
       return {
         x: (clientX - rect.left) * (canvas.width / rect.width),
-        y: (clientY - rect.top) * (canvas.height / rect.height),
-        rawX: clientX - rect.left,
-        rawY: clientY - rect.top
+        y: (clientY - rect.top) * (canvas.height / rect.height)
       };
     }
 
     function findNodeAt(cx, cy) {
-      const hitRadius = 38;
+      const hitRadius = 42;
       for (const node of Object.values(state.nodes)) {
         const dx = cx - node.x;
         const dy = cy - node.y;
@@ -1995,7 +2121,7 @@ export function renderUnifiedWorkbench(container) {
       return null;
     }
 
-    // Pointer Down (Start Drag / Click Action)
+    // Pointer Down
     const handleDown = (e) => {
       const pos = getCanvasCoords(e);
       const clickedNode = findNodeAt(pos.x, pos.y);
@@ -2004,7 +2130,6 @@ export function renderUnifiedWorkbench(container) {
       if (state.activeTool === "delete") {
         if (clickedNode) {
           sound.click();
-          // Remove connected links
           state.links = state.links.filter(l => l.fromNode !== clickedNode.id && l.toNode !== clickedNode.id);
           delete state.nodes[clickedNode.id];
           if (state.selectedDeviceId === clickedNode.id) {
@@ -2015,7 +2140,16 @@ export function renderUnifiedWorkbench(container) {
         return;
       }
 
-      // Tool: ADD SIMPLE PDU
+      // Tool: CABLE (Straight / Cross)
+      if (state.activeTool === "cable-straight" || state.activeTool === "cable-cross") {
+        if (clickedNode) {
+          sound.click();
+          openPortSelectionModal(clickedNode);
+        }
+        return;
+      }
+
+      // Tool: PDU (Envelope Ping)
       if (state.activeTool === "pdu") {
         if (clickedNode) {
           sound.click();
@@ -2027,7 +2161,7 @@ export function renderUnifiedWorkbench(container) {
               target: "?",
               type: "ICMP",
               time: "0.00 ms",
-              message: `Pilih perangkat tujuan untuk mengirim paket dari ${clickedNode.name}...`
+              message: `Pilih perangkat target untuk mengirim paket dari ${clickedNode.name}...`
             };
             render();
           } else {
@@ -2042,22 +2176,25 @@ export function renderUnifiedWorkbench(container) {
         return;
       }
 
-      // Tool: CABLE (Straight or Cross)
-      if (state.activeTool === "cable-straight" || state.activeTool === "cable-cross") {
-        if (clickedNode) {
-          sound.click();
-          showPortSelectionPopover(clickedNode, pos.rawX, pos.rawY);
-        }
-        return;
-      }
-
-      // Tool: SELECT (Move / Drag)
+      // Tool: SELECT (Move / Tap)
       if (clickedNode) {
         state.selectedDeviceId = clickedNode.id;
         isDragging = true;
         draggedNodeId = clickedNode.id;
         dragOffsetX = pos.x - clickedNode.x;
         dragOffsetY = pos.y - clickedNode.y;
+
+        const inspectBtn = document.getElementById("btn-inspect-selected");
+        if (inspectBtn) {
+          inspectBtn.removeAttribute("disabled");
+          inspectBtn.classList.remove("bg-slate-100", "text-slate-400", "cursor-not-allowed");
+          inspectBtn.classList.add("bg-indigo-600", "text-white", "hover:bg-indigo-700");
+          inspectBtn.innerHTML = `
+            <span class="material-symbols-outlined text-[16px]">settings</span>
+            <span>Konfigurasi: ${clickedNode.name}</span>
+          `;
+        }
+
         draw(ctx, canvas.width, canvas.height);
       } else {
         state.selectedDeviceId = null;
@@ -2065,17 +2202,23 @@ export function renderUnifiedWorkbench(container) {
       }
     };
 
-    // Pointer Move (Dragging node)
+    // Pointer Move
     const handleMove = (e) => {
+      const pos = getCanvasCoords(e);
+      state.pointerPos.x = pos.x;
+      state.pointerPos.y = pos.y;
+      state.pointerPos.active = true;
+
       if (isDragging && draggedNodeId && state.nodes[draggedNodeId]) {
-        const pos = getCanvasCoords(e);
         state.nodes[draggedNodeId].x = Math.max(40, Math.min(canvas.width - 40, pos.x - dragOffsetX));
         state.nodes[draggedNodeId].y = Math.max(40, Math.min(canvas.height - 40, pos.y - dragOffsetY));
+        draw(ctx, canvas.width, canvas.height);
+      } else if (state.cablePending) {
         draw(ctx, canvas.width, canvas.height);
       }
     };
 
-    // Pointer Up (End Drag)
+    // Pointer Up
     const handleUp = () => {
       if (isDragging) {
         isDragging = false;
@@ -2083,7 +2226,7 @@ export function renderUnifiedWorkbench(container) {
       }
     };
 
-    // Double-click to open Device Inspector
+    // Double-click to open inspector
     canvas.addEventListener("dblclick", (e) => {
       const pos = getCanvasCoords(e);
       const clickedNode = findNodeAt(pos.x, pos.y);
@@ -2096,134 +2239,21 @@ export function renderUnifiedWorkbench(container) {
     canvas.addEventListener("mousemove", handleMove);
     window.addEventListener("mouseup", handleUp);
 
-    canvas.addEventListener("touchstart", handleDown, { passive: true });
-    canvas.addEventListener("touchmove", handleMove, { passive: true });
+    canvas.addEventListener("touchstart", (e) => {
+      e.preventDefault();
+      handleDown(e);
+    }, { passive: false });
+
+    canvas.addEventListener("touchmove", (e) => {
+      e.preventDefault();
+      handleMove(e);
+    }, { passive: false });
+
     window.addEventListener("touchend", handleUp);
   }
 
   // --------------------------------------------------------------------------
-  // Port Selection Popover for Interactive Wiring
-  // --------------------------------------------------------------------------
-  function showPortSelectionPopover(node, rawX, rawY) {
-    const pop = document.getElementById("cisco-port-popover");
-    if (!pop) return;
-
-    const cableKind = state.activeTool === "cable-cross" ? "cross" : "straight";
-
-    // Check which ports are already occupied
-    const occupiedPorts = new Set();
-    state.links.forEach(l => {
-      if (l.fromNode === node.id) occupiedPorts.add(l.fromPort);
-      if (l.toNode === node.id) occupiedPorts.add(l.toPort);
-    });
-
-    if (!state.cablePending) {
-      // Step 1: Select Source Port
-      pop.innerHTML = `
-        <div class="space-y-2">
-          <div class="flex items-center justify-between border-b border-slate-700 pb-1.5">
-            <span class="font-bold text-indigo-400">Pilih Port Asal: ${node.name}</span>
-            <button id="btn-close-pop" class="text-slate-400 hover:text-white">&times;</button>
-          </div>
-          <div class="space-y-1">
-            ${node.ports.map(p => {
-              const isOccupied = occupiedPorts.has(p);
-              return `
-                <button class="w-full text-left px-2.5 py-1.5 rounded-lg border text-xs font-mono flex items-center justify-between ${isOccupied ? 'opacity-40 bg-slate-900 border-slate-800 text-slate-500 cursor-not-allowed' : 'bg-slate-900 border-indigo-500/40 hover:bg-indigo-600 hover:text-white cursor-pointer'}" data-port="${p}" ${isOccupied ? 'disabled' : ''}>
-                  <span>${p}</span>
-                  <span class="text-[9px] ${isOccupied ? 'text-rose-400' : 'text-emerald-400'}">${isOccupied ? 'Terpakai' : 'Tersedia'}</span>
-                </button>
-              `;
-            }).join("")}
-          </div>
-        </div>
-      `;
-
-      pop.style.left = `${Math.min(window.innerWidth - 220, Math.max(20, rawX))}px`;
-      pop.style.top = `${Math.min(window.innerHeight - 240, Math.max(20, rawY))}px`;
-      pop.classList.remove("hidden");
-
-      pop.querySelector("#btn-close-pop")?.addEventListener("click", () => {
-        pop.classList.add("hidden");
-        state.cablePending = null;
-      });
-
-      pop.querySelectorAll("button[data-port]").forEach(btn => {
-        btn.addEventListener("click", () => {
-          const selectedPort = btn.dataset.port;
-          sound.click();
-          state.cablePending = {
-            fromNodeId: node.id,
-            fromPort: selectedPort,
-            cableType: cableKind
-          };
-          pop.classList.add("hidden");
-          render();
-        });
-      });
-
-    } else {
-      // Step 2: Select Destination Port and Complete Link!
-      if (node.id === state.cablePending.fromNodeId) {
-        pop.classList.add("hidden");
-        return;
-      }
-
-      pop.innerHTML = `
-        <div class="space-y-2">
-          <div class="flex items-center justify-between border-b border-slate-700 pb-1.5">
-            <span class="font-bold text-emerald-400">Hubungkan ke Port: ${node.name}</span>
-            <button id="btn-close-pop" class="text-slate-400 hover:text-white">&times;</button>
-          </div>
-          <div class="space-y-1">
-            ${node.ports.map(p => {
-              const isOccupied = occupiedPorts.has(p);
-              return `
-                <button class="w-full text-left px-2.5 py-1.5 rounded-lg border text-xs font-mono flex items-center justify-between ${isOccupied ? 'opacity-40 bg-slate-900 border-slate-800 text-slate-500 cursor-not-allowed' : 'bg-slate-900 border-emerald-500/40 hover:bg-emerald-600 hover:text-white cursor-pointer'}" data-port="${p}" ${isOccupied ? 'disabled' : ''}>
-                  <span>${p}</span>
-                  <span class="text-[9px] ${isOccupied ? 'text-rose-400' : 'text-emerald-400'}">${isOccupied ? 'Terpakai' : 'Tersedia'}</span>
-                </button>
-              `;
-            }).join("")}
-          </div>
-        </div>
-      `;
-
-      pop.style.left = `${Math.min(window.innerWidth - 220, Math.max(20, rawX))}px`;
-      pop.style.top = `${Math.min(window.innerHeight - 240, Math.max(20, rawY))}px`;
-      pop.classList.remove("hidden");
-
-      pop.querySelector("#btn-close-pop")?.addEventListener("click", () => {
-        pop.classList.add("hidden");
-        state.cablePending = null;
-      });
-
-      pop.querySelectorAll("button[data-port]").forEach(btn => {
-        btn.addEventListener("click", () => {
-          const toPort = btn.dataset.port;
-          sound.success();
-
-          state.links.push({
-            id: `link_${Date.now().toString(36)}`,
-            fromNode: state.cablePending.fromNodeId,
-            fromPort: state.cablePending.fromPort,
-            toNode: node.id,
-            toPort: toPort,
-            cableType: state.cablePending.cableType,
-            status: "up"
-          });
-
-          state.cablePending = null;
-          state.activeTool = "select";
-          pop.classList.add("hidden");
-          render();
-        });
-      });
-    }
-  }
-
-  // --------------------------------------------------------------------------
-  // Canvas Drawing Engine (Nodes, Cables, LEDs, and Glowing PDU Animation)
+  // Canvas Drawing Engine (Nodes, Cables, Rubberband, and Glowing Envelope)
   // --------------------------------------------------------------------------
   function draw(ctx, w, h) {
     ctx.clearRect(0, 0, w, h);
@@ -2232,7 +2262,6 @@ export function renderUnifiedWorkbench(container) {
     ctx.fillStyle = "#0a0f1d";
     ctx.fillRect(0, 0, w, h);
 
-    // Grid Dots / Lines
     ctx.strokeStyle = "rgba(56, 189, 248, 0.07)";
     ctx.lineWidth = 1;
     for (let x = 0; x < w; x += 28) {
@@ -2257,16 +2286,22 @@ export function renderUnifiedWorkbench(container) {
       }
     });
 
-    // 2. Draw In-Progress Cable Rubberband
-    if (state.cablePending) {
+    // 2. Draw In-Progress Rubberband Cable
+    if (state.cablePending && state.pointerPos.active) {
       const fromN = state.nodes[state.cablePending.fromNodeId];
       if (fromN) {
         ctx.save();
         ctx.strokeStyle = "#38bdf8";
-        ctx.lineWidth = 2;
-        ctx.setLineDash([6, 6]);
+        ctx.lineWidth = 2.5;
+        ctx.setLineDash([6, 4]);
         ctx.beginPath();
-        ctx.arc(fromN.x, fromN.y, 45, 0, Math.PI * 2);
+        ctx.moveTo(fromN.x, fromN.y);
+        ctx.lineTo(state.pointerPos.x, state.pointerPos.y);
+        ctx.stroke();
+
+        ctx.strokeStyle = "#38bdf8";
+        ctx.beginPath();
+        ctx.arc(fromN.x, fromN.y, 48, 0, Math.PI * 2);
         ctx.stroke();
         ctx.restore();
       }
@@ -2277,20 +2312,19 @@ export function renderUnifiedWorkbench(container) {
       drawDevice(ctx, node.x, node.y, node);
     });
 
-    // 4. Draw Active PDU Flight Envelope Animation
+    // 4. Draw Active PDU Flight Animation
     const s = state.simulationSteps[state.currentStepIndex];
     if (s && state.nodes) {
       const activeDev = Object.values(state.nodes).find(n => n.name === s.atDevice);
       if (activeDev) {
         ctx.save();
-        ctx.translate(activeDev.x, activeDev.y - 42);
+        ctx.translate(activeDev.x, activeDev.y - 44);
 
-        // Glowing envelope shadow
         ctx.shadowColor = s.color || "#f59e0b";
         ctx.shadowBlur = 14;
 
-        const envW = 38;
-        const envH = 24;
+        const envW = 40;
+        const envH = 26;
 
         ctx.fillStyle = s.color || "#f59e0b";
         ctx.fillRect(-envW / 2, -envH / 2, envW, envH);
@@ -2299,17 +2333,16 @@ export function renderUnifiedWorkbench(container) {
         ctx.lineWidth = 1.5;
         ctx.strokeRect(-envW / 2, -envH / 2, envW, envH);
 
-        // Envelope fold
         ctx.beginPath();
         ctx.moveTo(-envW / 2, -envH / 2);
-        ctx.lineTo(0, 3);
+        ctx.lineTo(0, 4);
         ctx.lineTo(envW / 2, -envH / 2);
         ctx.stroke();
 
         ctx.fillStyle = "#ffffff";
         ctx.font = "bold 9px monospace";
         ctx.textAlign = "center";
-        ctx.fillText(s.type || "PDU", 0, 7);
+        ctx.fillText(s.type || "PDU", 0, 8);
 
         ctx.restore();
       }
@@ -2334,12 +2367,10 @@ export function renderUnifiedWorkbench(container) {
     ctx.lineTo(x2, y2);
     ctx.stroke();
 
-    // Link Lights (Green Triangles ▲ indicating Link UP)
     ctx.fillStyle = "#10b981";
     drawLinkLight(ctx, x1 + (x2 - x1) * 0.16, y1 + (y2 - y1) * 0.16, true);
     drawLinkLight(ctx, x2 - (x2 - x1) * 0.16, y2 - (y2 - y1) * 0.16, false);
 
-    // Port labels
     ctx.fillStyle = "#94a3b8";
     ctx.font = "9px monospace";
     ctx.textAlign = "center";
@@ -2369,45 +2400,49 @@ export function renderUnifiedWorkbench(container) {
 
     const isSelected = node.id === state.selectedDeviceId;
     const isPduSource = node.id === state.pduPendingSource;
-    const cardW = 86;
-    const cardH = 74;
+    const isCableSource = state.cablePending && state.cablePending.fromNodeId === node.id;
+
+    const cardW = 88;
+    const cardH = 76;
     const halfW = cardW / 2;
     const halfH = cardH / 2;
     const radius = 10;
 
-    // Outer Device Card
-    ctx.fillStyle = "rgba(15, 23, 42, 0.92)";
-    ctx.strokeStyle = isPduSource ? "#f59e0b" : (isSelected ? "#6366f1" : "rgba(148, 163, 184, 0.35)");
-    ctx.lineWidth = isSelected || isPduSource ? 2.5 : 1.5;
+    if (isSelected || isPduSource || isCableSource) {
+      ctx.shadowColor = isPduSource ? "#f59e0b" : (isCableSource ? "#38bdf8" : "#6366f1");
+      ctx.shadowBlur = 16;
+    }
+
+    ctx.fillStyle = "rgba(15, 23, 42, 0.94)";
+    ctx.strokeStyle = isPduSource ? "#f59e0b" : (isCableSource ? "#38bdf8" : (isSelected ? "#6366f1" : "rgba(148, 163, 184, 0.35)"));
+    ctx.lineWidth = isSelected || isPduSource || isCableSource ? 2.5 : 1.5;
 
     ctx.beginPath();
     ctx.roundRect ? ctx.roundRect(x - halfW, y - halfH, cardW, cardH, radius) : ctx.rect(x - halfW, y - halfH, cardW, cardH);
     ctx.fill();
     ctx.stroke();
 
-    // Device Power LED Indicator
+    ctx.shadowBlur = 0;
+
     ctx.fillStyle = node.poweredOn ? "#10b981" : "#ef4444";
     ctx.beginPath();
-    ctx.arc(x + 32, y - 24, 3.5, 0, Math.PI * 2);
+    ctx.arc(x + 33, y - 25, 3.5, 0, Math.PI * 2);
     ctx.fill();
 
-    // Device Glyph Icon
     ctx.fillStyle = "#38bdf8";
     ctx.font = "bold 18px monospace";
     ctx.textAlign = "center";
     const symbol = node.type === "switch" ? "☵" : (node.type === "router" ? "⨁" : (node.type === "server" ? "🗄️" : (node.type === "laptop" ? "💻" : "🖥️")));
     ctx.fillText(symbol, x, y - 4);
 
-    // Device Label Name (e.g. PC0, Switch0)
     ctx.fillStyle = "#ffffff";
     ctx.font = "bold 10px monospace";
     ctx.textAlign = "center";
-    ctx.fillText(node.name, x, y + 14);
+    ctx.fillText(node.name, x, y + 15);
 
-    // IP Address Tag
     ctx.fillStyle = "#94a3b8";
     ctx.font = "9px monospace";
-    ctx.fillText(node.ip, x, y + 25);
+    ctx.fillText(node.ip, x, y + 26);
 
     ctx.restore();
   }

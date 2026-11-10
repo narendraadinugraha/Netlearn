@@ -1725,8 +1725,24 @@ function renderDashboard(container) {
     }, 80);
   };
 
+  const launchSimulationWithFullscreen = () => {
+    navigateTo("simulation");
+    setTimeout(() => {
+      const wrapper = document.getElementById("sim-fullscreen-wrapper");
+      if (wrapper && (wrapper.requestFullscreen || wrapper.webkitRequestFullscreen)) {
+        (wrapper.requestFullscreen || wrapper.webkitRequestFullscreen).call(wrapper).then(() => {
+          if (screen.orientation && screen.orientation.lock) screen.orientation.lock("landscape").catch(() => {});
+        }).catch(() => {
+          wrapper.classList.add("sim-lab-fullscreen");
+        });
+      } else if (wrapper) {
+        wrapper.classList.add("sim-lab-fullscreen");
+      }
+    }, 100);
+  };
+
   document.getElementById("btn-dash-minigame")?.addEventListener("click", launchGameWithFullscreen);
-  document.getElementById("btn-dash-cisco")?.addEventListener("click", () => navigateTo("simulation"));
+  document.getElementById("btn-dash-cisco")?.addEventListener("click", launchSimulationWithFullscreen);
   document.getElementById("btn-tool-minigame")?.addEventListener("click", launchGameWithFullscreen);
   document.getElementById("btn-hero-continue")?.addEventListener("click", () => {
     if (activeMod) {
@@ -1735,8 +1751,8 @@ function renderDashboard(container) {
       navigateTo("materials");
     }
   });
-  document.getElementById("btn-hero-lab")?.addEventListener("click", () => navigateTo("simulation"));
-  document.getElementById("btn-hero-lab-secondary")?.addEventListener("click", () => navigateTo("simulation"));
+  document.getElementById("btn-hero-lab")?.addEventListener("click", launchSimulationWithFullscreen);
+  document.getElementById("btn-hero-lab-secondary")?.addEventListener("click", launchSimulationWithFullscreen);
   document.getElementById("btn-resume-lab")?.addEventListener("click", () => {
     if (activeMod) {
       openMaterialModal(activeMod.id);
@@ -1927,7 +1943,7 @@ function renderSimulation(container) {
   let currentMode = "workbench";
 
   container.innerHTML = `
-    <div class="max-w-7xl mx-auto space-y-6 w-full">
+    <div id="sim-fullscreen-wrapper" class="max-w-7xl mx-auto space-y-6 w-full transition-all">
       
       <!-- Simulation Lab Header -->
       <div class="bg-surface-container-lowest p-5 sm:p-6 rounded-2xl border border-outline-variant shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -1949,14 +1965,20 @@ function renderSimulation(container) {
           </p>
         </div>
 
-        <div class="flex items-center gap-2 shrink-0">
-          <div class="p-3 bg-surface-container-low rounded-xl border border-outline-variant flex items-center gap-3">
-            <div class="w-10 h-10 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
-              <span class="material-symbols-outlined text-2xl">verified</span>
+        <div class="flex items-center gap-2.5 shrink-0 flex-wrap">
+          <!-- Fullscreen Toggle Button -->
+          <button id="btn-sim-fullscreen" class="px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white font-mono font-bold text-xs rounded-xl shadow-md hover:shadow-indigo-500/25 transition-all flex items-center gap-2 cursor-pointer active:scale-95">
+            <span class="material-symbols-outlined text-[18px]" id="sim-fs-icon">fullscreen</span>
+            <span id="sim-fs-label">${isId ? "Masuk Layar Penuh (Fullscreen)" : "Enter Fullscreen"}</span>
+          </button>
+
+          <div class="p-2.5 sm:p-3 bg-surface-container-low rounded-xl border border-outline-variant flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+              <span class="material-symbols-outlined text-xl">verified</span>
             </div>
             <div class="text-left font-mono">
-              <span class="text-[10px] text-outline uppercase block">${isId ? "Status Lab" : "Lab Status"}</span>
-              <span class="text-xs font-bold text-emerald-400 flex items-center gap-1">
+              <span class="text-[9px] text-outline uppercase block">${isId ? "Status Lab" : "Lab Status"}</span>
+              <span class="text-[11px] font-bold text-emerald-400 flex items-center gap-1">
                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                 ${isId ? "Siap Digunakan" : "Ready"}
               </span>
@@ -1993,6 +2015,52 @@ function renderSimulation(container) {
 
   const workspace = container.querySelector("#sim-active-workspace");
   const tabButtons = container.querySelectorAll(".sim-mode-tab-btn");
+  const fsWrapper = container.querySelector("#sim-fullscreen-wrapper");
+  const fsBtn = container.querySelector("#btn-sim-fullscreen");
+  const fsIcon = container.querySelector("#sim-fs-icon");
+  const fsLabel = container.querySelector("#sim-fs-label");
+
+  function toggleSimFullscreen() {
+    const isFS = !!(document.fullscreenElement || document.webkitFullscreenElement || fsWrapper?.classList.contains("sim-lab-fullscreen"));
+    if (!isFS) {
+      if (fsWrapper?.requestFullscreen) {
+        fsWrapper.requestFullscreen().catch(() => {
+          fsWrapper.classList.add("sim-lab-fullscreen");
+        });
+      } else if (fsWrapper?.webkitRequestFullscreen) {
+        fsWrapper.webkitRequestFullscreen();
+      } else {
+        fsWrapper?.classList.add("sim-lab-fullscreen");
+      }
+      if (screen.orientation && screen.orientation.lock) {
+        screen.orientation.lock("landscape").catch(() => {});
+      }
+      sound.click();
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+      }
+      fsWrapper?.classList.remove("sim-lab-fullscreen");
+      sound.click();
+    }
+  }
+
+  fsBtn?.addEventListener("click", toggleSimFullscreen);
+
+  const onFSChange = () => {
+    const isFS = !!(document.fullscreenElement || document.webkitFullscreenElement || fsWrapper?.classList.contains("sim-lab-fullscreen"));
+    if (fsIcon) fsIcon.textContent = isFS ? "fullscreen_exit" : "fullscreen";
+    if (fsLabel) fsLabel.textContent = isFS ? (isId ? "Keluar Layar Penuh" : "Exit Fullscreen") : (isId ? "Masuk Layar Penuh (Fullscreen)" : "Enter Fullscreen");
+    setTimeout(() => {
+      window.dispatchEvent(new Event("resize"));
+    }, 150);
+  };
+
+  document.addEventListener("fullscreenchange", onFSChange);
+  document.addEventListener("webkitfullscreenchange", onFSChange);
+
 
   function switchMode(modeId) {
     currentMode = modeId;
