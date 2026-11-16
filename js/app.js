@@ -1156,14 +1156,6 @@ function renderAuth(container, mode = "login") {
     }
   });
 }
-    } finally {
-      if (submitBtn) {
-        submitBtn.disabled = false;
-        submitBtn.classList.remove("opacity-60");
-      }
-    }
-  });
-}
 
 // ============================================================================
 // VIEW 2: STUDENT DASHBOARD (Dynamic Progress & Stitch Architecture)
