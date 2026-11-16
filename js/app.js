@@ -37,7 +37,14 @@ import {
   updateTopicVideo,
   getMaterialsFromDb,
   saveMaterialToDb,
-  deleteMaterialFromDb
+  deleteMaterialFromDb,
+  getCustomQuizzesSync,
+  getCustomQuizzes,
+  saveCustomQuiz,
+  deleteCustomQuiz,
+  toggleCustomQuizStatus,
+  saveItemAnswers,
+  getItemDiagnostics
 } from "./services/supabase.js";
 
 // ============================================================================
@@ -2401,6 +2408,33 @@ const TOPIC_NAMES = [
 ];
 
 function getQuestionsForTest(type) {
+  if (type && (type.startsWith("custom-") || type.startsWith("quiz-"))) {
+    const customQuizzes = getCustomQuizzesSync();
+    const quiz = customQuizzes.find(q => String(q.id) === String(type));
+    if (quiz && quiz.questions && quiz.questions.length > 0) {
+      return quiz.questions.map((q, idx) => ({
+        id: q.id || idx + 1,
+        topic: 1,
+        scenario_id: q.scenario || "",
+        scenario_en: q.scenario || "",
+        question_id: q.question,
+        question_en: q.question,
+        options_id: q.options.map(opt => ({
+          key: opt.key,
+          text: opt.text,
+          correct: opt.key === q.correctKey
+        })),
+        options_en: q.options.map(opt => ({
+          key: opt.key,
+          text: opt.text,
+          correct: opt.key === q.correctKey
+        })),
+        correct: q.correctKey,
+        explanation_id: q.explanation || `Kunci jawaban yang benar adalah pilihan ${q.correctKey}.`,
+        explanation_en: q.explanation || `The correct option is ${q.correctKey}.`
+      }));
+    }
+  }
   if (type && type.startsWith("topic-")) {
     const topicId = parseInt(type.replace("topic-", ""), 10);
     return HOTS_QUESTIONS.filter(q => q.topic === topicId);
@@ -2409,6 +2443,21 @@ function getQuestionsForTest(type) {
 }
 
 function getTestMeta(type, isId) {
+  if (type && (type.startsWith("custom-") || type.startsWith("quiz-"))) {
+    const customQuizzes = getCustomQuizzesSync();
+    const quiz = customQuizzes.find(q => String(q.id) === String(type));
+    if (quiz) {
+      return {
+        title: quiz.title,
+        badge: isId ? "KUIS DARI GURU" : "TEACHER QUIZ",
+        durationMins: quiz.durationMins || 15,
+        totalQuestions: (quiz.questions || []).length,
+        description: isId 
+          ? `Kuis / ulangan harian dari instruktur untuk materi ${quiz.category}.` 
+          : `Custom evaluation quiz from instructor covering ${quiz.category}.`
+      };
+    }
+  }
   if (type === "pre") {
     return {
       title: isId ? "Pretest Diagnostik Jaringan" : "Diagnostic Baseline Pretest",
@@ -2816,6 +2865,22 @@ function finishExam(type) {
   // Persist locally
   if (!state.userStats.results) state.userStats.results = [];
   state.userStats.results.unshift(testResult);
+
+  // Save item answers for Item Diagnostic Analysis
+  try {
+    saveItemAnswers({
+      testType: type,
+      quizId: type,
+      userId: state.currentUser?.user?.id || (state.currentUser?.id || "guest"),
+      studentName: state.currentUser?.name || state.currentUser?.user?.user_metadata?.name || "Siswa",
+      className: state.currentUser?.className || state.currentUser?.user?.user_metadata?.class_name || "X TKJ 1",
+      answers: [...ts.answers],
+      totalQuestions: questionsList.length,
+      score: correctCount
+    });
+  } catch (diagErr) {
+    console.warn("Could not save diagnostic item answers:", diagErr);
+  }
 
   const xpEarned = isPost ? 250 : (isPre ? 150 : 80);
   const xpReason = isPost ? "Menyelesaikan Ujian Posttest" : (isPre ? "Menyelesaikan Pretest Diagnostik" : "Menyelesaikan Kuis Topik");
@@ -3519,6 +3584,8 @@ function renderMiniGame(container) {
 // ============================================================================
 function renderQuizzes(container) {
   const isId = getLang() === "id";
+  const customQuizzes = getCustomQuizzesSync();
+  const activeCustomQuizzes = customQuizzes.filter(q => q.status === "active");
 
   const preResult = (state.userStats?.results || []).find(r => r.type === "pre");
   const postResult = (state.userStats?.results || []).find(r => r.type === "post");
@@ -3701,8 +3768,100 @@ function renderQuizzes(container) {
         </div>
       </div>
 
+      <!-- MAIN FEATURE 3: KUIS & ULANGAN HARIAN DARI GURU -->
+      <div class="space-y-4 pt-4 border-t border-slate-200">
+        <div class="flex items-center justify-between pb-1 flex-wrap gap-2">
+          <div>
+            <h3 class="text-base font-bold text-slate-900 font-display flex items-center gap-2">
+              <span class="material-symbols-outlined text-primary text-[22px]">assignment</span>
+              <span>${isId ? "Kuis & Ulangan Harian dari Guru" : "Instructor Quizzes & Tests"}</span>
+            </h3>
+            <p class="text-xs text-slate-500">${isId ? "Paket soal latihan dan ulangan yang diterbitkan langsung oleh guru kelas." : "Chapter quizzes and evaluations published by your teacher."}</p>
+          </div>
+          <span class="px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-primary/10 text-primary border border-primary/20">
+            ${activeCustomQuizzes.length} ${isId ? "Kuis Aktif" : "Active Quizzes"}
+          </span>
+        </div>
+
+        ${activeCustomQuizzes.length === 0 ? `
+          <div class="p-8 bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-center font-mono text-xs text-slate-500">
+            ${isId ? "Belum ada kuis atau ulangan harian yang dibuka oleh guru saat ini." : "No active quizzes published by your teacher at this moment."}
+          </div>
+        ` : `
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            ${activeCustomQuizzes.map(q => {
+              const prevAttempt = (state.userStats?.results || []).find(r => r.type === q.id);
+              const qCount = (q.questions || []).length;
+              return `
+                <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs flex flex-col justify-between hover:border-primary/50 hover:shadow-md transition-all">
+                  <div class="space-y-2.5">
+                    <div class="flex items-center justify-between gap-2 flex-wrap">
+                      <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-primary/10 text-primary border border-primary/20">
+                        ${q.category}
+                      </span>
+                      ${q.token ? `
+                        <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/10 text-amber-700 border border-amber-500/20 flex items-center gap-1">
+                          <span class="material-symbols-outlined text-[13px]">key</span>
+                          <span>Wajib Token</span>
+                        </span>
+                      ` : `
+                        <span class="px-2 py-0.5 rounded text-[10px] font-mono text-emerald-700 bg-emerald-500/10 border border-emerald-500/20 font-bold">
+                          Bebas Token
+                        </span>
+                      `}
+                    </div>
+
+                    <h4 class="font-bold text-sm text-slate-900 leading-snug line-clamp-2">${q.title}</h4>
+
+                    <div class="flex items-center gap-3 text-xs font-mono text-slate-500 pt-1">
+                      <span class="flex items-center gap-1"><span class="material-symbols-outlined text-[15px]">quiz</span> ${qCount} Soal</span>
+                      <span class="flex items-center gap-1"><span class="material-symbols-outlined text-[15px]">timer</span> ${q.durationMins || 15} Menit</span>
+                    </div>
+
+                    ${prevAttempt ? `
+                      <div class="p-2.5 bg-emerald-50 rounded-lg border border-emerald-200 text-xs font-mono text-emerald-900 flex items-center justify-between">
+                        <span>${isId ? "Nilai Sebelumnya:" : "Score:"}</span>
+                        <span class="font-bold">${prevAttempt.score_percentage !== undefined ? prevAttempt.score_percentage : Math.round((prevAttempt.score / qCount) * 100)} / 100 (${prevAttempt.score}/${qCount})</span>
+                      </div>
+                    ` : ""}
+                  </div>
+
+                  <div class="pt-4 border-t border-slate-100 mt-4">
+                    <button type="button" class="btn-start-student-custom-quiz w-full h-10 ${prevAttempt ? 'bg-white hover:bg-slate-50 text-primary border border-outline-variant' : 'bg-primary hover:bg-primary-container text-on-primary'} font-mono text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 shadow-xs" data-id="${q.id}" data-token="${q.token || ""}">
+                      <span class="material-symbols-outlined text-[16px]">${prevAttempt ? "refresh" : "play_arrow"}</span>
+                      <span>${prevAttempt ? (isId ? "Ulangi Kuis" : "Retake Quiz") : (isId ? "Mulai Kerjakan Kuis" : "Start Quiz")}</span>
+                    </button>
+                  </div>
+                </div>
+              `;
+            }).join("")}
+          </div>
+        `}
+      </div>
+
     </div>
   `;
+
+  // Student custom quiz click handler
+  container.querySelectorAll(".btn-start-student-custom-quiz").forEach(btn => {
+    btn.addEventListener("click", () => {
+      sound.click();
+      const quizId = btn.dataset.id;
+      const requiredToken = (btn.dataset.token || "").trim().toUpperCase();
+
+      if (requiredToken) {
+        const inputToken = window.prompt(isId ? `Kuis ini memerlukan Token Ujian dari Guru.\nMasukkan Token Ujian:` : "Enter exam token from your teacher:");
+        if (inputToken === null) return;
+        if (inputToken.trim().toUpperCase() !== requiredToken) {
+          showToast(isId ? "Token Salah" : "Invalid Token", isId ? "Token ujian yang Anda masukkan tidak sesuai. Silakan tanyakan kepada guru." : "Incorrect token.", "error");
+          return;
+        }
+      }
+
+      state.testState = null;
+      navigateTo("quiz", { type: quizId });
+    });
+  });
 
   // Attach event handlers
   document.getElementById("btn-launch-minigame-hero")?.addEventListener("click", () => {
@@ -3763,15 +3922,23 @@ async function renderAdmin(container) {
         </div>
       </div>
 
-      <!-- Navigation Tabs: 2 Fitur Utama Sesuai Kebutuhan Guru -->
-      <div class="flex items-center gap-2 p-1.5 bg-surface-container-low rounded-xl border border-outline-variant">
-        <button type="button" class="admin-tab-btn flex-1 py-2.5 px-4 rounded-lg text-xs font-bold font-mono transition-all flex items-center justify-center gap-2 cursor-pointer bg-surface-container-lowest text-primary shadow-xs border border-outline-variant/50" data-tab="tab-progress">
-          <span class="material-symbols-outlined text-[18px]">monitoring</span>
-          <span>1. ${isId ? "Pantau Progres Siswa" : "Student Progress"}</span>
+      <!-- Navigation Tabs: 4 Fitur Utama Sesuai Kebutuhan Guru -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-2 p-1.5 bg-surface-container-low rounded-xl border border-outline-variant">
+        <button type="button" class="admin-tab-btn py-2.5 px-3 rounded-lg text-xs font-bold font-mono transition-all flex items-center justify-center gap-1.5 cursor-pointer bg-surface-container-lowest text-primary shadow-xs border border-outline-variant/50" data-tab="tab-progress">
+          <span class="material-symbols-outlined text-[17px]">monitoring</span>
+          <span>1. ${isId ? "Progres Siswa" : "Progress"}</span>
         </button>
-        <button type="button" class="admin-tab-btn flex-1 py-2.5 px-4 rounded-lg text-xs font-bold font-mono transition-all flex items-center justify-center gap-2 cursor-pointer text-outline hover:text-on-surface" data-tab="tab-materials">
-          <span class="material-symbols-outlined text-[18px]">library_add</span>
-          <span>2. ${isId ? "Tambah & Kelola Materi" : "Manage Materials"}</span>
+        <button type="button" class="admin-tab-btn py-2.5 px-3 rounded-lg text-xs font-bold font-mono transition-all flex items-center justify-center gap-1.5 cursor-pointer text-outline hover:text-on-surface" data-tab="tab-materials">
+          <span class="material-symbols-outlined text-[17px]">library_add</span>
+          <span>2. ${isId ? "Kelola Materi" : "Materials"}</span>
+        </button>
+        <button type="button" class="admin-tab-btn py-2.5 px-3 rounded-lg text-xs font-bold font-mono transition-all flex items-center justify-center gap-1.5 cursor-pointer text-outline hover:text-on-surface" data-tab="tab-quizzes">
+          <span class="material-symbols-outlined text-[17px]">quiz</span>
+          <span>3. ${isId ? "Bank Soal & Kuis" : "Quiz Builder"}</span>
+        </button>
+        <button type="button" class="admin-tab-btn py-2.5 px-3 rounded-lg text-xs font-bold font-mono transition-all flex items-center justify-center gap-1.5 cursor-pointer text-outline hover:text-on-surface" data-tab="tab-diagnostics">
+          <span class="material-symbols-outlined text-[17px]">troubleshoot</span>
+          <span>4. ${isId ? "Analisis Butir & Miskonsepsi" : "Item Diagnostics"}</span>
         </button>
       </div>
 
@@ -3786,7 +3953,7 @@ async function renderAdmin(container) {
   async function switchTab(tabId) {
     tabBtns.forEach(btn => {
       const isActive = btn.dataset.tab === tabId;
-      btn.className = `admin-tab-btn flex-1 py-2.5 px-4 rounded-lg text-xs font-bold font-mono transition-all flex items-center justify-center gap-2 cursor-pointer ${
+      btn.className = `admin-tab-btn py-2.5 px-3 rounded-lg text-xs font-bold font-mono transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
         isActive 
           ? "bg-surface-container-lowest text-primary shadow-xs border border-outline-variant/50" 
           : "text-outline hover:text-on-surface hover:bg-surface-container-high/40"
@@ -3795,8 +3962,12 @@ async function renderAdmin(container) {
 
     if (tabId === "tab-progress") {
       await renderAdminProgressTab(tabContentEl);
-    } else {
+    } else if (tabId === "tab-materials") {
       await renderAdminMaterialsTab(tabContentEl);
+    } else if (tabId === "tab-quizzes") {
+      await renderAdminQuizzesTab(tabContentEl);
+    } else if (tabId === "tab-diagnostics") {
+      await renderAdminDiagnosticsTab(tabContentEl);
     }
   }
 
@@ -4329,6 +4500,674 @@ async function renderAdminMaterialsTab(container) {
   });
 
   await refreshMaterialsList();
+}
+
+async function renderAdminQuizzesTab(container) {
+  const isId = getLang() === "id";
+
+  container.innerHTML = `
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      
+      <!-- LEFT COLUMN: Formulir Pembuat Kuis & Butir Soal (7 cols) -->
+      <div class="lg:col-span-7 bg-surface-container-lowest p-5 sm:p-6 rounded-xl border border-outline-variant shadow-xs space-y-4">
+        <div class="border-b border-outline-variant pb-3 flex items-center justify-between">
+          <div>
+            <div class="flex items-center gap-2 text-primary mb-1">
+              <span class="material-symbols-outlined text-[20px]">add_task</span>
+              <h3 class="font-bold text-sm text-on-surface font-mono">${isId ? "Buat Paket Kuis / Ulangan Harian Baru" : "Create New Quiz Package"}</h3>
+            </div>
+            <p class="text-xs text-on-surface-variant">${isId ? "Kuis yang dibuat langsung tersinkronisasi ke portal siswa dan dapat dikerjakan secara real-time." : "Quizzes are instantly published and synchronized to students."}</p>
+          </div>
+        </div>
+
+        <form id="form-admin-create-quiz" class="space-y-4">
+          <!-- Quiz Meta Grid -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div class="sm:col-span-2">
+              <label class="block text-xs font-semibold text-on-surface mb-1 font-mono">${isId ? "Judul Kuis / Ulangan *" : "Quiz Title *"}</label>
+              <input 
+                type="text" 
+                id="quiz-form-title" 
+                placeholder="${isId ? "Contoh: Ulangan Harian Bab 3: Model OSI & TCP/IP" : "e.g. Chapter 3 Quiz: OSI Reference Model"}" 
+                required
+                class="w-full px-3 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-xs font-mono text-on-surface focus:outline-none focus:ring-1 focus:ring-primary focus:bg-white"
+              />
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-on-surface mb-1 font-mono">${isId ? "Kategori / Topik *" : "Topic / Category *"}</label>
+              <select 
+                id="quiz-form-category" 
+                class="w-full px-3 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-xs font-mono text-on-surface focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+              >
+                <option value="Pengenalan Jaringan">${isId ? "Pengenalan Jaringan" : "Network Scopes"}</option>
+                <option value="Topologi & Media" selected>${isId ? "Topologi & Media Transmisi" : "Topology & Media"}</option>
+                <option value="Arsitektur Protokol">${isId ? "Model OSI & TCP/IP" : "OSI & TCP/IP"}</option>
+                <option value="Pengalamatan IP">${isId ? "Subnetting & IPv4" : "Subnetting & IP"}</option>
+                <option value="Perangkat Keras">${isId ? "Perangkat Keras Lab" : "Hardware & Media"}</option>
+                <option value="Layanan Jaringan">${isId ? "Layanan Jaringan (DNS/DHCP)" : "Network Services"}</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-on-surface mb-1 font-mono">${isId ? "Durasi Pengerjaan (Menit) *" : "Duration (Minutes) *"}</label>
+              <input 
+                type="number" 
+                id="quiz-form-duration" 
+                value="15" 
+                min="5" 
+                max="120" 
+                required
+                class="w-full px-3 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-xs font-mono text-on-surface focus:outline-none focus:ring-1 focus:ring-primary focus:bg-white"
+              />
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-on-surface mb-1 font-mono">${isId ? "Token Ujian (Opsional)" : "Exam Token (Optional)"}</label>
+              <input 
+                type="text" 
+                id="quiz-form-token" 
+                placeholder="${isId ? "Contoh: TKJ2026 (Kosongkan jika bebas)" : "e.g. TKJ2026"}" 
+                class="w-full px-3 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-xs font-mono text-on-surface focus:outline-none focus:ring-1 focus:ring-primary focus:bg-white uppercase"
+              />
+              <span class="text-[10px] text-outline font-mono mt-0.5 block">${isId ? "Jika diisi, siswa wajib memasukkan token ini sebelum ujian dimulai." : "Required for students to start the test."}</span>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-on-surface mb-1 font-mono">${isId ? "Status Awal Publikasi *" : "Initial Status *"}</label>
+              <select 
+                id="quiz-form-status" 
+                class="w-full px-3 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-xs font-mono text-on-surface focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+              >
+                <option value="active" selected>🟢 ${isId ? "Langsung Aktifkan untuk Siswa" : "Active (Visible to Students)"}</option>
+                <option value="inactive">⚪ ${isId ? "Simpan sebagai Draf (Terkunci)" : "Draft (Locked)"}</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Dynamic Questions List Section -->
+          <div class="pt-3 border-t border-outline-variant space-y-3">
+            <div class="flex items-center justify-between">
+              <div>
+                <h4 class="font-bold text-xs text-on-surface font-mono uppercase tracking-wider">${isId ? "Daftar Butir Soal Pilihan Ganda" : "Multiple Choice Question Items"}</h4>
+                <span class="text-[11px] text-outline font-mono" id="quiz-builder-count">1 Soal Ditambahkan</span>
+              </div>
+              <button type="button" id="btn-add-question-item" class="h-8 px-3 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 text-xs font-mono font-bold flex items-center gap-1 transition-colors cursor-pointer">
+                <span class="material-symbols-outlined text-[16px]">add</span>
+                <span>${isId ? "Tambah Soal" : "Add Question"}</span>
+              </button>
+            </div>
+
+            <!-- Question items container -->
+            <div id="quiz-builder-items-container" class="space-y-4">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+
+          <button 
+            type="submit" 
+            id="btn-save-quiz-package"
+            class="w-full py-3 px-4 bg-primary hover:bg-primary-container text-on-primary font-mono font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer mt-4"
+          >
+            <span class="material-symbols-outlined text-[18px]">publish</span>
+            <span>${isId ? "Simpan & Publikasikan Kuis ke Portal Siswa" : "Publish Quiz Package to Students"}</span>
+          </button>
+        </form>
+      </div>
+
+      <!-- RIGHT COLUMN: Daftar Kuis yang Sedang Aktif (5 cols) -->
+      <div class="lg:col-span-5 bg-surface-container-lowest p-5 sm:p-6 rounded-xl border border-outline-variant shadow-xs space-y-4">
+        <div class="border-b border-outline-variant pb-3 flex items-center justify-between">
+          <div>
+            <div class="flex items-center gap-2 text-primary mb-1">
+              <span class="material-symbols-outlined text-[20px]">inventory_2</span>
+              <h3 class="font-bold text-sm text-on-surface font-mono">${isId ? "Daftar Paket Kuis Guru" : "Instructor Quiz Roster"}</h3>
+            </div>
+            <p class="text-xs text-on-surface-variant">${isId ? "Kelola status buka/kunci kuis untuk kelas." : "Toggle open/lock status."}</p>
+          </div>
+          <span id="quizzes-count-badge" class="px-2 py-0.5 rounded-full text-xs font-mono font-bold bg-primary/10 text-primary border border-primary/20">
+            ...
+          </span>
+        </div>
+
+        <div id="admin-quizzes-list" class="space-y-3">
+          <div class="p-6 text-center text-outline font-mono text-xs">
+            <span class="material-symbols-outlined text-2xl text-primary animate-spin">progress_activity</span>
+            <p class="mt-2">${isId ? "Memuat paket kuis..." : "Loading quizzes..."}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  let builderQuestions = [
+    {
+      id: 1,
+      question: "",
+      options: [
+        { key: "A", text: "" },
+        { key: "B", text: "" },
+        { key: "C", text: "" },
+        { key: "D", text: "" }
+      ],
+      correctKey: "A",
+      explanation: ""
+    }
+  ];
+
+  function renderBuilderQuestions() {
+    const container = document.getElementById("quiz-builder-items-container");
+    const countEl = document.getElementById("quiz-builder-count");
+    if (!container) return;
+
+    if (countEl) countEl.textContent = `${builderQuestions.length} ${isId ? "Soal Ditambahkan" : "Questions"}`;
+
+    container.innerHTML = builderQuestions.map((q, idx) => `
+      <div class="p-4 rounded-xl border border-outline-variant bg-surface-container-low space-y-3 relative group" data-qidx="${idx}">
+        <div class="flex items-center justify-between border-b border-outline-variant pb-2">
+          <span class="font-bold text-xs text-primary font-mono">${isId ? `Nomor Soal ${idx + 1}` : `Question #${idx + 1}`}</span>
+          ${builderQuestions.length > 1 ? `
+            <button type="button" class="btn-remove-builder-q p-1 rounded hover:bg-red-500/10 text-red-600 text-xs font-mono transition-colors cursor-pointer" data-idx="${idx}" title="${isId ? "Hapus Soal Ini" : "Remove"}">
+              <span class="material-symbols-outlined text-[16px]">delete</span>
+            </button>
+          ` : ""}
+        </div>
+
+        <div>
+          <label class="block text-[11px] font-semibold text-on-surface mb-1 font-mono">${isId ? "Pertanyaan / Studi Kasus *" : "Question Text *"}</label>
+          <textarea 
+            rows="2" 
+            required 
+            placeholder="${isId ? "Ketikkan pertanyaan atau skenario kasus jaringan di sini..." : "Enter scenario or question text..."}"
+            class="input-q-text w-full px-3 py-2 bg-surface-container-lowest border border-outline-variant rounded-lg text-xs font-mono text-on-surface focus:outline-none focus:ring-1 focus:ring-primary resize-y"
+            data-idx="${idx}"
+          >${q.question}</textarea>
+        </div>
+
+        <div class="space-y-2">
+          <label class="block text-[11px] font-semibold text-on-surface font-mono">${isId ? "Pilihan Jawaban & Tandai Kunci Benar (Pilih Bulatan) *" : "Options & Mark Correct Key *"}</label>
+          ${["A", "B", "C", "D"].map((key, optIdx) => `
+            <div class="flex items-center gap-2">
+              <label class="flex items-center gap-1.5 cursor-pointer select-none">
+                <input 
+                  type="radio" 
+                  name="correct-radio-${idx}" 
+                  value="${key}" 
+                  class="radio-q-correct w-3.5 h-3.5 text-emerald-600 focus:ring-emerald-500 accent-emerald-600 cursor-pointer" 
+                  data-idx="${idx}" 
+                  ${q.correctKey === key ? "checked" : ""} 
+                />
+                <span class="w-5 text-center font-bold text-xs font-mono ${q.correctKey === key ? "text-emerald-700 dark:text-emerald-400 font-extrabold" : "text-outline"}">${key}.</span>
+              </label>
+              <input 
+                type="text" 
+                required 
+                placeholder="${isId ? `Teks Pilihan ${key}` : `Option ${key}`}"
+                value="${q.options[optIdx]?.text || ""}"
+                class="input-opt-text flex-1 px-3 py-1.5 bg-surface-container-lowest border border-outline-variant rounded-lg text-xs font-mono text-on-surface focus:outline-none focus:ring-1 focus:ring-primary ${q.correctKey === key ? "border-emerald-500/50 bg-emerald-500/5" : ""}"
+                data-idx="${idx}"
+                data-optkey="${key}"
+              />
+            </div>
+          `).join("")}
+        </div>
+
+        <div>
+          <label class="block text-[11px] font-semibold text-on-surface mb-1 font-mono">${isId ? "Pembahasan / Penjelasan Soal (Opsional)" : "Explanation (Optional)"}</label>
+          <input 
+            type="text" 
+            placeholder="${isId ? "Penjelasan mengapa kunci tersebut benar..." : "Explanation why this is correct..."}"
+            value="${q.explanation || ""}"
+            class="input-q-expl w-full px-3 py-1.5 bg-surface-container-lowest border border-outline-variant rounded-lg text-xs font-mono text-on-surface focus:outline-none focus:ring-1 focus:ring-primary"
+            data-idx="${idx}"
+          />
+        </div>
+      </div>
+    `).join("");
+
+    container.querySelectorAll(".input-q-text").forEach(el => {
+      el.addEventListener("input", (e) => {
+        const i = parseInt(e.target.dataset.idx, 10);
+        builderQuestions[i].question = e.target.value;
+      });
+    });
+
+    container.querySelectorAll(".input-opt-text").forEach(el => {
+      el.addEventListener("input", (e) => {
+        const i = parseInt(e.target.dataset.idx, 10);
+        const key = e.target.dataset.optkey;
+        const opt = builderQuestions[i].options.find(o => o.key === key);
+        if (opt) opt.text = e.target.value;
+      });
+    });
+
+    container.querySelectorAll(".input-q-expl").forEach(el => {
+      el.addEventListener("input", (e) => {
+        const i = parseInt(e.target.dataset.idx, 10);
+        builderQuestions[i].explanation = e.target.value;
+      });
+    });
+
+    container.querySelectorAll(".radio-q-correct").forEach(el => {
+      el.addEventListener("change", (e) => {
+        const i = parseInt(e.target.dataset.idx, 10);
+        builderQuestions[i].correctKey = e.target.value;
+        renderBuilderQuestions();
+      });
+    });
+
+    container.querySelectorAll(".btn-remove-builder-q").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const i = parseInt(btn.dataset.idx, 10);
+        if (builderQuestions.length > 1) {
+          builderQuestions.splice(i, 1);
+          renderBuilderQuestions();
+        }
+      });
+    });
+  }
+
+  renderBuilderQuestions();
+
+  document.getElementById("btn-add-question-item")?.addEventListener("click", () => {
+    sound.click();
+    builderQuestions.push({
+      id: builderQuestions.length + 1,
+      question: "",
+      options: [
+        { key: "A", text: "" },
+        { key: "B", text: "" },
+        { key: "C", text: "" },
+        { key: "D", text: "" }
+      ],
+      correctKey: "A",
+      explanation: ""
+    });
+    renderBuilderQuestions();
+  });
+
+  async function refreshQuizzesList() {
+    const listEl = document.getElementById("admin-quizzes-list");
+    const countBadge = document.getElementById("quizzes-count-badge");
+    if (!listEl) return;
+
+    let quizzes = [];
+    try {
+      quizzes = await getCustomQuizzes();
+    } catch (_) {
+      quizzes = getCustomQuizzesSync();
+    }
+
+    if (countBadge) {
+      countBadge.textContent = `${quizzes.length} ${isId ? "Paket" : "Quizzes"}`;
+    }
+
+    if (!quizzes || quizzes.length === 0) {
+      listEl.innerHTML = `<p class="p-6 text-center text-outline font-mono text-xs">${isId ? "Belum ada paket kuis buatan guru." : "No quizzes yet."}</p>`;
+      return;
+    }
+
+    listEl.innerHTML = quizzes.map(q => {
+      const isActive = q.status === "active";
+      const qCount = (q.questions || []).length;
+
+      return `
+        <div class="p-4 rounded-xl border border-outline-variant bg-surface-container-low hover:bg-surface-container transition-all space-y-3">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-1.5 mb-1 flex-wrap">
+                <span class="px-2 py-0.5 rounded font-mono text-[10px] font-bold ${isActive ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20" : "bg-surface-container text-outline border border-outline-variant"}">
+                  ${isActive ? (isId ? "🟢 Aktif di Siswa" : "🟢 Active") : (isId ? "⚪ Draf / Nonaktif" : "⚪ Inactive")}
+                </span>
+                <span class="text-[10px] font-mono text-outline">${q.category}</span>
+                ${q.token ? `<span class="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 font-mono text-[10px] font-bold">Token: ${q.token}</span>` : ""}
+              </div>
+              <h4 class="font-bold text-xs text-on-surface">${q.title}</h4>
+              <p class="text-[11px] font-mono text-outline mt-0.5">${qCount} Butir Soal • Durasi ${q.durationMins || 15} Menit</p>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2 pt-2 border-t border-outline-variant flex-wrap">
+            <button type="button" class="btn-toggle-quiz-status h-7 px-2.5 rounded-lg text-xs font-mono font-medium border transition-colors cursor-pointer flex items-center gap-1 ${isActive ? "bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/20" : "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/20"}" data-id="${q.id}">
+              <span class="material-symbols-outlined text-[14px]">${isActive ? "lock" : "lock_open"}</span>
+              <span>${isActive ? (isId ? "Kunci Kuis" : "Lock") : (isId ? "Buka ke Siswa" : "Activate")}</span>
+            </button>
+
+            <button type="button" class="btn-preview-quiz h-7 px-2.5 rounded-lg bg-surface-container-lowest hover:bg-surface-container text-on-surface border border-outline-variant text-xs font-mono font-medium flex items-center gap-1 transition-colors cursor-pointer" data-id="${q.id}">
+              <span class="material-symbols-outlined text-[14px] text-primary">visibility</span>
+              <span>${isId ? "Uji Coba" : "Try Quiz"}</span>
+            </button>
+
+            <button type="button" class="btn-delete-quiz h-7 px-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-600 border border-red-500/20 text-xs font-mono transition-colors cursor-pointer ml-auto" data-id="${q.id}" title="${isId ? "Hapus Kuis" : "Delete"}">
+              <span class="material-symbols-outlined text-[14px]">delete</span>
+            </button>
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    listEl.querySelectorAll(".btn-toggle-quiz-status").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        sound.click();
+        const quizId = btn.dataset.id;
+        const newStatus = await toggleCustomQuizStatus(quizId);
+        showToast(
+          isId ? "Status Kuis Diperbarui" : "Status Updated", 
+          newStatus === "active" 
+            ? (isId ? "Kuis sekarang dibuka dan muncul di portal siswa." : "Quiz is now visible to students.") 
+            : (isId ? "Kuis dikunci dan disembunyikan dari siswa." : "Quiz is locked."), 
+          "sync"
+        );
+        await refreshQuizzesList();
+      });
+    });
+
+    listEl.querySelectorAll(".btn-preview-quiz").forEach(btn => {
+      btn.addEventListener("click", () => {
+        sound.click();
+        const quizId = btn.dataset.id;
+        state.testState = null;
+        navigateTo("quiz", { type: quizId });
+      });
+    });
+
+    listEl.querySelectorAll(".btn-delete-quiz").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        sound.click();
+        const quizId = btn.dataset.id;
+        const confirmDel = window.confirm(isId ? "Yakin ingin menghapus kuis ini?" : "Delete this quiz?");
+        if (!confirmDel) return;
+        await deleteCustomQuiz(quizId);
+        showToast(isId ? "Kuis Dihapus" : "Quiz Deleted", isId ? "Paket kuis berhasil dihapus." : "Quiz removed.", "delete");
+        await refreshQuizzesList();
+      });
+    });
+  }
+
+  document.getElementById("form-admin-create-quiz")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    sound.click();
+
+    const title = document.getElementById("quiz-form-title")?.value.trim();
+    const category = document.getElementById("quiz-form-category")?.value || "Topologi & Media";
+    const durationMins = parseInt(document.getElementById("quiz-form-duration")?.value || "15", 10);
+    const token = document.getElementById("quiz-form-token")?.value.trim().toUpperCase() || "";
+    const status = document.getElementById("quiz-form-status")?.value || "active";
+
+    for (let i = 0; i < builderQuestions.length; i++) {
+      const q = builderQuestions[i];
+      if (!q.question.trim()) {
+        showToast(isId ? "Soal Belum Lengkap" : "Incomplete", isId ? `Isi pertanyaan nomor ${i + 1}.` : `Fill question #${i + 1}.`, "warning");
+        return;
+      }
+      for (const opt of q.options) {
+        if (!opt.text.trim()) {
+          showToast(isId ? "Pilihan Belum Lengkap" : "Incomplete", isId ? `Isi pilihan ${opt.key} nomor ${i + 1}.` : `Fill option ${opt.key} #${i + 1}.`, "warning");
+          return;
+        }
+      }
+    }
+
+    const submitBtn = document.getElementById("btn-save-quiz-package");
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = `<span class="material-symbols-outlined text-[18px] animate-spin">progress_activity</span> <span>${isId ? "Menyimpan ke Portal Siswa..." : "Publishing..."}</span>`;
+    }
+
+    try {
+      await saveCustomQuiz({
+        title,
+        category,
+        durationMins,
+        token,
+        status,
+        questions: builderQuestions
+      });
+
+      showToast(
+        isId ? "Kuis Berhasil Diterbitkan!" : "Quiz Published!",
+        `${isId ? "Kuis baru aktif dan langsung tersinkron ke siswa:" : "Published:"} ${title}`,
+        "verified"
+      );
+
+      document.getElementById("form-admin-create-quiz")?.reset();
+      builderQuestions = [
+        {
+          id: 1,
+          question: "",
+          options: [
+            { key: "A", text: "" },
+            { key: "B", text: "" },
+            { key: "C", text: "" },
+            { key: "D", text: "" }
+          ],
+          correctKey: "A",
+          explanation: ""
+        }
+      ];
+      renderBuilderQuestions();
+      await refreshQuizzesList();
+    } catch (err) {
+      console.error("Save quiz error:", err);
+      showToast(isId ? "Gagal Menyimpan" : "Save Error", err.message || "Error saving quiz.", "error");
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = `<span class="material-symbols-outlined text-[18px]">publish</span> <span>${isId ? "Simpan & Publikasikan Kuis ke Portal Siswa" : "Publish Quiz Package to Students"}</span>`;
+      }
+    }
+  });
+
+  await refreshQuizzesList();
+}
+
+async function renderAdminDiagnosticsTab(container) {
+  const isId = getLang() === "id";
+  const customQuizzes = getCustomQuizzesSync();
+
+  container.innerHTML = `
+    <div class="space-y-6">
+      
+      <!-- Filter Bar: Pilih Jenis Asesmen & Kelas -->
+      <div class="bg-surface-container-lowest p-4 sm:p-5 rounded-xl border border-outline-variant shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div class="flex items-center gap-2 text-primary mb-1">
+            <span class="material-symbols-outlined text-[20px]">troubleshoot</span>
+            <h3 class="font-bold text-sm text-on-surface font-mono">${isId ? "Diagnostik Butir Soal & Pola Miskonsepsi Siswa" : "Item Diagnostic & Misconception Insights"}</h3>
+          </div>
+          <p class="text-xs text-on-surface-variant">${isId ? "Statistik tingkat kesukaran (P-Value), efektivitas opsi pengecoh, dan deteksi kelemahan materi siswa." : "Item difficulty, distractor distribution, and student misconceptions."}</p>
+        </div>
+
+        <div class="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
+          <select id="diag-select-test" class="px-3 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-xs font-mono text-on-surface focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer">
+            <option value="post" selected>${isId ? "Ujian Akhir Posttest HOTS (25 Soal)" : "HOTS Posttest (25 Items)"}</option>
+            <option value="pre">${isId ? "Pretest Diagnostik Awal (25 Soal)" : "Diagnostic Pretest (25 Items)"}</option>
+            ${customQuizzes.map(q => `<option value="${q.id}">${isId ? "Kuis Guru: " : "Quiz: "}${q.title}</option>`).join("")}
+          </select>
+
+          <select id="diag-select-class" class="px-3 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-xs font-mono text-on-surface focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer">
+            <option value="ALL">${isId ? "-- Semua Kelas TKJ --" : "-- All Classes --"}</option>
+            ${TKJ_CLASSES.map(c => `<option value="${c}">${c}</option>`).join("")}
+          </select>
+        </div>
+      </div>
+
+      <!-- KPI Summary Cards -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4" id="diag-kpi-cards">
+        <!-- Rendered dynamically -->
+      </div>
+
+      <!-- Diagnostic Items List -->
+      <div class="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-xs overflow-hidden">
+        <div class="p-4 bg-surface-container-low border-b border-outline-variant flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-[18px] text-primary">analytics</span>
+            <h4 class="font-bold text-xs text-on-surface font-mono uppercase tracking-wider">${isId ? "Analisis Butir Soal per Nomor" : "Item-by-Item Breakdown"}</h4>
+          </div>
+          <span class="text-xs font-mono text-outline" id="diag-total-items-badge">...</span>
+        </div>
+
+        <div class="p-4 sm:p-6 space-y-4" id="diag-items-list-container">
+          <!-- Rendered dynamically -->
+        </div>
+      </div>
+    </div>
+  `;
+
+  function refreshDiagnostics() {
+    const selectedTest = document.getElementById("diag-select-test")?.value || "post";
+    const selectedClass = document.getElementById("diag-select-class")?.value || "ALL";
+
+    let questionsList = [];
+    let isCustom = selectedTest.startsWith("quiz-") || selectedTest.startsWith("custom-");
+
+    if (isCustom) {
+      const qz = customQuizzes.find(q => String(q.id) === String(selectedTest));
+      questionsList = (qz && qz.questions) ? qz.questions.map((q, idx) => ({
+        id: q.id || idx + 1,
+        question_id: q.question,
+        scenario_id: q.scenario || "",
+        correctKey: q.correctKey,
+        explanation_id: q.explanation || "",
+        options: q.options
+      })) : [];
+    } else {
+      questionsList = HOTS_QUESTIONS;
+    }
+
+    const items = getItemDiagnostics({
+      testType: selectedTest,
+      quizId: isCustom ? selectedTest : null,
+      filterClass: selectedClass,
+      questionsList: questionsList
+    });
+
+    const kpiContainer = document.getElementById("diag-kpi-cards");
+    const badgeContainer = document.getElementById("diag-total-items-badge");
+    const listContainer = document.getElementById("diag-items-list-container");
+
+    const totalQuestions = items.length;
+    const avgScorePct = totalQuestions > 0 ? Math.round(items.reduce((acc, it) => acc + it.pctCorrect, 0) / totalQuestions) : 0;
+    const highMisconceptionCount = items.filter(it => it.hasHighMisconception).length;
+    const hardCount = items.filter(it => it.pctCorrect < 30).length;
+
+    if (badgeContainer) {
+      badgeContainer.textContent = `${totalQuestions} ${isId ? "Butir Soal Dianalisis" : "Items Analyzed"}`;
+    }
+
+    if (kpiContainer) {
+      kpiContainer.innerHTML = `
+        <div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant shadow-xs flex items-center gap-3">
+          <div class="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0 border border-primary/20">
+            <span class="material-symbols-outlined text-[22px]">score</span>
+          </div>
+          <div>
+            <span class="text-[10px] font-mono text-outline uppercase block">${isId ? "Rata-rata Skor Capaian" : "Avg Score"}</span>
+            <span class="text-xl font-extrabold text-on-surface font-mono">${avgScorePct}%</span>
+          </div>
+        </div>
+
+        <div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant shadow-xs flex items-center gap-3">
+          <div class="w-10 h-10 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0 border border-amber-500/20">
+            <span class="material-symbols-outlined text-[22px]">warning</span>
+          </div>
+          <div>
+            <span class="text-[10px] font-mono text-outline uppercase block">${isId ? "Soal Terindikasi Miskonsepsi" : "High Misconception"}</span>
+            <span class="text-xl font-extrabold text-amber-600 font-mono">${highMisconceptionCount} <span class="text-xs text-outline font-normal">Soal</span></span>
+          </div>
+        </div>
+
+        <div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant shadow-xs flex items-center gap-3">
+          <div class="w-10 h-10 rounded-lg bg-red-500/10 text-red-600 flex items-center justify-center shrink-0 border border-red-500/20">
+            <span class="material-symbols-outlined text-[22px]">error</span>
+          </div>
+          <div>
+            <span class="text-[10px] font-mono text-outline uppercase block">${isId ? "Soal Kategori Sukar (<30%)" : "Difficult Items (<30%)"}</span>
+            <span class="text-xl font-extrabold text-red-600 font-mono">${hardCount} <span class="text-xs text-outline font-normal">Soal</span></span>
+          </div>
+        </div>
+      `;
+    }
+
+    if (listContainer) {
+      if (items.length === 0) {
+        listContainer.innerHTML = `<p class="p-6 text-center text-outline font-mono text-xs">${isId ? "Tidak ada butir soal untuk asesmen ini." : "No items found."}</p>`;
+        return;
+      }
+
+      listContainer.innerHTML = items.map(it => `
+        <div class="p-4 sm:p-5 rounded-xl border border-outline-variant bg-surface-container-low hover:bg-surface-container transition-all space-y-3.5">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-outline-variant pb-2.5">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="w-6 h-6 rounded-full bg-primary text-on-primary flex items-center justify-center font-bold text-xs font-mono">
+                ${it.index}
+              </span>
+              <span class="text-xs font-bold font-mono text-on-surface">${isId ? `Butir Soal #${it.index}` : `Item #${it.index}`}</span>
+              <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold border ${it.difficultyColor}">
+                Tingkat ${it.difficulty} (P = ${it.pValue})
+              </span>
+              <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 font-bold">
+                ✓ Kunci: ${it.correctKey}
+              </span>
+            </div>
+            <div class="text-[11px] font-mono text-outline">
+              ${it.correctCount} / ${it.totalRespondents} Siswa Benar (${it.pctCorrect}%)
+            </div>
+          </div>
+
+          <div>
+            ${it.scenario ? `<p class="text-xs text-on-surface-variant italic mb-1 leading-relaxed">${it.scenario}</p>` : ""}
+            <p class="text-xs font-semibold text-on-surface leading-relaxed">${it.question}</p>
+          </div>
+
+          <div class="space-y-1.5 pt-1">
+            <span class="text-[10px] font-mono uppercase tracking-wider text-outline block font-semibold">
+              ${isId ? "Distribusi Pilihan Siswa:" : "Student Option Distribution:"}
+            </span>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono">
+              ${it.distCounts.map(d => {
+                const isCorrect = d.key === it.correctKey;
+                return `
+                  <div class="p-2 rounded-lg border ${isCorrect ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300 font-bold" : "bg-surface-container-lowest border-outline-variant text-on-surface"}">
+                    <div class="flex items-center justify-between mb-1">
+                      <span>Opsi ${d.key} ${isCorrect ? "✓ (Kunci)" : ""}</span>
+                      <span>${d.pct}%</span>
+                    </div>
+                    <div class="w-full h-1.5 bg-outline-variant/30 rounded-full overflow-hidden">
+                      <div class="h-full ${isCorrect ? "bg-emerald-600" : (d.pct >= 22 ? "bg-amber-500" : "bg-primary")}" style="width: ${Math.max(4, d.pct)}%"></div>
+                    </div>
+                  </div>
+                `;
+              }).join("")}
+            </div>
+          </div>
+
+          ${it.hasHighMisconception ? `
+            <div class="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300 text-xs font-mono flex items-start gap-2.5">
+              <span class="material-symbols-outlined text-[18px] text-amber-600 shrink-0 mt-0.5">warning</span>
+              <div class="space-y-1">
+                <span class="font-bold block">${isId ? "⚠️ Terdeteksi Pola Miskonsepsi Siswa!" : "⚠️ Common Misconception Pattern Detected!"}</span>
+                <p class="text-[11px] leading-relaxed">
+                  ${isId 
+                    ? `Sebanyak <strong>${it.topMisconception.pct}% siswa terjebak memilih Opsi ${it.topMisconception.key}</strong>. Siswa cenderung keliru memahami konsep ini.`
+                    : `${it.topMisconception.pct}% of students picked distractor ${it.topMisconception.key}.`}
+                </p>
+                ${it.explanation ? `
+                  <div class="text-[10px] text-on-surface-variant pt-1 border-t border-amber-500/20">
+                    <strong>${isId ? "Rekomendasi Penjelasan Guru:" : "Remediation Guide:"}</strong> ${it.explanation}
+                  </div>
+                ` : ""}
+              </div>
+            </div>
+          ` : ""}
+        </div>
+      `).join("");
+    }
+  }
+
+  refreshDiagnostics();
+  document.getElementById("diag-select-test")?.addEventListener("change", refreshDiagnostics);
+  document.getElementById("diag-select-class")?.addEventListener("change", refreshDiagnostics);
 }
 
 // ============================================================================
