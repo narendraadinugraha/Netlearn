@@ -169,7 +169,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
     const isTeacher = isUserAdmin(state.currentUser);
     const targetHash = window.location.hash.replace("#", "").trim();
-    const validViews = ["dashboard", "materials", "simulation", "quizzes", "minigame", "pretest", "posttest", "manual", "profile", "admin"];
+    const validViews = isTeacher 
+      ? ["admin", "materials", "profile"] 
+      : ["dashboard", "materials", "simulation", "quizzes", "minigame", "pretest", "posttest", "manual", "profile"];
     const initialView = validViews.includes(targetHash) ? targetHash : (isTeacher ? "admin" : "dashboard");
     navigateTo(initialView);
   } else {
@@ -183,16 +185,47 @@ document.addEventListener("DOMContentLoaded", async () => {
 // ============================================================================
 function updateRoleAccess() {
   const isTeacher = isUserAdmin(state.currentUser);
+  const studentViews = ["dashboard", "simulation", "quizzes", "manual"];
 
-  document.querySelectorAll(".admin-nav-btn, #nav-btn-admin, #top-nav-admin").forEach(btn => {
-    if (isTeacher) {
-      btn.classList.remove("hidden");
-      btn.style.setProperty("display", "inline-flex", "important");
-    } else {
-      btn.classList.add("hidden");
-      btn.style.setProperty("display", "none", "important");
+  document.querySelectorAll(".nav-item-btn").forEach(btn => {
+    const view = btn.dataset.view;
+    if (view === "admin") {
+      if (isTeacher) {
+        btn.classList.remove("hidden");
+        btn.style.setProperty("display", "inline-flex", "important");
+      } else {
+        btn.classList.add("hidden");
+        btn.style.setProperty("display", "none", "important");
+      }
+    } else if (studentViews.includes(view)) {
+      if (isTeacher) {
+        // Sembunyikan semua menu khusus siswa jika yang login adalah guru
+        btn.classList.add("hidden");
+        btn.style.setProperty("display", "none", "important");
+      } else {
+        btn.classList.remove("hidden");
+        btn.style.removeProperty("display");
+      }
     }
   });
+
+  // Sesuaikan status header HUD jika guru
+  const curriculumCounter = document.getElementById("hud-curriculum-counter")?.parentElement;
+  if (curriculumCounter) {
+    if (isTeacher) {
+      curriculumCounter.innerHTML = `
+        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+        <span class="text-on-surface-variant font-medium">Akses:</span>
+        <span class="font-bold text-secondary font-mono">Panel Guru Aktif</span>
+      `;
+    } else {
+      curriculumCounter.innerHTML = `
+        <span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+        <span class="text-on-surface-variant font-medium">Kurikulum:</span>
+        <span class="font-bold text-primary" id="hud-curriculum-counter">${state.userStats?.readMaterials?.length || 0}/6 Modul</span>
+      `;
+    }
+  }
 }
 
 // ============================================================================
@@ -474,11 +507,19 @@ export function navigateTo(viewName, params = {}) {
   // Ensure APK layout frame is visible
   showAppLayout();
 
-  // Role Security Guard: Panel Guru hanya boleh diakses oleh Guru/Admin
+  // Role Security & Dedicated Guru View Guard
   const isTeacher = isUserAdmin(state.currentUser);
-  if (viewName === "admin" && !isTeacher) {
-    showToast("Akses Ditolak", t("toastAccessDenied"), "lock");
-    viewName = "dashboard";
+  if (isTeacher) {
+    // Guru hanya mengakses menu khusus Guru: admin, materials, dan profile
+    if (viewName !== "admin" && viewName !== "materials" && viewName !== "profile") {
+      viewName = "admin";
+    }
+  } else {
+    // Siswa tidak boleh mengakses admin
+    if (viewName === "admin") {
+      showToast("Akses Ditolak", t("toastAccessDenied"), "lock");
+      viewName = "dashboard";
+    }
   }
 
   state.currentView = viewName;
@@ -576,10 +617,12 @@ export function navigateTo(viewName, params = {}) {
 // ============================================================================
 function setupGlobalEvents() {
   document.getElementById("nav-brand")?.addEventListener("click", () => {
-    navigateTo(state.currentUser ? "dashboard" : "auth");
+    const target = isUserAdmin(state.currentUser) ? "admin" : (state.currentUser ? "dashboard" : "auth");
+    navigateTo(target);
   });
   document.getElementById("header-brand-click")?.addEventListener("click", () => {
-    navigateTo(state.currentUser ? "dashboard" : "auth");
+    const target = isUserAdmin(state.currentUser) ? "admin" : (state.currentUser ? "dashboard" : "auth");
+    navigateTo(target);
   });
 
   document.querySelectorAll(".nav-item-btn").forEach(btn => {
