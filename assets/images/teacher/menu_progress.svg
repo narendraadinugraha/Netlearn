@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 220" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="50%" stop-color="#1e293b" />
+      <stop offset="100%" stop-color="#0284c7" stop-opacity="0.8" />
+    </linearGradient>
+    <linearGradient id="barGrad" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" stop-color="#0284c7" />
+      <stop offset="100%" stop-color="#38bdf8" />
+    </linearGradient>
+    <linearGradient id="lineGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="50%" stop-color="#34d399" />
+      <stop offset="100%" stop-color="#10b981" />
+    </linearGradient>
+    <filter id="glow1" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Background Canvas -->
+  <rect width="400" height="220" rx="16" fill="url(#bgGrad1)" />
+
+  <!-- Subtle Grid Lines -->
+  <path d="M 30 50 H 370 M 30 90 H 370 M 30 130 H 370 M 30 170 H 370" stroke="#334155" stroke-width="1" stroke-dasharray="4 4" opacity="0.6" />
+  <path d="M 90 30 V 180 M 160 30 V 180 M 230 30 V 180 M 300 30 V 180" stroke="#334155" stroke-width="1" stroke-dasharray="4 4" opacity="0.3" />
+
+  <!-- Bar Chart Columns -->
+  <rect x="70" y="110" width="28" height="60" rx="6" fill="#1e293b" stroke="#38bdf8" stroke-width="1.5" />
+  <rect x="72" y="115" width="24" height="53" rx="4" fill="url(#barGrad)" opacity="0.75" />
+
+  <rect x="135" y="85" width="28" height="85" rx="6" fill="#1e293b" stroke="#38bdf8" stroke-width="1.5" />
+  <rect x="137" y="90" width="24" height="78" rx="4" fill="url(#barGrad)" opacity="0.85" />
+
+  <rect x="200" y="60" width="28" height="110" rx="6" fill="#1e293b" stroke="#38bdf8" stroke-width="1.5" />
+  <rect x="202" y="65" width="24" height="103" rx="4" fill="url(#barGrad)" />
+
+  <rect x="265" y="45" width="28" height="125" rx="6" fill="#1e293b" stroke="#34d399" stroke-width="2" />
+  <rect x="267" y="50" width="24" height="118" rx="4" fill="url(#lineGrad)" />
+
+  <!-- Glowing Trend Line -->
+  <path d="M 50 145 Q 110 120 150 95 T 240 70 T 350 35" fill="none" stroke="url(#lineGrad)" stroke-width="4" stroke-linecap="round" filter="url(#glow1)" />
+  <path d="M 50 145 Q 110 120 150 95 T 240 70 T 350 35" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" />
+
+  <!-- Data Nodes -->
+  <circle cx="84" cy="120" r="5" fill="#38bdf8" stroke="#ffffff" stroke-width="2" />
+  <circle cx="149" cy="95" r="5" fill="#38bdf8" stroke="#ffffff" stroke-width="2" />
+  <circle cx="214" cy="70" r="5" fill="#34d399" stroke="#ffffff" stroke-width="2" />
+  <circle cx="279" cy="48" r="6" fill="#10b981" stroke="#ffffff" stroke-width="2.5" />
+  <circle cx="345" cy="36" r="7" fill="#10b981" stroke="#ffffff" stroke-width="3" filter="url(#glow1)" />
+
+  <!-- Floating Metric Chip -->
+  <g transform="translate(230, 150)">
+    <rect width="140" height="46" rx="10" fill="#0f172a" fill-opacity="0.9" stroke="#10b981" stroke-width="1.5" />
+    <circle cx="22" cy="23" r="10" fill="#10b981" fill-opacity="0.2" />
+    <path d="M 18 23 L 21 26 L 27 19" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+    <text x="38" y="19" fill="#94a3b8" font-family="system-ui, sans-serif" font-size="9" font-weight="600">KETUNTASAN</text>
+    <text x="38" y="35" fill="#f8fafc" font-family="system-ui, sans-serif" font-size="14" font-weight="800">94.8% MASTERY</text>
+  </g>
+
+  <!-- Left Top Badge -->
+  <g transform="translate(30, 24)">
+    <rect width="110" height="26" rx="6" fill="#0284c7" fill-opacity="0.25" stroke="#38bdf8" stroke-width="1" />
+    <circle cx="12" cy="13" r="4" fill="#38bdf8" />
+    <text x="22" y="17" fill="#e0f2fe" font-family="system-ui, sans-serif" font-size="10" font-weight="700">COHORT LIVE</text>
+  </g>
+</svg>

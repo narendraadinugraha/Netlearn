@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 220" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGrad4" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="60%" stop-color="#1e1b4b" />
+      <stop offset="100%" stop-color="#be123c" stop-opacity="0.8" />
+    </linearGradient>
+    <linearGradient id="roseGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#f43f5e" />
+      <stop offset="100%" stop-color="#fda4af" />
+    </linearGradient>
+    <filter id="glow4" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Background Canvas -->
+  <rect width="400" height="220" rx="16" fill="url(#bgGrad4)" />
+
+  <!-- Radar / Scan Circles -->
+  <circle cx="120" cy="115" r="70" fill="none" stroke="#334155" stroke-width="1" stroke-dasharray="3 3" opacity="0.6" />
+  <circle cx="120" cy="115" r="45" fill="none" stroke="#475569" stroke-width="1.2" opacity="0.6" />
+  <circle cx="120" cy="115" r="20" fill="none" stroke="#f43f5e" stroke-width="1.5" opacity="0.8" />
+  <line x1="50" y1="115" x2="190" y2="115" stroke="#334155" stroke-width="1" opacity="0.4" />
+  <line x1="120" y1="45" x2="120" y2="185" stroke="#334155" stroke-width="1" opacity="0.4" />
+
+  <!-- Magnifier Target with Alert -->
+  <g transform="translate(65, 60)">
+    <circle cx="55" cy="55" r="38" fill="#1e293b" fill-opacity="0.75" stroke="#38bdf8" stroke-width="3" filter="url(#glow4)" />
+    <!-- Alert Icon Inside Glass -->
+    <path d="M 55 35 L 72 65 H 38 Z" fill="#f43f5e" fill-opacity="0.2" stroke="#f43f5e" stroke-width="2" stroke-linejoin="round" />
+    <line x1="55" y1="46" x2="55" y2="54" stroke="#ffffff" stroke-width="2" stroke-linecap="round" />
+    <circle cx="55" cy="59" r="1.5" fill="#ffffff" />
+    <!-- Handle -->
+    <line x1="82" y1="82" x2="110" y2="110" stroke="#94a3b8" stroke-width="6" stroke-linecap="round" />
+  </g>
+
+  <!-- Right Option Distractor Bars Breakdown -->
+  <g transform="translate(210, 52)">
+    <!-- Option A (Correct) -->
+    <text x="0" y="16" fill="#10b981" font-family="monospace" font-size="11" font-weight="800">A (Kunci)</text>
+    <rect x="62" y="6" width="110" height="12" rx="4" fill="#1e293b" stroke="#334155" stroke-width="1" />
+    <rect x="63" y="7" width="75" height="10" rx="3" fill="#10b981" />
+    <text x="145" y="16" fill="#10b981" font-family="system-ui, sans-serif" font-size="10" font-weight="700">65%</text>
+
+    <!-- Option B (Trap Distractor!) -->
+    <text x="0" y="44" fill="#f43f5e" font-family="monospace" font-size="11" font-weight="800">B (Trap)</text>
+    <rect x="62" y="34" width="110" height="12" rx="4" fill="#1e293b" stroke="#f43f5e" stroke-width="1" />
+    <rect x="63" y="35" width="40" height="10" rx="3" fill="#f43f5e" />
+    <text x="145" y="44" fill="#f43f5e" font-family="system-ui, sans-serif" font-size="10" font-weight="700">28%</text>
+
+    <!-- Option C -->
+    <text x="0" y="72" fill="#94a3b8" font-family="monospace" font-size="11" font-weight="700">C</text>
+    <rect x="62" y="62" width="110" height="12" rx="4" fill="#1e293b" stroke="#334155" stroke-width="1" />
+    <rect x="63" y="63" width="10" height="10" rx="3" fill="#64748b" />
+    <text x="145" y="72" fill="#94a3b8" font-family="system-ui, sans-serif" font-size="10" font-weight="600">4%</text>
+
+    <!-- Option D -->
+    <text x="0" y="100" fill="#94a3b8" font-family="monospace" font-size="11" font-weight="700">D</text>
+    <rect x="62" y="90" width="110" height="12" rx="4" fill="#1e293b" stroke="#334155" stroke-width="1" />
+    <rect x="63" y="91" width="8" height="10" rx="3" fill="#64748b" />
+    <text x="145" y="100" fill="#94a3b8" font-family="system-ui, sans-serif" font-size="10" font-weight="600">3%</text>
+  </g>
+
+  <!-- Floating Alert Warning Box -->
+  <g transform="translate(195, 160)">
+    <rect width="185" height="38" rx="8" fill="#4c0519" fill-opacity="0.9" stroke="#f43f5e" stroke-width="1" />
+    <circle cx="18" cy="19" r="8" fill="#f43f5e" fill-opacity="0.3" />
+    <text x="15" y="23" fill="#f43f5e" font-family="system-ui, sans-serif" font-size="11" font-weight="900">!</text>
+    <text x="32" y="16" fill="#fecdd3" font-family="system-ui, sans-serif" font-size="9" font-weight="800">MISKONSEPSI TINGGI</text>
+    <text x="32" y="28" fill="#fda4af" font-family="system-ui, sans-serif" font-size="8" font-weight="500">28% Terjebak Opsi B</text>
+  </g>
+
+  <!-- Left Top Badge -->
+  <g transform="translate(30, 24)">
+    <rect width="130" height="26" rx="6" fill="#881337" fill-opacity="0.3" stroke="#f43f5e" stroke-width="1" />
+    <circle cx="12" cy="13" r="4" fill="#f43f5e" />
+    <text x="22" y="17" fill="#ffe4e6" font-family="system-ui, sans-serif" font-size="10" font-weight="700">DIAGNOSTIK BUTIR</text>
+  </g>
+</svg>

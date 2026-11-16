@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 220" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="60%" stop-color="#1e1b4b" />
+      <stop offset="100%" stop-color="#4f46e5" stop-opacity="0.8" />
+    </linearGradient>
+    <linearGradient id="bookGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#818cf8" />
+      <stop offset="100%" stop-color="#6366f1" />
+    </linearGradient>
+    <linearGradient id="nodeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#a855f7" />
+      <stop offset="100%" stop-color="#6366f1" />
+    </linearGradient>
+    <filter id="glow2" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Background Canvas -->
+  <rect width="400" height="220" rx="16" fill="url(#bgGrad2)" />
+
+  <!-- Network Circuit Lines -->
+  <path d="M 40 70 H 120 L 160 110 H 240 M 160 110 V 160 H 100" stroke="#475569" stroke-width="1.5" stroke-dasharray="5 5" opacity="0.5" />
+  <path d="M 280 60 H 340 L 370 90 V 150" stroke="#475569" stroke-width="1.5" stroke-dasharray="5 5" opacity="0.5" />
+
+  <!-- 3D Book / Curriculum Stack -->
+  <g transform="translate(60, 65)">
+    <!-- Base Layer 3 -->
+    <path d="M 20 95 L 110 120 L 190 95 L 100 75 Z" fill="#1e1b4b" stroke="#4f46e5" stroke-width="1.5" />
+    <path d="M 20 95 V 105 L 110 130 V 120 Z" fill="#312e81" stroke="#4f46e5" stroke-width="1" />
+    <path d="M 110 130 L 190 105 V 95 L 110 120 Z" fill="#3730a3" stroke="#4f46e5" stroke-width="1" />
+
+    <!-- Base Layer 2 -->
+    <path d="M 20 75 L 110 100 L 190 75 L 100 55 Z" fill="#312e81" stroke="#6366f1" stroke-width="1.5" />
+    <path d="M 20 75 V 85 L 110 110 V 100 Z" fill="#3730a3" stroke="#6366f1" stroke-width="1" />
+    <path d="M 110 110 L 190 85 V 75 L 110 100 Z" fill="#4338ca" stroke="#6366f1" stroke-width="1" />
+
+    <!-- Top Open Book -->
+    <path d="M 20 50 L 105 72 L 180 50 L 100 30 Z" fill="url(#bookGrad)" stroke="#a5b4fc" stroke-width="1.5" filter="url(#glow2)" />
+    <!-- Book Pages Spine -->
+    <path d="M 105 72 L 105 45" stroke="#ffffff" stroke-width="2" stroke-linecap="round" opacity="0.8" />
+    <!-- Book Content Lines -->
+    <path d="M 45 48 L 85 58 M 48 55 L 82 63" stroke="#e0e7ff" stroke-width="2" stroke-linecap="round" opacity="0.7" />
+    <path d="M 125 58 L 165 48 M 128 64 L 160 55" stroke="#e0e7ff" stroke-width="2" stroke-linecap="round" opacity="0.7" />
+  </g>
+
+  <!-- Network Floating Modules -->
+  <g transform="translate(250, 45)">
+    <!-- Node 1: OSI -->
+    <rect width="115" height="34" rx="8" fill="#1e1b4b" fill-opacity="0.9" stroke="#818cf8" stroke-width="1.5" />
+    <circle cx="18" cy="17" r="7" fill="#6366f1" />
+    <text x="32" y="15" fill="#94a3b8" font-family="system-ui, sans-serif" font-size="8" font-weight="600">LAYER 3</text>
+    <text x="32" y="26" fill="#f8fafc" font-family="system-ui, sans-serif" font-size="11" font-weight="700">Model OSI</text>
+  </g>
+
+  <g transform="translate(265, 95)">
+    <!-- Node 2: Subnetting -->
+    <rect width="115" height="34" rx="8" fill="#1e1b4b" fill-opacity="0.9" stroke="#a855f7" stroke-width="1.5" />
+    <circle cx="18" cy="17" r="7" fill="#a855f7" />
+    <text x="32" y="15" fill="#94a3b8" font-family="system-ui, sans-serif" font-size="8" font-weight="600">IP &amp; CIDR</text>
+    <text x="32" y="26" fill="#f8fafc" font-family="system-ui, sans-serif" font-size="11" font-weight="700">Subnetting</text>
+  </g>
+
+  <g transform="translate(240, 145)">
+    <!-- Node 3: Routing -->
+    <rect width="125" height="34" rx="8" fill="#1e1b4b" fill-opacity="0.9" stroke="#ec4899" stroke-width="1.5" />
+    <circle cx="18" cy="17" r="7" fill="#ec4899" />
+    <text x="32" y="15" fill="#94a3b8" font-family="system-ui, sans-serif" font-size="8" font-weight="600">ROUTING</text>
+    <text x="32" y="26" fill="#f8fafc" font-family="system-ui, sans-serif" font-size="11" font-weight="700">Routing Statis</text>
+  </g>
+
+  <!-- Left Top Badge -->
+  <g transform="translate(30, 24)">
+    <rect width="120" height="26" rx="6" fill="#4338ca" fill-opacity="0.3" stroke="#818cf8" stroke-width="1" />
+    <circle cx="12" cy="13" r="4" fill="#818cf8" />
+    <text x="22" y="17" fill="#e0e7ff" font-family="system-ui, sans-serif" font-size="10" font-weight="700">KURIKULUM TKJ</text>
+  </g>
+</svg>

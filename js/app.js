@@ -3902,43 +3902,220 @@ function renderQuizzes(container) {
 // ============================================================================
 async function renderAdmin(container) {
   const isId = getLang() === "id";
+  const user = getCurrentUser();
+  const teacherName = user?.name || user?.user_metadata?.full_name || "Narendra Nugraha";
+  const teacherEmail = user?.email || "narendra.23076@mhs.unesa.ac.id";
+  const teacherInitials = (teacherName || "N").split(" ").map(w => w[0]).slice(0, 2).join("").toUpperCase();
+
   container.innerHTML = `
-    <div class="max-w-7xl mx-auto space-y-6 w-full animate-fade-in">
-      <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-2 border-b border-outline-variant">
-        <div>
-          <div class="flex items-center gap-1.5 font-mono text-xs text-outline uppercase tracking-wider">
-            <span>${isId ? "Panel Manajemen Guru & Instruktur" : "Teacher Console"}</span>
-            <span class="text-outline-variant">/</span>
-            <span>NetLearn Administration</span>
+    <div class="max-w-7xl mx-auto space-y-6 w-full animate-fade-in pb-12">
+      
+      <!-- HERO TEACHER WELCOME BANNER -->
+      <div class="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 border border-indigo-500/30 shadow-lg text-white p-5 sm:p-7">
+        <div class="absolute -right-16 -top-16 w-64 h-64 bg-primary/20 rounded-full blur-3xl pointer-events-none"></div>
+        <div class="absolute -left-16 -bottom-16 w-64 h-64 bg-secondary/20 rounded-full blur-3xl pointer-events-none"></div>
+
+        <div class="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+          <!-- Left: Identity & Greeting -->
+          <div class="flex items-start sm:items-center gap-4">
+            <div class="relative shrink-0">
+              <div class="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-tr from-primary to-indigo-400 p-0.5 shadow-md">
+                <div class="w-full h-full rounded-[14px] bg-slate-900 flex items-center justify-center font-mono font-extrabold text-xl text-primary-fixed">
+                  ${teacherInitials}
+                </div>
+              </div>
+              <span class="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 border-2 border-slate-900 flex items-center justify-center text-[10px] text-white font-bold" title="Instruktur Aktif">✓</span>
+            </div>
+
+            <div class="space-y-1">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="px-2.5 py-0.5 rounded-full bg-primary/20 border border-primary/40 text-primary-fixed font-mono text-[10px] font-bold uppercase tracking-wider">
+                  ${isId ? "Portal Instruktur TKJ" : "Instructor Hub"}
+                </span>
+                <span class="px-2.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-mono text-[10px] font-bold flex items-center gap-1">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  ${isId ? "Live Sync Supabase" : "Live Sync"}
+                </span>
+              </div>
+              <h1 class="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight text-white flex items-center gap-2">
+                <span>${isId ? "Selamat Datang," : "Welcome,"} ${teacherName}</span>
+              </h1>
+              <p class="text-xs sm:text-sm text-slate-300 max-w-2xl">
+                ${isId 
+                  ? "Pusat kendali pembelajaran jaringan komputer: monitoring ketuntasan siswa, manajemen kurikulum modul, bank kuis interaktif, dan diagnostik miskonsepsi butir soal." 
+                  : "Command center for computer networking: monitor cohort mastery, manage materials, build quizzes, and inspect misconception diagnostics."}
+              </p>
+            </div>
           </div>
-          <h1 class="text-2xl sm:text-3xl font-extrabold text-on-surface tracking-tight">${isId ? "Panel Administrasi Guru" : "Instructor Administration"}</h1>
-          <p class="text-xs sm:text-sm text-on-surface-variant">${isId ? "Monitoring progres ketuntasan siswa serta penambahan materi pembelajaran kurikulum." : "Monitor student cohort progress and manage learning materials."}</p>
-        </div>
-        <div class="flex items-center gap-2">
-          <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary/10 text-secondary border border-secondary/20 text-xs font-mono font-bold">
-            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            ${isId ? "Mode Guru Aktif" : "Teacher Active"}
-          </span>
+
+          <!-- Right: Quick Stat Chips -->
+          <div class="flex items-center gap-2 sm:gap-3 flex-wrap lg:justify-end">
+            <div class="px-3.5 py-2 rounded-xl bg-slate-800/80 border border-slate-700 text-left">
+              <span class="text-[10px] font-mono text-slate-400 block uppercase">${isId ? "Hak Akses" : "Role"}</span>
+              <span class="text-xs font-mono font-bold text-amber-400">Guru / Instruktur</span>
+            </div>
+            <div class="px-3.5 py-2 rounded-xl bg-slate-800/80 border border-slate-700 text-left">
+              <span class="text-[10px] font-mono text-slate-400 block uppercase">${isId ? "Status DB" : "Database"}</span>
+              <span class="text-xs font-mono font-bold text-emerald-400">Online &amp; Aktif</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      <!-- Navigation Tabs: 4 Fitur Utama Sesuai Kebutuhan Guru -->
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-2 p-1.5 bg-surface-container-low rounded-xl border border-outline-variant">
-        <button type="button" class="admin-tab-btn py-2.5 px-3 rounded-lg text-xs font-bold font-mono transition-all flex items-center justify-center gap-1.5 cursor-pointer bg-surface-container-lowest text-primary shadow-xs border border-outline-variant/50" data-tab="tab-progress">
-          <span class="material-symbols-outlined text-[17px]">monitoring</span>
+      <!-- VISUAL MENU CARDS WITH IMAGES (4 PILIHAN FITUR UTAMA) -->
+      <div>
+        <div class="flex items-center justify-between mb-3 px-1">
+          <div>
+            <h2 class="text-xs font-mono font-bold text-outline uppercase tracking-wider flex items-center gap-1.5">
+              <span class="material-symbols-outlined text-[16px] text-primary">dashboard_customize</span>
+              <span>${isId ? "Pilihan Menu Panel Guru" : "Teacher Console Modules"}</span>
+            </h2>
+            <p class="text-xs text-on-surface-variant">${isId ? "Pilih salah satu menu di bawah untuk mengelola kelas dan materi:" : "Select a module below to manage classes and materials:"}</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          
+          <!-- Card 1: Progres Siswa -->
+          <button type="button" class="admin-menu-card group text-left rounded-2xl bg-surface-container-lowest border-2 border-outline-variant hover:border-primary/60 transition-all duration-200 overflow-hidden shadow-xs hover:shadow-md cursor-pointer flex flex-col" data-tab="tab-progress">
+            <div class="relative w-full h-36 bg-slate-900 overflow-hidden">
+              <img src="assets/images/teacher/menu_progress.svg" alt="Progres Siswa" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+              <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent opacity-80"></div>
+              <span class="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-md bg-blue-500/90 text-white font-mono text-[10px] font-bold tracking-wide shadow-xs">
+                ${isId ? "📊 Kohort & Rekap" : "Analytics"}
+              </span>
+              <span class="admin-card-active-indicator hidden absolute top-2.5 right-2.5 px-2 py-0.5 rounded-md bg-emerald-500 text-white font-mono text-[10px] font-black items-center gap-1 shadow-xs">
+                <span class="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>
+                ${isId ? "Aktif" : "Active"}
+              </span>
+            </div>
+            <div class="p-4 flex-1 flex flex-col justify-between space-y-2">
+              <div>
+                <h3 class="font-extrabold text-sm text-on-surface group-hover:text-primary transition-colors flex items-center justify-between">
+                  <span>1. ${isId ? "Progres Siswa" : "Student Progress"}</span>
+                  <span class="material-symbols-outlined text-[18px] text-outline group-hover:translate-x-0.5 transition-transform">arrow_forward</span>
+                </h3>
+                <p class="text-xs text-on-surface-variant line-clamp-2 mt-1">
+                  ${isId ? "Pantau ketuntasan, nilai Pretest vs Posttest, N-Gain Hake, dan unduh rekap data kelas Excel/CSV." : "Monitor mastery, pre/post scores, N-Gain, and export cohort data."}
+                </p>
+              </div>
+              <div class="pt-2 border-t border-outline-variant/60 flex items-center justify-between text-[11px] font-mono text-outline">
+                <span>${isId ? "Pantau Nilai" : "View Grades"}</span>
+                <span class="font-bold text-primary">${isId ? "Buka Tab →" : "Open Tab →"}</span>
+              </div>
+            </div>
+          </button>
+
+          <!-- Card 2: Kelola Materi -->
+          <button type="button" class="admin-menu-card group text-left rounded-2xl bg-surface-container-lowest border-2 border-outline-variant hover:border-primary/60 transition-all duration-200 overflow-hidden shadow-xs hover:shadow-md cursor-pointer flex flex-col" data-tab="tab-materials">
+            <div class="relative w-full h-36 bg-slate-900 overflow-hidden">
+              <img src="assets/images/teacher/menu_materials.svg" alt="Kelola Materi" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+              <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent opacity-80"></div>
+              <span class="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-md bg-indigo-500/90 text-white font-mono text-[10px] font-bold tracking-wide shadow-xs">
+                ${isId ? "📚 Kurikulum TKJ" : "Curriculum"}
+              </span>
+              <span class="admin-card-active-indicator hidden absolute top-2.5 right-2.5 px-2 py-0.5 rounded-md bg-emerald-500 text-white font-mono text-[10px] font-black items-center gap-1 shadow-xs">
+                <span class="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>
+                ${isId ? "Aktif" : "Active"}
+              </span>
+            </div>
+            <div class="p-4 flex-1 flex flex-col justify-between space-y-2">
+              <div>
+                <h3 class="font-extrabold text-sm text-on-surface group-hover:text-primary transition-colors flex items-center justify-between">
+                  <span>2. ${isId ? "Kelola Materi" : "Learning Modules"}</span>
+                  <span class="material-symbols-outlined text-[18px] text-outline group-hover:translate-x-0.5 transition-transform">arrow_forward</span>
+                </h3>
+                <p class="text-xs text-on-surface-variant line-clamp-2 mt-1">
+                  ${isId ? "Tambah modul pembelajaran baru, panduan konfigurasi lab jaringan, dan sinkronkan ke portal siswa." : "Create new learning modules, lab configuration guides, and publish to students."}
+                </p>
+              </div>
+              <div class="pt-2 border-t border-outline-variant/60 flex items-center justify-between text-[11px] font-mono text-outline">
+                <span>${isId ? "Tambah & Edit" : "Add & Edit"}</span>
+                <span class="font-bold text-primary">${isId ? "Buka Tab →" : "Open Tab →"}</span>
+              </div>
+            </div>
+          </button>
+
+          <!-- Card 3: Bank Soal & Kuis -->
+          <button type="button" class="admin-menu-card group text-left rounded-2xl bg-surface-container-lowest border-2 border-outline-variant hover:border-primary/60 transition-all duration-200 overflow-hidden shadow-xs hover:shadow-md cursor-pointer flex flex-col" data-tab="tab-quizzes">
+            <div class="relative w-full h-36 bg-slate-900 overflow-hidden">
+              <img src="assets/images/teacher/menu_quizzes.svg" alt="Bank Soal & Kuis" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+              <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent opacity-80"></div>
+              <span class="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-md bg-amber-500/90 text-white font-mono text-[10px] font-bold tracking-wide shadow-xs">
+                ${isId ? "📝 Ujian & Token" : "Quizzes"}
+              </span>
+              <span class="admin-card-active-indicator hidden absolute top-2.5 right-2.5 px-2 py-0.5 rounded-md bg-emerald-500 text-white font-mono text-[10px] font-black items-center gap-1 shadow-xs">
+                <span class="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>
+                ${isId ? "Aktif" : "Active"}
+              </span>
+            </div>
+            <div class="p-4 flex-1 flex flex-col justify-between space-y-2">
+              <div>
+                <h3 class="font-extrabold text-sm text-on-surface group-hover:text-primary transition-colors flex items-center justify-between">
+                  <span>3. ${isId ? "Bank Soal & Kuis" : "Quiz & Exam Builder"}</span>
+                  <span class="material-symbols-outlined text-[18px] text-outline group-hover:translate-x-0.5 transition-transform">arrow_forward</span>
+                </h3>
+                <p class="text-xs text-on-surface-variant line-clamp-2 mt-1">
+                  ${isId ? "Rancang kuis bab, tentukan token akses, kunci jawaban, dan buka/tutup waktu ujian secara real-time." : "Build chapter quizzes, set tokens, answer keys, and toggle exam access."}
+                </p>
+              </div>
+              <div class="pt-2 border-t border-outline-variant/60 flex items-center justify-between text-[11px] font-mono text-outline">
+                <span>${isId ? "Buat Ujian" : "Create Quiz"}</span>
+                <span class="font-bold text-primary">${isId ? "Buka Tab →" : "Open Tab →"}</span>
+              </div>
+            </div>
+          </button>
+
+          <!-- Card 4: Analisis Butir & Miskonsepsi -->
+          <button type="button" class="admin-menu-card group text-left rounded-2xl bg-surface-container-lowest border-2 border-outline-variant hover:border-primary/60 transition-all duration-200 overflow-hidden shadow-xs hover:shadow-md cursor-pointer flex flex-col" data-tab="tab-diagnostics">
+            <div class="relative w-full h-36 bg-slate-900 overflow-hidden">
+              <img src="assets/images/teacher/menu_diagnostics.svg" alt="Analisis Butir & Miskonsepsi" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+              <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent opacity-80"></div>
+              <span class="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-md bg-rose-500/90 text-white font-mono text-[10px] font-bold tracking-wide shadow-xs">
+                ${isId ? "🔬 Diagnostik AI" : "Item Analysis"}
+              </span>
+              <span class="admin-card-active-indicator hidden absolute top-2.5 right-2.5 px-2 py-0.5 rounded-md bg-emerald-500 text-white font-mono text-[10px] font-black items-center gap-1 shadow-xs">
+                <span class="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>
+                ${isId ? "Aktif" : "Active"}
+              </span>
+            </div>
+            <div class="p-4 flex-1 flex flex-col justify-between space-y-2">
+              <div>
+                <h3 class="font-extrabold text-sm text-on-surface group-hover:text-primary transition-colors flex items-center justify-between">
+                  <span>4. ${isId ? "Analisis Butir & Miskonsepsi" : "Item Diagnostics"}</span>
+                  <span class="material-symbols-outlined text-[18px] text-outline group-hover:translate-x-0.5 transition-transform">arrow_forward</span>
+                </h3>
+                <p class="text-xs text-on-surface-variant line-clamp-2 mt-1">
+                  ${isId ? "Analisis tingkat kesukaran (P-Value), sebaran distractor opsi, dan deteksi jebakan konsep yang perlu remidiasi." : "Inspect difficulty (P-Value), distractor efficacy, and pedagogical misconception flags."}
+                </p>
+              </div>
+              <div class="pt-2 border-t border-outline-variant/60 flex items-center justify-between text-[11px] font-mono text-outline">
+                <span>${isId ? "Inspeksi Butir" : "Inspect Items"}</span>
+                <span class="font-bold text-primary">${isId ? "Buka Tab →" : "Open Tab →"}</span>
+              </div>
+            </div>
+          </button>
+
+        </div>
+      </div>
+
+      <!-- Quick Switcher Pills (Secondary Compact Sub-Nav) -->
+      <div class="flex items-center gap-1.5 p-1 bg-surface-container-low rounded-xl border border-outline-variant overflow-x-auto">
+        <button type="button" class="admin-sub-tab-btn flex-1 min-w-[140px] py-2 px-3 rounded-lg text-xs font-mono font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-outline hover:text-on-surface" data-tab="tab-progress">
+          <span class="material-symbols-outlined text-[16px]">monitoring</span>
           <span>1. ${isId ? "Progres Siswa" : "Progress"}</span>
         </button>
-        <button type="button" class="admin-tab-btn py-2.5 px-3 rounded-lg text-xs font-bold font-mono transition-all flex items-center justify-center gap-1.5 cursor-pointer text-outline hover:text-on-surface" data-tab="tab-materials">
-          <span class="material-symbols-outlined text-[17px]">library_add</span>
+        <button type="button" class="admin-sub-tab-btn flex-1 min-w-[140px] py-2 px-3 rounded-lg text-xs font-mono font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-outline hover:text-on-surface" data-tab="tab-materials">
+          <span class="material-symbols-outlined text-[16px]">library_add</span>
           <span>2. ${isId ? "Kelola Materi" : "Materials"}</span>
         </button>
-        <button type="button" class="admin-tab-btn py-2.5 px-3 rounded-lg text-xs font-bold font-mono transition-all flex items-center justify-center gap-1.5 cursor-pointer text-outline hover:text-on-surface" data-tab="tab-quizzes">
-          <span class="material-symbols-outlined text-[17px]">quiz</span>
-          <span>3. ${isId ? "Bank Soal & Kuis" : "Quiz Builder"}</span>
+        <button type="button" class="admin-sub-tab-btn flex-1 min-w-[140px] py-2 px-3 rounded-lg text-xs font-mono font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-outline hover:text-on-surface" data-tab="tab-quizzes">
+          <span class="material-symbols-outlined text-[16px]">quiz</span>
+          <span>3. ${isId ? "Bank Soal & Kuis" : "Quizzes"}</span>
         </button>
-        <button type="button" class="admin-tab-btn py-2.5 px-3 rounded-lg text-xs font-bold font-mono transition-all flex items-center justify-center gap-1.5 cursor-pointer text-outline hover:text-on-surface" data-tab="tab-diagnostics">
-          <span class="material-symbols-outlined text-[17px]">troubleshoot</span>
-          <span>4. ${isId ? "Analisis Butir & Miskonsepsi" : "Item Diagnostics"}</span>
+        <button type="button" class="admin-sub-tab-btn flex-1 min-w-[140px] py-2 px-3 rounded-lg text-xs font-mono font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-outline hover:text-on-surface" data-tab="tab-diagnostics">
+          <span class="material-symbols-outlined text-[16px]">troubleshoot</span>
+          <span>4. ${isId ? "Analisis Butir" : "Diagnostics"}</span>
         </button>
       </div>
 
@@ -3947,19 +4124,43 @@ async function renderAdmin(container) {
     </div>
   `;
 
-  const tabBtns = container.querySelectorAll(".admin-tab-btn");
+  const menuCards = container.querySelectorAll(".admin-menu-card");
+  const subTabBtns = container.querySelectorAll(".admin-sub-tab-btn");
   const tabContentEl = container.querySelector("#admin-tab-content");
 
+  let currentActiveTab = "tab-progress";
+
   async function switchTab(tabId) {
-    tabBtns.forEach(btn => {
+    currentActiveTab = tabId;
+
+    // Update big cards
+    menuCards.forEach(card => {
+      const isActive = card.dataset.tab === tabId;
+      const indicator = card.querySelector(".admin-card-active-indicator");
+      if (isActive) {
+        card.classList.add("ring-2", "ring-primary", "border-primary", "bg-surface-container-low", "shadow-md");
+        card.classList.remove("border-outline-variant", "bg-surface-container-lowest");
+        if (indicator) indicator.classList.remove("hidden");
+        if (indicator) indicator.classList.add("inline-flex");
+      } else {
+        card.classList.remove("ring-2", "ring-primary", "border-primary", "bg-surface-container-low", "shadow-md");
+        card.classList.add("border-outline-variant", "bg-surface-container-lowest");
+        if (indicator) indicator.classList.add("hidden");
+        if (indicator) indicator.classList.remove("inline-flex");
+      }
+    });
+
+    // Update compact sub-tab buttons
+    subTabBtns.forEach(btn => {
       const isActive = btn.dataset.tab === tabId;
-      btn.className = `admin-tab-btn py-2.5 px-3 rounded-lg text-xs font-bold font-mono transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+      btn.className = `admin-sub-tab-btn flex-1 min-w-[140px] py-2 px-3 rounded-lg text-xs font-mono font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
         isActive 
-          ? "bg-surface-container-lowest text-primary shadow-xs border border-outline-variant/50" 
+          ? "bg-surface-container-lowest text-primary shadow-xs border border-outline-variant/60" 
           : "text-outline hover:text-on-surface hover:bg-surface-container-high/40"
       }`;
     });
 
+    // Render corresponding tab
     if (tabId === "tab-progress") {
       await renderAdminProgressTab(tabContentEl);
     } else if (tabId === "tab-materials") {
@@ -3971,7 +4172,14 @@ async function renderAdmin(container) {
     }
   }
 
-  tabBtns.forEach(btn => {
+  menuCards.forEach(card => {
+    card.addEventListener("click", () => {
+      sound.click();
+      switchTab(card.dataset.tab);
+    });
+  });
+
+  subTabBtns.forEach(btn => {
     btn.addEventListener("click", () => {
       sound.click();
       switchTab(btn.dataset.tab);
@@ -4019,101 +4227,143 @@ async function renderAdminProgressTab(container) {
 
   container.innerHTML = `
     <div class="space-y-6">
-      <!-- 4 KPI Cards -->
+      
+      <!-- 4 High-Impact KPI Cards -->
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant shadow-xs flex items-center gap-3.5">
-          <div class="w-11 h-11 rounded-xl bg-blue-500/10 text-primary flex items-center justify-center shrink-0 border border-primary/20">
-            <span class="material-symbols-outlined text-[24px]">group</span>
+        
+        <!-- KPI 1 -->
+        <div class="bg-surface-container-lowest p-5 rounded-2xl border-t-4 border-t-blue-500 border border-outline-variant shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow">
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] font-mono uppercase tracking-wider text-outline font-bold">${isId ? "Total Siswa Terdaftar" : "Enrolled Students"}</span>
+            <div class="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-600 flex items-center justify-center shrink-0 border border-blue-500/20">
+              <span class="material-symbols-outlined text-[22px]">group</span>
+            </div>
           </div>
-          <div>
-            <span class="text-[10px] font-mono uppercase tracking-wider text-outline block">${isId ? "Total Siswa Terdaftar" : "Enrolled Students"}</span>
-            <span class="text-xl font-extrabold text-on-surface font-mono">${totalStudents} <span class="text-xs font-normal text-outline">Siswa</span></span>
-          </div>
-        </div>
-
-        <div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant shadow-xs flex items-center gap-3.5">
-          <div class="w-11 h-11 rounded-xl bg-slate-500/10 text-slate-700 dark:text-slate-200 flex items-center justify-center shrink-0 border border-slate-300">
-            <span class="material-symbols-outlined text-[24px]">assignment_turned_in</span>
-          </div>
-          <div>
-            <span class="text-[10px] font-mono uppercase tracking-wider text-outline block">${isId ? "Rata-rata Pretest" : "Avg Pretest"}</span>
-            <span class="text-xl font-extrabold text-on-surface font-mono">${avgPre} <span class="text-xs font-normal text-outline">/ 25</span></span>
+          <div class="mt-3">
+            <div class="text-2xl font-black text-on-surface font-mono">${totalStudents} <span class="text-xs font-normal text-outline">Siswa Aktif</span></div>
+            <p class="text-[11px] text-outline mt-1 font-mono">${isId ? "Terdistribusi di 3 Kelas TKJ" : "Across 3 TKJ Classes"}</p>
           </div>
         </div>
 
-        <div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant shadow-xs flex items-center gap-3.5">
-          <div class="w-11 h-11 rounded-xl bg-indigo-500/10 text-indigo-600 flex items-center justify-center shrink-0 border border-indigo-200">
-            <span class="material-symbols-outlined text-[24px]">military_tech</span>
+        <!-- KPI 2 -->
+        <div class="bg-surface-container-lowest p-5 rounded-2xl border-t-4 border-t-slate-500 border border-outline-variant shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow">
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] font-mono uppercase tracking-wider text-outline font-bold">${isId ? "Rata-rata Pretest" : "Avg Pretest"}</span>
+            <div class="w-10 h-10 rounded-xl bg-slate-500/10 text-slate-700 dark:text-slate-200 flex items-center justify-center shrink-0 border border-slate-500/20">
+              <span class="material-symbols-outlined text-[22px]">assignment_late</span>
+            </div>
           </div>
-          <div>
-            <span class="text-[10px] font-mono uppercase tracking-wider text-outline block">${isId ? "Rata-rata Posttest" : "Avg Posttest"}</span>
-            <span class="text-xl font-extrabold text-indigo-600 font-mono">${avgPost} <span class="text-xs font-normal text-outline">/ 25</span></span>
+          <div class="mt-3">
+            <div class="text-2xl font-black text-on-surface font-mono">${avgPre} <span class="text-xs font-normal text-outline">/ 25 Soal</span></div>
+            <p class="text-[11px] text-outline mt-1 font-mono">${isId ? "Kemampuan dasar awal kelas" : "Baseline prior knowledge"}</p>
           </div>
         </div>
 
-        <div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant shadow-xs flex items-center gap-3.5">
-          <div class="w-11 h-11 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-200">
-            <span class="material-symbols-outlined text-[24px]">check_circle</span>
+        <!-- KPI 3 -->
+        <div class="bg-surface-container-lowest p-5 rounded-2xl border-t-4 border-t-indigo-500 border border-outline-variant shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow">
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] font-mono uppercase tracking-wider text-outline font-bold">${isId ? "Rata-rata Posttest" : "Avg Posttest"}</span>
+            <div class="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-600 flex items-center justify-center shrink-0 border border-indigo-500/20">
+              <span class="material-symbols-outlined text-[22px]">military_tech</span>
+            </div>
           </div>
-          <div>
-            <span class="text-[10px] font-mono uppercase tracking-wider text-outline block">${isId ? "Tingkat Ketuntasan" : "Mastery Rate"}</span>
-            <span class="text-xl font-extrabold text-emerald-600 font-mono">${masteryRate}% <span class="text-xs font-normal text-outline">(${masteryCount}/${totalStudents})</span></span>
+          <div class="mt-3">
+            <div class="text-2xl font-black text-indigo-600 font-mono">${avgPost} <span class="text-xs font-normal text-outline">/ 25 Soal</span></div>
+            <p class="text-[11px] text-emerald-600 mt-1 font-mono font-bold flex items-center gap-1">
+              <span>↑</span>
+              <span>+${(avgPost - avgPre).toFixed(1)} ${isId ? "Poin Peningkatan" : "Points Gain"}</span>
+            </p>
+          </div>
+        </div>
+
+        <!-- KPI 4 -->
+        <div class="bg-surface-container-lowest p-5 rounded-2xl border-t-4 border-t-emerald-500 border border-outline-variant shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow">
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] font-mono uppercase tracking-wider text-outline font-bold">${isId ? "Tingkat Ketuntasan" : "Mastery Rate"}</span>
+            <div class="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-500/20">
+              <span class="material-symbols-outlined text-[22px]">verified</span>
+            </div>
+          </div>
+          <div class="mt-3">
+            <div class="text-2xl font-black text-emerald-600 font-mono">${masteryRate}% <span class="text-xs font-normal text-outline">(${masteryCount}/${totalStudents})</span></div>
+            <p class="text-[11px] text-outline mt-1 font-mono">${isId ? "Target KKM Tercapai (≥70)" : "Mastery target reached"}</p>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Filters & Interactive Action Bar -->
+      <div class="bg-surface-container-lowest p-4 sm:p-5 rounded-2xl border border-outline-variant shadow-xs space-y-3">
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          
+          <!-- Search & Filter Controls -->
+          <div class="flex flex-1 flex-col sm:flex-row items-center gap-3">
+            <div class="relative w-full sm:w-80">
+              <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-outline pointer-events-none">search</span>
+              <input 
+                type="text" 
+                id="admin-search-student" 
+                placeholder="${isId ? "Cari nama, kelas, atau email siswa..." : "Search student..."}" 
+                class="w-full pl-9 pr-3 py-2 bg-surface-container-low border border-outline-variant rounded-xl text-xs font-mono text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
+              />
+            </div>
+
+            <!-- Class Quick Filter Pills -->
+            <div class="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto py-0.5">
+              <button type="button" class="btn-quick-class px-3 py-1.5 rounded-lg text-xs font-mono font-bold border transition-colors bg-primary text-on-primary border-primary shrink-0 cursor-pointer" data-class="ALL">
+                ${isId ? "Semua Kelas" : "All Classes"}
+              </button>
+              ${TKJ_CLASSES.map(c => `
+                <button type="button" class="btn-quick-class px-3 py-1.5 rounded-lg text-xs font-mono font-bold border transition-colors bg-surface-container-low text-outline hover:text-on-surface border-outline-variant shrink-0 cursor-pointer" data-class="${c}">
+                  ${c}
+                </button>
+              `).join("")}
+            </div>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="flex items-center gap-2 shrink-0">
+            <button type="button" id="btn-refresh-cohort" class="h-9 px-3.5 bg-surface-container-low hover:bg-surface-container text-on-surface border border-outline-variant font-mono text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-colors cursor-pointer" title="Perbarui Data Kohort">
+              <span class="material-symbols-outlined text-[16px] text-primary">sync</span>
+              <span>${isId ? "Segarkan" : "Refresh"}</span>
+            </button>
+            <button type="button" id="btn-export-cohort-csv" class="h-9 px-4 bg-primary hover:bg-primary/90 text-on-primary font-mono text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs hover:shadow-md">
+              <span class="material-symbols-outlined text-[16px]">file_download</span>
+              <span>${isId ? "Unduh Rekap CSV" : "Export CSV"}</span>
+            </button>
           </div>
         </div>
       </div>
 
-      <!-- Filters & Action Bar -->
-      <div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-        <div class="flex flex-1 flex-col sm:flex-row items-center gap-3">
-          <div class="relative w-full sm:w-72">
-            <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-outline pointer-events-none">search</span>
-            <input 
-              type="text" 
-              id="admin-search-student" 
-              placeholder="${isId ? "Cari nama atau email siswa..." : "Search student by name or email..."}" 
-              class="w-full pl-9 pr-3 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-xs font-mono text-on-surface focus:outline-none focus:ring-1 focus:ring-primary"
-            />
+      <!-- Cohort Table with Elevated Visual Styling -->
+      <div class="bg-surface-container-lowest rounded-2xl border border-outline-variant shadow-xs overflow-hidden">
+        <div class="p-4 sm:p-5 bg-surface-container-low border-b border-outline-variant flex items-center justify-between flex-wrap gap-2">
+          <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-bold">
+              <span class="material-symbols-outlined text-[18px]">groups</span>
+            </div>
+            <div>
+              <h3 class="text-xs font-mono font-bold text-on-surface uppercase tracking-wider">${isId ? "Daftar Siswa & Rekap Capaian Belajar" : "Student Roster & Outcomes"}</h3>
+              <p class="text-[11px] text-outline">${isId ? "Hasil evaluasi Pretest, Posttest HOTS, serta efektivitas N-Gain Hake." : "Pre/Posttest evaluations and normalized gain."}</p>
+            </div>
           </div>
-
-          <div class="relative w-full sm:w-48">
-            <select 
-              id="admin-filter-class" 
-              class="w-full px-3 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-xs font-mono text-on-surface focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
-            >
-              <option value="ALL">${isId ? "-- Semua Kelas TKJ --" : "-- All Classes --"}</option>
-              ${TKJ_CLASSES.map(c => `<option value="${c}">${c}</option>`).join("")}
-            </select>
-          </div>
-        </div>
-
-        <button type="button" id="btn-export-cohort-csv" class="h-9 px-4 bg-primary hover:bg-primary-container text-on-primary font-mono text-xs font-bold rounded-lg flex items-center justify-center gap-2 transition-colors cursor-pointer shrink-0 shadow-xs">
-          <span class="material-symbols-outlined text-[16px]">file_download</span>
-          <span>${isId ? "Unduh Rekap CSV" : "Export CSV"}</span>
-        </button>
-      </div>
-
-      <!-- Cohort Table -->
-      <div class="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-xs overflow-hidden">
-        <div class="p-4 bg-surface-container-low border-b border-outline-variant flex items-center justify-between">
-          <div class="flex items-center gap-2">
-            <span class="material-symbols-outlined text-[18px] text-primary">groups</span>
-            <h3 class="text-xs font-mono font-bold text-on-surface uppercase tracking-wider">${isId ? "Daftar Siswa & Rekap Capaian Belajar" : "Student Roster & Learning Outcomes"}</h3>
-          </div>
-          <span id="cohort-filtered-count" class="text-xs font-mono text-outline">${totalStudents} ${isId ? "Siswa Ditampilkan" : "Students"}</span>
+          <span id="cohort-filtered-count" class="px-2.5 py-1 rounded-lg bg-surface-container text-xs font-mono font-bold text-outline border border-outline-variant/60">
+            ${totalStudents} ${isId ? "Siswa Ditampilkan" : "Students"}
+          </span>
         </div>
 
         <div class="overflow-x-auto">
           <table class="w-full text-left font-mono text-xs">
             <thead class="bg-surface-container text-outline text-[11px] uppercase border-b border-outline-variant">
               <tr>
-                <th class="p-3.5">${isId ? "Nama Siswa" : "Student"}</th>
-                <th class="p-3.5">${isId ? "Kelas" : "Class"}</th>
-                <th class="p-3.5">Email</th>
-                <th class="p-3.5 text-center">${isId ? "Materi Dibaca" : "Read Progress"}</th>
-                <th class="p-3.5 text-center">Pretest</th>
-                <th class="p-3.5 text-center">Posttest</th>
-                <th class="p-3.5 text-center">N-Gain (Hake)</th>
-                <th class="p-3.5 text-center">Status</th>
+                <th class="p-4">${isId ? "Nama Siswa" : "Student"}</th>
+                <th class="p-4">${isId ? "Kelas" : "Class"}</th>
+                <th class="p-4">Email</th>
+                <th class="p-4 text-center">${isId ? "Materi Tuntas" : "Modules"}</th>
+                <th class="p-4 text-center">Pretest</th>
+                <th class="p-4 text-center">Posttest</th>
+                <th class="p-4 text-center">N-Gain (Hake)</th>
+                <th class="p-4 text-center">Status</th>
               </tr>
             </thead>
             <tbody id="cohort-table-body" class="divide-y divide-outline-variant">
@@ -4125,13 +4375,14 @@ async function renderAdminProgressTab(container) {
     </div>
   `;
 
+  let activeClassFilter = "ALL";
+
   function updateTable() {
     const searchVal = document.getElementById("admin-search-student")?.value.toLowerCase().trim() || "";
-    const classVal = document.getElementById("admin-filter-class")?.value || "ALL";
 
     const filtered = cohort.filter(s => {
       const matchSearch = (s.name || "").toLowerCase().includes(searchVal) || (s.email || "").toLowerCase().includes(searchVal);
-      const matchClass = (classVal === "ALL") || (s.className === classVal);
+      const matchClass = (activeClassFilter === "ALL") || (s.className === activeClassFilter);
       return matchSearch && matchClass;
     });
 
@@ -4144,50 +4395,90 @@ async function renderAdminProgressTab(container) {
     if (filtered.length === 0) {
       tbody.innerHTML = `
         <tr>
-          <td colspan="8" class="p-8 text-center text-outline font-mono text-xs">
-            ${isId ? "Tidak ada siswa yang sesuai kriteria pencarian." : "No students match the criteria."}
+          <td colspan="8" class="p-10 text-center text-outline font-mono text-xs">
+            <span class="material-symbols-outlined text-3xl text-outline mb-1 block">search_off</span>
+            ${isId ? "Tidak ada data siswa yang cocok dengan filter atau kata kunci." : "No students match the criteria."}
           </td>
         </tr>
       `;
       return;
     }
 
-    tbody.innerHTML = filtered.map(s => {
+    const avatarColors = [
+      "bg-blue-500/10 text-blue-600 border-blue-500/20",
+      "bg-indigo-500/10 text-indigo-600 border-indigo-500/20",
+      "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
+      "bg-purple-500/10 text-purple-600 border-purple-500/20",
+      "bg-amber-500/10 text-amber-600 border-amber-500/20"
+    ];
+
+    tbody.innerHTML = filtered.map((s, idx) => {
       const gainVal = s.gain !== undefined && s.gain !== null ? Number(s.gain) : 0;
       const gainPercent = Math.round(gainVal * 100);
       const isPass = s.isMastery || (s.postScore !== "-" && Number(s.postScore) >= 18);
+      const colorClass = avatarColors[idx % avatarColors.length];
+      const readProgress = Math.min(100, Math.round(((s.readCount || 0) / 6) * 100));
 
       return `
         <tr class="hover:bg-surface-container-low/60 transition-colors">
-          <td class="p-3.5 font-bold text-on-surface">
-            <div class="flex items-center gap-2.5">
-              <div class="w-7 h-7 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0 font-mono">
+          <td class="p-4 font-bold text-on-surface">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-xl ${colorClass} flex items-center justify-center font-bold text-xs shrink-0 font-mono border">
                 ${(s.name || "S").charAt(0).toUpperCase()}
               </div>
-              <span class="truncate">${s.name || "-"}</span>
+              <div>
+                <span class="truncate block font-bold text-on-surface">${s.name || "-"}</span>
+                <span class="text-[10px] text-outline font-normal font-mono block">${s.lastActive ? new Date(s.lastActive).toLocaleDateString() : "Hari ini"}</span>
+              </div>
             </div>
           </td>
-          <td class="p-3.5 font-bold font-mono text-secondary">
-            <span class="px-2 py-0.5 rounded bg-surface-container text-on-surface border border-outline-variant text-[11px]">${s.className || "X TKJ 1"}</span>
+          <td class="p-4 font-bold font-mono">
+            <span class="px-2.5 py-1 rounded-lg bg-surface-container text-on-surface border border-outline-variant text-[11px] font-bold">${s.className || "X TKJ 1"}</span>
           </td>
-          <td class="p-3.5 text-on-surface-variant text-[11px]">${s.email || "-"}</td>
-          <td class="p-3.5 text-center font-mono">
-            <span class="font-bold ${s.readCount >= 6 ? "text-emerald-600" : "text-primary"}">${s.readCount || 0}</span>
-            <span class="text-outline text-[10px]">/ 6 Modul</span>
+          <td class="p-4 text-on-surface-variant text-[11px] font-mono">${s.email || "-"}</td>
+          <td class="p-4 text-center">
+            <div class="flex flex-col items-center gap-1.5">
+              <div class="flex items-center gap-1 font-mono text-xs">
+                <span class="font-extrabold ${s.readCount >= 6 ? "text-emerald-600" : "text-primary"}">${s.readCount || 0}</span>
+                <span class="text-outline text-[10px]">/ 6 Bab</span>
+              </div>
+              <div class="w-16 h-1.5 rounded-full bg-surface-container overflow-hidden">
+                <div class="h-full ${s.readCount >= 6 ? "bg-emerald-500" : "bg-primary"}" style="width: ${readProgress}%"></div>
+              </div>
+            </div>
           </td>
-          <td class="p-3.5 text-center text-outline">${s.preScore !== "-" ? `${s.preScore} / 25` : "-"}</td>
-          <td class="p-3.5 text-center font-bold ${isPass ? "text-emerald-600" : "text-primary"}">${s.postScore !== "-" ? `${s.postScore} / 25` : "-"}</td>
-          <td class="p-3.5 text-center font-bold ${gainVal >= 0.7 ? "text-emerald-600" : (gainVal >= 0.3 ? "text-secondary" : "text-outline")}">
-            ${s.postScore !== "-" ? `+${gainPercent}% (g=${gainVal.toFixed(2)})` : "-"}
+          <td class="p-4 text-center font-mono font-medium text-outline">
+            ${s.preScore !== "-" ? `<span class="px-2 py-0.5 rounded bg-surface-container border border-outline-variant/60">${s.preScore}/25</span>` : "-"}
           </td>
-          <td class="p-3.5 text-center">
+          <td class="p-4 text-center font-mono">
+            ${s.postScore !== "-" ? `
+              <span class="px-2 py-0.5 rounded font-extrabold ${isPass ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20" : "bg-primary/10 text-primary border border-primary/20"}">
+                ${s.postScore}/25
+              </span>
+            ` : "-"}
+          </td>
+          <td class="p-4 text-center">
+            ${s.postScore !== "-" ? `
+              <div class="flex flex-col items-center">
+                <span class="font-mono font-extrabold text-xs ${gainVal >= 0.7 ? "text-emerald-600" : (gainVal >= 0.3 ? "text-indigo-600" : "text-amber-600")}">
+                  +${gainPercent}%
+                </span>
+                <span class="text-[9px] font-mono uppercase tracking-tight text-outline">
+                  ${gainVal >= 0.7 ? "Tinggi" : (gainVal >= 0.3 ? "Sedang" : "Rendah")}
+                </span>
+              </div>
+            ` : "-"}
+          </td>
+          <td class="p-4 text-center">
             ${isPass ? `
-              <span class="px-2 py-0.5 rounded font-mono text-[10px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 font-bold">
-                ✓ ${isId ? "Tuntas" : "Mastery"}
+              <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-mono text-[10px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 font-bold">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                <span>${isId ? "Tuntas" : "Mastery"}</span>
               </span>
             ` : `
-              <span class="px-2 py-0.5 rounded font-mono text-[10px] bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 font-medium">
-                ${isId ? "Bimbingan" : "Pending"}
+              <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-mono text-[10px] bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/30 font-medium">
+                <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                <span>${isId ? "Bimbingan" : "Pending"}</span>
               </span>
             `}
           </td>
@@ -4197,8 +4488,34 @@ async function renderAdminProgressTab(container) {
   }
 
   updateTable();
+
+  // Wire up filter pills
+  const quickClassBtns = container.querySelectorAll(".btn-quick-class");
+  quickClassBtns.forEach(btn => {
+    btn.addEventListener("click", () => {
+      sound.click();
+      activeClassFilter = btn.dataset.class;
+      quickClassBtns.forEach(b => {
+        const isMatch = b.dataset.class === activeClassFilter;
+        b.className = `btn-quick-class px-3 py-1.5 rounded-lg text-xs font-mono font-bold border transition-colors shrink-0 cursor-pointer ${
+          isMatch ? "bg-primary text-on-primary border-primary" : "bg-surface-container-low text-outline hover:text-on-surface border-outline-variant"
+        }`;
+      });
+      updateTable();
+    });
+  });
+
   document.getElementById("admin-search-student")?.addEventListener("input", updateTable);
-  document.getElementById("admin-filter-class")?.addEventListener("change", updateTable);
+
+  document.getElementById("btn-refresh-cohort")?.addEventListener("click", async () => {
+    sound.click();
+    const btn = document.getElementById("btn-refresh-cohort");
+    if (btn) {
+      btn.innerHTML = `<span class="material-symbols-outlined text-[16px] text-primary animate-spin">sync</span><span>${isId ? "Memperbarui..." : "Syncing..."}</span>`;
+    }
+    await renderAdminProgressTab(container);
+    showToast(isId ? "Data Segar" : "Data Refreshed", isId ? "Daftar kohort siswa berhasil disinkronkan." : "Cohort roster updated.", "check_circle");
+  });
 
   document.getElementById("btn-export-cohort-csv")?.addEventListener("click", () => {
     sound.click();
@@ -4563,12 +4880,18 @@ async function renderAdminQuizzesTab(container) {
             </div>
 
             <div>
-              <label class="block text-xs font-semibold text-on-surface mb-1 font-mono">${isId ? "Token Ujian (Opsional)" : "Exam Token (Optional)"}</label>
+              <div class="flex items-center justify-between mb-1">
+                <label class="block text-xs font-semibold text-on-surface font-mono">${isId ? "Token Ujian (Opsional)" : "Exam Token (Optional)"}</label>
+                <button type="button" id="btn-generate-random-token" class="text-[10px] font-mono text-primary hover:underline flex items-center gap-0.5 cursor-pointer">
+                  <span class="material-symbols-outlined text-[13px]">casino</span>
+                  <span>${isId ? "Acak Token" : "Generate"}</span>
+                </button>
+              </div>
               <input 
                 type="text" 
                 id="quiz-form-token" 
                 placeholder="${isId ? "Contoh: TKJ2026 (Kosongkan jika bebas)" : "e.g. TKJ2026"}" 
-                class="w-full px-3 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-xs font-mono text-on-surface focus:outline-none focus:ring-1 focus:ring-primary focus:bg-white uppercase"
+                class="w-full px-3 py-2 bg-surface-container-low border border-outline-variant rounded-xl text-xs font-mono text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary uppercase font-bold"
               />
               <span class="text-[10px] text-outline font-mono mt-0.5 block">${isId ? "Jika diisi, siswa wajib memasukkan token ini sebelum ujian dimulai." : "Required for students to start the test."}</span>
             </div>
@@ -4786,6 +5109,16 @@ async function renderAdminQuizzesTab(container) {
     renderBuilderQuestions();
   });
 
+  document.getElementById("btn-generate-random-token")?.addEventListener("click", () => {
+    sound.click();
+    const tokenInput = document.getElementById("quiz-form-token");
+    if (tokenInput) {
+      const randomCode = "TKJ" + Math.floor(1000 + Math.random() * 9000);
+      tokenInput.value = randomCode;
+      showToast(isId ? "Token Dibuat" : "Token Generated", `Token otomatis: ${randomCode}`, "casino");
+    }
+  });
+
   async function refreshQuizzesList() {
     const listEl = document.getElementById("admin-quizzes-list");
     const countBadge = document.getElementById("quizzes-count-badge");
@@ -4820,7 +5153,14 @@ async function renderAdminQuizzesTab(container) {
                   ${isActive ? (isId ? "🟢 Aktif di Siswa" : "🟢 Active") : (isId ? "⚪ Draf / Nonaktif" : "⚪ Inactive")}
                 </span>
                 <span class="text-[10px] font-mono text-outline">${q.category}</span>
-                ${q.token ? `<span class="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 font-mono text-[10px] font-bold">Token: ${q.token}</span>` : ""}
+                ${q.token ? `
+                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/30 font-mono text-[10px] font-bold">
+                    <span>Token: ${q.token}</span>
+                    <button type="button" class="btn-copy-token text-amber-600 hover:text-amber-800 cursor-pointer p-0.5" data-token="${q.token}" title="Salin Token">
+                      <span class="material-symbols-outlined text-[13px]">content_copy</span>
+                    </button>
+                  </span>
+                ` : ""}
               </div>
               <h4 class="font-bold text-xs text-on-surface">${q.title}</h4>
               <p class="text-[11px] font-mono text-outline mt-0.5">${qCount} Butir Soal • Durasi ${q.durationMins || 15} Menit</p>
@@ -4859,6 +5199,18 @@ async function renderAdminQuizzesTab(container) {
           "sync"
         );
         await refreshQuizzesList();
+      });
+    });
+
+    listEl.querySelectorAll(".btn-copy-token").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        sound.click();
+        const tokenVal = btn.dataset.token;
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(tokenVal);
+          showToast(isId ? "Token Disalin" : "Token Copied", `Token ${tokenVal} berhasil disalin ke clipboard.`, "content_copy");
+        }
       });
     });
 
@@ -4968,27 +5320,40 @@ async function renderAdminDiagnosticsTab(container) {
   container.innerHTML = `
     <div class="space-y-6">
       
-      <!-- Filter Bar: Pilih Jenis Asesmen & Kelas -->
-      <div class="bg-surface-container-lowest p-4 sm:p-5 rounded-xl border border-outline-variant shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <!-- Filter Bar & Diagnostic Header -->
+      <div class="bg-surface-container-lowest p-5 rounded-2xl border border-outline-variant shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <div class="flex items-center gap-2 text-primary mb-1">
-            <span class="material-symbols-outlined text-[20px]">troubleshoot</span>
+          <div class="flex items-center gap-2 text-rose-600 mb-1">
+            <span class="material-symbols-outlined text-[22px]">troubleshoot</span>
             <h3 class="font-bold text-sm text-on-surface font-mono">${isId ? "Diagnostik Butir Soal & Pola Miskonsepsi Siswa" : "Item Diagnostic & Misconception Insights"}</h3>
           </div>
           <p class="text-xs text-on-surface-variant">${isId ? "Statistik tingkat kesukaran (P-Value), efektivitas opsi pengecoh, dan deteksi kelemahan materi siswa." : "Item difficulty, distractor distribution, and student misconceptions."}</p>
         </div>
 
         <div class="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
-          <select id="diag-select-test" class="px-3 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-xs font-mono text-on-surface focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer">
-            <option value="post" selected>${isId ? "Ujian Akhir Posttest HOTS (25 Soal)" : "HOTS Posttest (25 Items)"}</option>
-            <option value="pre">${isId ? "Pretest Diagnostik Awal (25 Soal)" : "Diagnostic Pretest (25 Items)"}</option>
-            ${customQuizzes.map(q => `<option value="${q.id}">${isId ? "Kuis Guru: " : "Quiz: "}${q.title}</option>`).join("")}
+          <select id="diag-select-test" class="px-3.5 py-2.5 bg-surface-container-low border border-outline-variant rounded-xl text-xs font-mono text-on-surface focus:outline-none focus:ring-2 focus:ring-rose-500/30 cursor-pointer font-bold">
+            <option value="post" selected>${isId ? "🎯 Posttest HOTS (25 Soal)" : "HOTS Posttest (25 Items)"}</option>
+            <option value="pre">${isId ? "📋 Pretest Awal (25 Soal)" : "Diagnostic Pretest (25 Items)"}</option>
+            ${customQuizzes.map(q => `<option value="${q.id}">📝 ${isId ? "Kuis Guru: " : "Quiz: "}${q.title}</option>`).join("")}
           </select>
 
-          <select id="diag-select-class" class="px-3 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-xs font-mono text-on-surface focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer">
-            <option value="ALL">${isId ? "-- Semua Kelas TKJ --" : "-- All Classes --"}</option>
+          <select id="diag-select-class" class="px-3.5 py-2.5 bg-surface-container-low border border-outline-variant rounded-xl text-xs font-mono text-on-surface focus:outline-none focus:ring-2 focus:ring-rose-500/30 cursor-pointer font-bold">
+            <option value="ALL">${isId ? "Semua Kelas TKJ" : "All Classes"}</option>
             ${TKJ_CLASSES.map(c => `<option value="${c}">${c}</option>`).join("")}
           </select>
+        </div>
+      </div>
+
+      <!-- Pedagogical Methodology Info Banner -->
+      <div class="p-4 rounded-2xl bg-gradient-to-r from-rose-500/10 via-purple-500/5 to-primary/10 border border-rose-500/20 text-xs font-mono flex items-start gap-3">
+        <span class="material-symbols-outlined text-[20px] text-rose-600 shrink-0 mt-0.5">info</span>
+        <div class="space-y-1 text-on-surface">
+          <span class="font-bold block text-rose-700 dark:text-rose-400 uppercase tracking-wider text-[11px]">${isId ? "Pedoman Evaluasi Diagnostik Guru" : "Diagnostic Framework"}</span>
+          <p class="text-[11px] text-on-surface-variant leading-relaxed">
+            ${isId 
+              ? "Indeks Kesukaran: <strong>Mudah</strong> (P &gt; 0.70), <strong>Sedang</strong> (0.30 &le; P &le; 0.70), <strong>Sukar</strong> (P &lt; 0.30). Peringatan <strong>Miskonsepsi</strong> otomatis aktif bila salah satu opsi pengecoh salah dipilih oleh &ge; 22% siswa dalam satu kelas."
+              : "Difficulty Index: Easy (P &gt; 0.70), Moderate (0.30 &le; P &le; 0.70), Hard (P &lt; 0.30). Misconception alert triggers when &ge; 22% choose a distractor."}
+          </p>
         </div>
       </div>
 
@@ -4998,13 +5363,18 @@ async function renderAdminDiagnosticsTab(container) {
       </div>
 
       <!-- Diagnostic Items List -->
-      <div class="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-xs overflow-hidden">
-        <div class="p-4 bg-surface-container-low border-b border-outline-variant flex items-center justify-between">
-          <div class="flex items-center gap-2">
-            <span class="material-symbols-outlined text-[18px] text-primary">analytics</span>
-            <h4 class="font-bold text-xs text-on-surface font-mono uppercase tracking-wider">${isId ? "Analisis Butir Soal per Nomor" : "Item-by-Item Breakdown"}</h4>
+      <div class="bg-surface-container-lowest rounded-2xl border border-outline-variant shadow-xs overflow-hidden">
+        <div class="p-4 sm:p-5 bg-surface-container-low border-b border-outline-variant flex items-center justify-between">
+          <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-lg bg-rose-500/10 text-rose-600 flex items-center justify-center font-bold">
+              <span class="material-symbols-outlined text-[18px]">analytics</span>
+            </div>
+            <div>
+              <h4 class="font-bold text-xs text-on-surface font-mono uppercase tracking-wider">${isId ? "Analisis Butir Soal per Nomor" : "Item-by-Item Breakdown"}</h4>
+              <p class="text-[11px] text-outline">${isId ? "Distribusi pilihan A-D siswa, kunci benar, & saran remidiasi konsep." : "Option distribution and remediation guidance."}</p>
+            </div>
           </div>
-          <span class="text-xs font-mono text-outline" id="diag-total-items-badge">...</span>
+          <span class="px-2.5 py-1 rounded-lg bg-surface-container text-xs font-mono font-bold text-outline border border-outline-variant/60" id="diag-total-items-badge">...</span>
         </div>
 
         <div class="p-4 sm:p-6 space-y-4" id="diag-items-list-container">
@@ -5057,33 +5427,36 @@ async function renderAdminDiagnosticsTab(container) {
 
     if (kpiContainer) {
       kpiContainer.innerHTML = `
-        <div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant shadow-xs flex items-center gap-3">
-          <div class="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0 border border-primary/20">
-            <span class="material-symbols-outlined text-[22px]">score</span>
-          </div>
+        <div class="bg-surface-container-lowest p-5 rounded-2xl border-t-4 border-t-primary border border-outline-variant shadow-xs flex items-center justify-between">
           <div>
-            <span class="text-[10px] font-mono text-outline uppercase block">${isId ? "Rata-rata Skor Capaian" : "Avg Score"}</span>
-            <span class="text-xl font-extrabold text-on-surface font-mono">${avgScorePct}%</span>
+            <span class="text-[10px] font-mono text-outline uppercase block font-bold">${isId ? "Rata-rata Skor Capaian" : "Avg Score"}</span>
+            <span class="text-2xl font-black text-on-surface font-mono">${avgScorePct}%</span>
+            <span class="text-[11px] text-outline font-mono block mt-0.5">${isId ? "Tingkat ketepatan kelas" : "Class accuracy"}</span>
+          </div>
+          <div class="w-11 h-11 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0 border border-primary/20">
+            <span class="material-symbols-outlined text-[24px]">grade</span>
           </div>
         </div>
 
-        <div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant shadow-xs flex items-center gap-3">
-          <div class="w-10 h-10 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0 border border-amber-500/20">
-            <span class="material-symbols-outlined text-[22px]">warning</span>
-          </div>
+        <div class="bg-surface-container-lowest p-5 rounded-2xl border-t-4 border-t-amber-500 border border-outline-variant shadow-xs flex items-center justify-between">
           <div>
-            <span class="text-[10px] font-mono text-outline uppercase block">${isId ? "Soal Terindikasi Miskonsepsi" : "High Misconception"}</span>
-            <span class="text-xl font-extrabold text-amber-600 font-mono">${highMisconceptionCount} <span class="text-xs text-outline font-normal">Soal</span></span>
+            <span class="text-[10px] font-mono text-outline uppercase block font-bold">${isId ? "Soal Terindikasi Miskonsepsi" : "High Misconception"}</span>
+            <span class="text-2xl font-black text-amber-600 font-mono">${highMisconceptionCount} <span class="text-xs text-outline font-normal">Soal</span></span>
+            <span class="text-[11px] text-amber-600 font-mono block mt-0.5">${isId ? "Pengecoh > 22% siswa" : "Distractor > 22%"}</span>
+          </div>
+          <div class="w-11 h-11 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0 border border-amber-500/20">
+            <span class="material-symbols-outlined text-[24px]">warning</span>
           </div>
         </div>
 
-        <div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant shadow-xs flex items-center gap-3">
-          <div class="w-10 h-10 rounded-lg bg-red-500/10 text-red-600 flex items-center justify-center shrink-0 border border-red-500/20">
-            <span class="material-symbols-outlined text-[22px]">error</span>
-          </div>
+        <div class="bg-surface-container-lowest p-5 rounded-2xl border-t-4 border-t-rose-500 border border-outline-variant shadow-xs flex items-center justify-between">
           <div>
-            <span class="text-[10px] font-mono text-outline uppercase block">${isId ? "Soal Kategori Sukar (<30%)" : "Difficult Items (<30%)"}</span>
-            <span class="text-xl font-extrabold text-red-600 font-mono">${hardCount} <span class="text-xs text-outline font-normal">Soal</span></span>
+            <span class="text-[10px] font-mono text-outline uppercase block font-bold">${isId ? "Soal Kategori Sukar (<30%)" : "Difficult Items (<30%)"}</span>
+            <span class="text-2xl font-black text-rose-600 font-mono">${hardCount} <span class="text-xs text-outline font-normal">Soal</span></span>
+            <span class="text-[11px] text-rose-600 font-mono block mt-0.5">${isId ? "Butuh remidiasi klasikal" : "Needs review"}</span>
+          </div>
+          <div class="w-11 h-11 rounded-xl bg-rose-500/10 text-rose-600 flex items-center justify-center shrink-0 border border-rose-500/20">
+            <span class="material-symbols-outlined text-[24px]">psychology_alt</span>
           </div>
         </div>
       `;
@@ -5091,50 +5464,61 @@ async function renderAdminDiagnosticsTab(container) {
 
     if (listContainer) {
       if (items.length === 0) {
-        listContainer.innerHTML = `<p class="p-6 text-center text-outline font-mono text-xs">${isId ? "Tidak ada butir soal untuk asesmen ini." : "No items found."}</p>`;
+        listContainer.innerHTML = `<p class="p-8 text-center text-outline font-mono text-xs">${isId ? "Tidak ada butir soal untuk asesmen ini." : "No items found."}</p>`;
         return;
       }
 
       listContainer.innerHTML = items.map(it => `
-        <div class="p-4 sm:p-5 rounded-xl border border-outline-variant bg-surface-container-low hover:bg-surface-container transition-all space-y-3.5">
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-outline-variant pb-2.5">
+        <div class="p-5 rounded-2xl border border-outline-variant bg-surface-container-low hover:bg-surface-container transition-all space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-outline-variant pb-3">
             <div class="flex items-center gap-2 flex-wrap">
-              <span class="w-6 h-6 rounded-full bg-primary text-on-primary flex items-center justify-center font-bold text-xs font-mono">
+              <span class="w-7 h-7 rounded-xl bg-primary text-on-primary flex items-center justify-center font-bold text-xs font-mono shadow-xs">
                 ${it.index}
               </span>
               <span class="text-xs font-bold font-mono text-on-surface">${isId ? `Butir Soal #${it.index}` : `Item #${it.index}`}</span>
-              <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold border ${it.difficultyColor}">
+              <span class="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold border ${it.difficultyColor}">
                 Tingkat ${it.difficulty} (P = ${it.pValue})
               </span>
-              <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 font-bold">
+              <span class="px-2.5 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 font-bold">
                 ✓ Kunci: ${it.correctKey}
               </span>
             </div>
-            <div class="text-[11px] font-mono text-outline">
-              ${it.correctCount} / ${it.totalRespondents} Siswa Benar (${it.pctCorrect}%)
+            <div class="text-xs font-mono font-bold text-outline">
+              <span class="text-primary">${it.correctCount}</span> / ${it.totalRespondents} Siswa Benar (${it.pctCorrect}%)
             </div>
           </div>
 
           <div>
-            ${it.scenario ? `<p class="text-xs text-on-surface-variant italic mb-1 leading-relaxed">${it.scenario}</p>` : ""}
+            ${it.scenario ? `<p class="text-xs text-on-surface-variant italic mb-1.5 leading-relaxed bg-surface-container p-2.5 rounded-lg border border-outline-variant/40">${it.scenario}</p>` : ""}
             <p class="text-xs font-semibold text-on-surface leading-relaxed">${it.question}</p>
           </div>
 
-          <div class="space-y-1.5 pt-1">
-            <span class="text-[10px] font-mono uppercase tracking-wider text-outline block font-semibold">
-              ${isId ? "Distribusi Pilihan Siswa:" : "Student Option Distribution:"}
+          <div class="space-y-2 pt-1">
+            <span class="text-[10px] font-mono uppercase tracking-wider text-outline block font-bold">
+              ${isId ? "Distribusi Pilihan Jawaban Siswa:" : "Student Option Distribution:"}
             </span>
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono">
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs font-mono">
               ${it.distCounts.map(d => {
                 const isCorrect = d.key === it.correctKey;
+                const isTrap = !isCorrect && d.pct >= 22;
                 return `
-                  <div class="p-2 rounded-lg border ${isCorrect ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300 font-bold" : "bg-surface-container-lowest border-outline-variant text-on-surface"}">
-                    <div class="flex items-center justify-between mb-1">
-                      <span>Opsi ${d.key} ${isCorrect ? "✓ (Kunci)" : ""}</span>
-                      <span>${d.pct}%</span>
+                  <div class="p-3 rounded-xl border transition-all ${
+                    isCorrect 
+                      ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-700 dark:text-emerald-300 font-bold ring-1 ring-emerald-500/20" 
+                      : (isTrap 
+                          ? "bg-rose-500/10 border-rose-500/40 text-rose-700 dark:text-rose-300 font-bold ring-1 ring-rose-500/20" 
+                          : "bg-surface-container-lowest border-outline-variant text-on-surface")
+                  }">
+                    <div class="flex items-center justify-between mb-1.5">
+                      <span class="flex items-center gap-1">
+                        <span>Opsi ${d.key}</span>
+                        ${isCorrect ? `<span class="text-[10px] text-emerald-600">✓ Kunci</span>` : ""}
+                        ${isTrap ? `<span class="text-[10px] text-rose-600">⚠️ Trap</span>` : ""}
+                      </span>
+                      <span class="font-bold">${d.pct}%</span>
                     </div>
-                    <div class="w-full h-1.5 bg-outline-variant/30 rounded-full overflow-hidden">
-                      <div class="h-full ${isCorrect ? "bg-emerald-600" : (d.pct >= 22 ? "bg-amber-500" : "bg-primary")}" style="width: ${Math.max(4, d.pct)}%"></div>
+                    <div class="w-full h-2 bg-surface-container rounded-full overflow-hidden">
+                      <div class="h-full ${isCorrect ? "bg-emerald-500" : (isTrap ? "bg-rose-500" : "bg-primary/70")}" style="width: ${Math.max(4, d.pct)}%"></div>
                     </div>
                   </div>
                 `;
@@ -5143,18 +5527,25 @@ async function renderAdminDiagnosticsTab(container) {
           </div>
 
           ${it.hasHighMisconception ? `
-            <div class="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300 text-xs font-mono flex items-start gap-2.5">
-              <span class="material-symbols-outlined text-[18px] text-amber-600 shrink-0 mt-0.5">warning</span>
-              <div class="space-y-1">
-                <span class="font-bold block">${isId ? "⚠️ Terdeteksi Pola Miskonsepsi Siswa!" : "⚠️ Common Misconception Pattern Detected!"}</span>
-                <p class="text-[11px] leading-relaxed">
+            <div class="p-4 rounded-xl bg-gradient-to-r from-amber-500/10 to-rose-500/10 border border-amber-500/30 text-xs font-mono flex items-start gap-3">
+              <span class="material-symbols-outlined text-[20px] text-amber-600 shrink-0 mt-0.5">warning</span>
+              <div class="space-y-1.5 flex-1">
+                <div class="flex items-center justify-between">
+                  <span class="font-bold text-amber-800 dark:text-amber-300">${isId ? "⚠️ Terdeteksi Pola Miskonsepsi Siswa!" : "⚠️ Common Misconception Pattern Detected!"}</span>
+                  <span class="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-700 dark:text-rose-300 text-[10px] font-bold">${it.topMisconception.pct}% Terjebak</span>
+                </div>
+                <p class="text-[11px] leading-relaxed text-on-surface">
                   ${isId 
-                    ? `Sebanyak <strong>${it.topMisconception.pct}% siswa terjebak memilih Opsi ${it.topMisconception.key}</strong>. Siswa cenderung keliru memahami konsep ini.`
+                    ? `Sebanyak <strong>${it.topMisconception.pct}% siswa terjebak memilih Opsi ${it.topMisconception.key}</strong>. Siswa cenderung keliru membedakan konsep pada butir ini.`
                     : `${it.topMisconception.pct}% of students picked distractor ${it.topMisconception.key}.`}
                 </p>
                 ${it.explanation ? `
-                  <div class="text-[10px] text-on-surface-variant pt-1 border-t border-amber-500/20">
-                    <strong>${isId ? "Rekomendasi Penjelasan Guru:" : "Remediation Guide:"}</strong> ${it.explanation}
+                  <div class="text-[11px] text-on-surface-variant pt-2 border-t border-amber-500/20 mt-1 flex items-start gap-2">
+                    <span class="material-symbols-outlined text-[16px] text-indigo-500 shrink-0 mt-0.5">lightbulb</span>
+                    <div>
+                      <strong class="text-on-surface">${isId ? "Saran Remidiasi Pedagogis Guru:" : "Remediation Guide:"}</strong>
+                      <span class="italic text-on-surface-variant ml-1">${it.explanation}</span>
+                    </div>
                   </div>
                 ` : ""}
               </div>
