@@ -414,7 +414,8 @@ export async function checkLiveSession() {
       return null;
     }
 
-    let role = session.user.user_metadata?.role || "student";
+    const userEmail = (session.user.email || "").toLowerCase().trim();
+    let role = session.user.user_metadata?.role || (userEmail === "narendra.23076@mhs.unesa.ac.id" ? "teacher" : "student");
     let name = session.user.user_metadata?.name || session.user.user_metadata?.full_name || session.user.email.split("@")[0];
     let className = session.user.user_metadata?.class_name || "";
 
@@ -659,6 +660,9 @@ export async function signInWithGoogleEmail({ email, role = "student" }) {
     throw new Error("Format email Google tidak valid.");
   }
   const cleanEmail = email.trim().toLowerCase();
+  if (cleanEmail === "narendra.23076@mhs.unesa.ac.id") {
+    role = "teacher";
+  }
   let userRecord = null;
   let isNew = false;
   let className = "";
