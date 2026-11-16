@@ -20,6 +20,7 @@ import {
   checkLiveSession,
   signUp,
   signIn,
+  signInAdmin,
   signInWithGoogle,
   signInWithGoogleEmail,
   updateUserProfile,
@@ -451,21 +452,35 @@ function updateNavUser() {
   } else {
     if (container) {
       container.innerHTML = `
-        <button class="w-full py-2 px-3 bg-primary text-on-primary text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 hover:bg-primary-container transition-colors shadow-xs cursor-pointer" id="btn-sidebar-login">
-          <span class="material-symbols-outlined text-[16px]">login</span>
-          <span>${t("navLogin")}</span>
-        </button>
+        <div class="space-y-1.5 w-full">
+          <button class="w-full py-2 px-3 bg-primary text-on-primary text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 hover:bg-primary-container transition-colors shadow-xs cursor-pointer" id="btn-sidebar-login">
+            <span class="material-symbols-outlined text-[16px]">login</span>
+            <span>${t("navLogin")}</span>
+          </button>
+          <button class="w-full py-1.5 px-3 bg-surface-container hover:bg-surface-container-high text-outline hover:text-amber-600 text-[11px] font-mono font-bold rounded-lg flex items-center justify-center gap-1 transition-colors border border-outline-variant cursor-pointer" id="btn-sidebar-admin-login">
+            <span class="material-symbols-outlined text-[14px]">admin_panel_settings</span>
+            <span>Login Guru</span>
+          </button>
+        </div>
       `;
       document.getElementById("btn-sidebar-login")?.addEventListener("click", () => showAuthLayout("login"));
+      document.getElementById("btn-sidebar-admin-login")?.addEventListener("click", () => showAuthLayout("admin"));
     }
     if (topUserContainer) {
       topUserContainer.innerHTML = `
-        <button class="h-8 px-3 bg-primary text-on-primary text-xs font-semibold rounded-lg flex items-center gap-1.5 hover:bg-primary-container transition-colors cursor-pointer" id="btn-top-login">
-          <span class="material-symbols-outlined text-[15px]">login</span>
-          <span>${t("navLogin")}</span>
-        </button>
+        <div class="flex items-center gap-1.5">
+          <button class="h-8 px-3 bg-primary text-on-primary text-xs font-semibold rounded-lg flex items-center gap-1.5 hover:bg-primary-container transition-colors cursor-pointer" id="btn-top-login">
+            <span class="material-symbols-outlined text-[15px]">login</span>
+            <span>${t("navLogin")}</span>
+          </button>
+          <button class="h-8 px-2.5 bg-surface-container hover:bg-surface-container-high text-outline hover:text-amber-600 text-xs font-mono font-bold rounded-lg flex items-center gap-1 transition-colors border border-outline-variant cursor-pointer" id="btn-top-admin-login" title="Masuk sebagai Guru / Administrator">
+            <span class="material-symbols-outlined text-[15px]">admin_panel_settings</span>
+            <span class="hidden sm:inline">Guru</span>
+          </button>
+        </div>
       `;
       document.getElementById("btn-top-login")?.addEventListener("click", () => showAuthLayout("login"));
+      document.getElementById("btn-top-admin-login")?.addEventListener("click", () => showAuthLayout("admin"));
     }
   }
 
@@ -758,10 +773,12 @@ export function showToast(title, message = "", iconName = "info") {
 }
 
 // ============================================================================
-// VIEW 1: AUTHENTICATION (Login & Register with Google SSO & Stitch Layout)
+// VIEW 1: AUTHENTICATION (Login, Register, and Teacher Admin Mode)
 // ============================================================================
 function renderAuth(container, mode = "login") {
   const isLogin = mode === "login";
+  const isRegister = mode === "register";
+  const isAdmin = mode === "admin";
   const isId = getLang() === "id";
 
   container.innerHTML = `
@@ -776,36 +793,66 @@ function renderAuth(container, mode = "login") {
             <div>
               <div class="flex items-center gap-2">
                 <h1 class="text-xl font-bold text-on-surface tracking-tight leading-none">NetLearn</h1>
+                ${isAdmin ? `
+                  <span class="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/30 text-[10px] font-mono font-bold">
+                    Panel Guru
+                  </span>
+                ` : ""}
               </div>
               <p class="text-xs text-on-surface-variant mt-1">
-                ${isLogin 
-                  ? (isId ? "Web Pembelajaran Jaringan Komputer interaktif & mandiri." : "Sign in to computer networks learning platform.")
-                  : (isId ? "Buat akun baru untuk memulai pembelajaran & praktikum." : "Create a new account to access courseware & virtual lab.")}
+                ${isAdmin 
+                  ? (isId ? "Portal masuk khusus Guru & Administrator dengan Email & Password." : "Instructor console access with email and password.")
+                  : (isLogin 
+                      ? (isId ? "Web Pembelajaran Jaringan Komputer interaktif & mandiri." : "Sign in to computer networks learning platform.")
+                      : (isId ? "Buat akun baru untuk memulai pembelajaran & praktikum." : "Create a new account to access courseware & virtual lab."))}
               </p>
             </div>
           </div>
 
-          <!-- Primary Mode Selector: Masuk vs Daftar Baru -->
+          <!-- Primary Mode Selector: Masuk Siswa vs Daftar Siswa vs Login Guru -->
           <div class="flex items-center p-1 bg-surface-container-low rounded-xl mb-5 border border-outline-variant">
             <button 
               type="button" 
-              class="flex-1 py-2 px-3 rounded-lg text-xs font-bold text-center transition-all auth-mode-tab cursor-pointer ${isLogin ? 'bg-surface-container-lowest text-primary shadow-xs' : 'text-outline hover:text-on-surface'}" 
+              class="flex-1 py-2 px-2.5 rounded-lg text-xs font-bold text-center transition-all auth-mode-tab cursor-pointer ${isLogin ? 'bg-surface-container-lowest text-primary shadow-xs' : 'text-outline hover:text-on-surface'}" 
               data-mode="login"
             >
-              ${isId ? "Masuk ke Akun" : "Sign In"}
+              ${isId ? "Masuk Siswa" : "Student"}
             </button>
             <button 
               type="button" 
-              class="flex-1 py-2 px-3 rounded-lg text-xs font-bold text-center transition-all auth-mode-tab cursor-pointer ${!isLogin ? 'bg-surface-container-lowest text-primary shadow-xs' : 'text-outline hover:text-on-surface'}" 
+              class="flex-1 py-2 px-2.5 rounded-lg text-xs font-bold text-center transition-all auth-mode-tab cursor-pointer ${isRegister ? 'bg-surface-container-lowest text-primary shadow-xs' : 'text-outline hover:text-on-surface'}" 
               data-mode="register"
             >
-              ${isId ? "Daftar Akun Baru" : "Register"}
+              ${isId ? "Daftar Akun" : "Register"}
+            </button>
+            <button 
+              type="button" 
+              class="flex-1 py-2 px-2.5 rounded-lg text-xs font-bold text-center transition-all auth-mode-tab cursor-pointer flex items-center justify-center gap-1 ${isAdmin ? 'bg-amber-500/15 text-amber-800 dark:text-amber-200 border border-amber-500/40 shadow-xs' : 'text-outline hover:text-amber-600'}" 
+              data-mode="admin"
+            >
+              <span class="material-symbols-outlined text-[15px]">admin_panel_settings</span>
+              <span>${isId ? "Login Guru" : "Teacher"}</span>
             </button>
           </div>
 
+          ${isAdmin ? `
+            <!-- Teacher Credentials Helper Box -->
+            <div class="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs font-mono text-amber-900 dark:text-amber-200 space-y-1.5 mb-4">
+              <div class="flex items-center gap-1.5 font-bold text-amber-800 dark:text-amber-300">
+                <span class="material-symbols-outlined text-[16px]">verified_user</span>
+                <span>${isId ? "Akses Khusus Guru & Instruktur (Email & Password)" : "Instructor Authentication"}</span>
+              </div>
+              <p class="text-[11px] leading-relaxed text-on-surface-variant font-mono">
+                ${isId 
+                  ? "Masuk dengan email resmi guru Anda. Default password: <strong class='text-amber-700 dark:text-amber-300'>admin123</strong> (atau kata sandi akun Anda)." 
+                  : "Sign in with your teacher email and password. Default password: admin123."}
+              </p>
+            </div>
+          ` : ""}
+
           <!-- Form Element (Username/Email & Password) -->
           <form id="auth-form" class="space-y-3.5">
-            ${!isLogin ? `
+            ${isRegister ? `
               <div>
                 <label class="block text-xs font-semibold text-on-surface mb-1 font-mono">${t("nameLabel")} *</label>
                 <input 
@@ -835,13 +882,18 @@ function renderAuth(container, mode = "login") {
             ` : ""}
 
             <div>
-              <label class="block text-xs font-semibold text-on-surface mb-1 font-mono">${t("emailLabel")} *</label>
+              <label class="block text-xs font-semibold text-on-surface mb-1 font-mono">
+                ${isAdmin ? (isId ? "Email Guru / Administrator *" : "Instructor Email *") : `${t("emailLabel")} *`}
+              </label>
               <div class="relative flex items-center">
-                <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-outline pointer-events-none">alternate_email</span>
+                <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-outline pointer-events-none">
+                  ${isAdmin ? "badge" : "alternate_email"}
+                </span>
                 <input 
                   type="email" 
                   id="auth-email" 
-                  placeholder="${isId ? "nama@email.com" : "user@email.com"}"
+                  value="${isAdmin ? "narendra.23076@mhs.unesa.ac.id" : ""}"
+                  placeholder="${isAdmin ? "narendra.23076@mhs.unesa.ac.id" : (isId ? "nama@email.com" : "user@email.com")}"
                   class="w-full pl-10 pr-3.5 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg text-xs text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:bg-white font-mono" 
                   required 
                 />
@@ -850,13 +902,20 @@ function renderAuth(container, mode = "login") {
 
             <div>
               <div class="flex items-center justify-between mb-1">
-                <label class="block text-xs font-semibold text-on-surface font-mono">${t("passwordLabel")} *</label>
+                <label class="block text-xs font-semibold text-on-surface font-mono">
+                  ${isAdmin ? (isId ? "Kata Sandi Guru *" : "Instructor Password *") : `${t("passwordLabel")} *`}
+                </label>
+                <button type="button" id="btn-toggle-password-visibility" class="text-[10px] font-mono text-outline hover:text-on-surface flex items-center gap-1 cursor-pointer">
+                  <span class="material-symbols-outlined text-[13px]">visibility</span>
+                  <span>Lihat</span>
+                </button>
               </div>
               <div class="relative flex items-center">
                 <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-outline pointer-events-none">lock</span>
                 <input 
                   type="password" 
                   id="auth-password" 
+                  value="${isAdmin ? "admin123" : ""}"
                   placeholder="••••••••"
                   class="w-full pl-10 pr-3.5 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg text-xs text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:bg-white font-mono" 
                   required 
@@ -875,46 +934,50 @@ function renderAuth(container, mode = "login") {
             <!-- Submit Button -->
             <button 
               type="submit" 
-              class="w-full py-3 px-4 bg-primary hover:bg-primary-container text-on-primary font-semibold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2 mt-2 cursor-pointer"
+              class="w-full py-3 px-4 ${isAdmin ? 'bg-amber-600 hover:bg-amber-700 text-white' : 'bg-primary hover:bg-primary-container text-on-primary'} font-semibold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2 mt-2 cursor-pointer"
             >
-              <span>${isLogin ? t("btnSignIn") : t("btnRegister")}</span>
-              <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+              <span>${isAdmin ? (isId ? "Masuk ke Panel Guru & Admin" : "Access Teacher Console") : (isLogin ? t("btnSignIn") : t("btnRegister"))}</span>
+              <span class="material-symbols-outlined text-[16px]">${isAdmin ? "arrow_forward" : "arrow_forward"}</span>
             </button>
           </form>
 
-          <!-- Divider: Atau Masuk / Daftar dengan Google -->
-          <div class="relative my-4 text-center">
-            <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-outline-variant"></div></div>
-            <span class="relative bg-surface-container-lowest px-2.5 text-[10px] font-mono text-outline uppercase tracking-wider">${isId ? "Atau Lanjut Dengan" : "Or Continue With"}</span>
-          </div>
+          ${!isAdmin ? `
+            <!-- Divider: Atau Masuk / Daftar dengan Google (Hanya untuk Siswa) -->
+            <div class="relative my-4 text-center">
+              <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-outline-variant"></div></div>
+              <span class="relative bg-surface-container-lowest px-2.5 text-[10px] font-mono text-outline uppercase tracking-wider">${isId ? "Atau Lanjut Dengan" : "Or Continue With"}</span>
+            </div>
 
-          <!-- Google SSO Button Placed Below Form Credentials -->
-          <div>
-            <button type="button" id="btn-google-login" class="w-full py-2.5 px-4 bg-white hover:bg-slate-50 text-slate-800 font-semibold text-xs rounded-xl border border-outline-variant shadow-xs flex items-center justify-center gap-3 transition-all cursor-pointer">
-              <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
-                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
-              </svg>
-              <span>${isLogin ? t("googleSignIn") : (isId ? "Daftar Cepat dengan Akun Google" : "Quick Register with Google")}</span>
-            </button>
-          </div>
+            <!-- Google SSO Button Placed Below Form Credentials -->
+            <div>
+              <button type="button" id="btn-google-login" class="w-full py-2.5 px-4 bg-white hover:bg-slate-50 text-slate-800 font-semibold text-xs rounded-xl border border-outline-variant shadow-xs flex items-center justify-center gap-3 transition-all cursor-pointer">
+                <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+                </svg>
+                <span>${isLogin ? t("googleSignIn") : (isId ? "Daftar Cepat dengan Akun Google" : "Quick Register with Google")}</span>
+              </button>
+            </div>
+          ` : ""}
         </div>
 
         <!-- Footer switch mode link -->
         <div class="pt-4 border-t border-outline-variant flex items-center justify-between text-xs text-on-surface-variant mt-4">
           <p>
-            ${isLogin 
-              ? (isId ? "Belum memiliki akun?" : "Don't have an account?") 
-              : (isId ? "Sudah memiliki akun?" : "Already have an account?")}
+            ${isAdmin 
+              ? (isId ? "Bukan guru atau instruktur?" : "Not a teacher?") 
+              : (isLogin 
+                  ? (isId ? "Belum memiliki akun?" : "Don't have an account?") 
+                  : (isId ? "Sudah memiliki akun?" : "Already have an account?"))}
           </p>
           <button 
             type="button" 
             id="btn-toggle-auth-footer" 
             class="font-bold text-primary hover:underline hover:text-primary-container cursor-pointer flex items-center gap-1"
           >
-            <span>${isLogin ? (isId ? "Daftar Akun Baru" : "Register Now") : (isId ? "Masuk ke Akun" : "Sign In Now")}</span>
+            <span>${isAdmin ? (isId ? "Kembali ke Login Siswa" : "Back to Student Login") : (isLogin ? (isId ? "Daftar Akun Baru" : "Register Now") : (isId ? "Masuk ke Akun" : "Sign In Now"))}</span>
             <span class="material-symbols-outlined text-[15px]">arrow_forward</span>
           </button>
         </div>
@@ -934,42 +997,57 @@ function renderAuth(container, mode = "login") {
         <!-- Minimalist Glass Information Card -->
         <div class="relative z-10 bg-slate-900/75 backdrop-blur-md border border-white/15 p-5 rounded-2xl shadow-xl space-y-2">
           <div class="flex items-center gap-2">
-            <span class="w-2 h-2 rounded-full bg-secondary"></span>
-            <span class="text-[11px] font-mono font-semibold tracking-wider text-sky-300 uppercase">Akademi Jaringan Komputer</span>
+            <span class="w-2 h-2 rounded-full ${isAdmin ? 'bg-amber-400' : 'bg-secondary'}"></span>
+            <span class="text-[11px] font-mono font-semibold tracking-wider ${isAdmin ? 'text-amber-300' : 'text-sky-300'} uppercase">
+              ${isAdmin ? (isId ? "Panel Manajemen Guru" : "Instructor Administration") : (isId ? "Akademi Jaringan Komputer" : "Computer Network Academy")}
+            </span>
           </div>
           <h2 class="text-base font-bold text-white tracking-tight">
-            ${isId ? "Laboratorium Virtual & Kurikulum Terpadu" : "Virtual Networking Lab & Curriculum"}
+            ${isAdmin 
+              ? (isId ? "Pusat Pengelolaan Pembelajaran & Evaluasi" : "Learning Management & Evaluation Center") 
+              : (isId ? "Laboratorium Virtual & Kurikulum Terpadu" : "Virtual Networking Lab & Curriculum")}
           </h2>
           <p class="text-xs text-slate-300 leading-relaxed font-sans">
-            ${isId 
-              ? "Platform pembelajaran interaktif untuk penguasaan arsitektur protokol jaringan, subnetting VLSM, dan praktikum simulasi secara mandiri."
-              : "An interactive educational environment for mastering network protocols, VLSM subnetting, and hands-on simulation labs."}
+            ${isAdmin 
+              ? (isId ? "Kelola bank soal kuis, monitoring capaian N-Gain kohort siswa, dan analisis diagnostik miskonsepsi butir soal." : "Manage quiz packages, track student N-Gain outcomes, and diagnose item misconceptions.")
+              : (isId ? "Platform pembelajaran interaktif untuk penguasaan arsitektur protokol jaringan, subnetting VLSM, dan praktikum simulasi secara mandiri." : "Interactive environment for mastering network protocols and hands-on simulation labs.")}
           </p>
         </div>
       </div>
     </div>
   `;
 
-  // Google Sign-In / Register Handler
+  // Password visibility toggle
+  const togglePassBtn = document.getElementById("btn-toggle-password-visibility");
+  const passInput = document.getElementById("auth-password");
+  if (togglePassBtn && passInput) {
+    togglePassBtn.addEventListener("click", () => {
+      const isPass = passInput.type === "password";
+      passInput.type = isPass ? "text" : "password";
+      togglePassBtn.innerHTML = `
+        <span class="material-symbols-outlined text-[13px]">${isPass ? "visibility_off" : "visibility"}</span>
+        <span>${isPass ? "Tutup" : "Lihat"}</span>
+      `;
+    });
+  }
+
+  // Google Sign-In / Register Handler (Only present in non-admin mode)
   document.getElementById("btn-google-login")?.addEventListener("click", async () => {
     sound.click();
     
-    // Jika live Supabase OAuth aktif dan bisa redirect, coba terlebih dahulu
     if (isUsingLiveSupabase()) {
       try {
         const res = await signInWithGoogle({ role: "student" });
         if (res && res.isRedirecting) return;
       } catch (err) {
-        // Jika provider belum aktif di dashboard, lanjutkan ke modal Google Quick Sign-in mandiri
         console.log("Supabase OAuth redirect tidak aktif, membuka Google Quick Sign-In:", err);
       }
     }
 
-    // Tampilkan formulir Google Quick Sign-In interaktif
     showGoogleAccountPromptModal("student");
   });
 
-  // Mode switch tabs (Masuk vs Daftar Baru)
+  // Mode switch tabs (Masuk vs Daftar vs Login Guru)
   container.querySelectorAll(".auth-mode-tab").forEach(tab => {
     tab.addEventListener("click", () => {
       sound.click();
@@ -980,16 +1058,10 @@ function renderAuth(container, mode = "login") {
   // Footer toggle link
   container.querySelector("#btn-toggle-auth-footer")?.addEventListener("click", () => {
     sound.click();
-    renderAuth(container, isLogin ? "register" : "login");
-  });
-
-  // Fallback for anchor links if any
-  container.querySelectorAll("a").forEach(a => {
-    if (a.textContent.includes("Daftar") || a.textContent.includes("Register")) {
-      a.addEventListener("click", (e) => { e.preventDefault(); renderAuth(container, "register"); });
-    }
-    if (a.textContent.includes("Masuk") || a.textContent.includes("Sign In")) {
-      a.addEventListener("click", (e) => { e.preventDefault(); renderAuth(container, "login"); });
+    if (isAdmin) {
+      renderAuth(container, "login");
+    } else {
+      renderAuth(container, isLogin ? "register" : "login");
     }
   });
 
@@ -1009,7 +1081,7 @@ function renderAuth(container, mode = "login") {
       return;
     }
 
-    if (!isLogin && !className) {
+    if (isRegister && !className) {
       showToast(isId ? "Kelas Wajib Dipilih" : "Class is Required", isId ? "Silakan pilih kelas TKJ Anda." : "Please select your TKJ class.", "warning");
       return;
     }
@@ -1021,7 +1093,9 @@ function renderAuth(container, mode = "login") {
 
     try {
       let loggedUser;
-      if (isLogin) {
+      if (isAdmin) {
+        loggedUser = await signInAdmin({ email, password });
+      } else if (isLogin) {
         loggedUser = await signIn({ email, password });
       } else {
         loggedUser = await signUp({
@@ -1047,16 +1121,41 @@ function renderAuth(container, mode = "login") {
       updateRoleAccess();
       updateHUD();
 
-      if (!isUserAdmin(loggedUser) && (loggedUser.needsProfileCompletion || (loggedUser.role === "student" && (!loggedUser.className || loggedUser.className.trim() === "")))) {
-        showStudentProfileModal(loggedUser);
+      if (isAdmin || isUserAdmin(state.currentUser)) {
+        navigateTo("admin");
+        showToast(
+          isId ? "Login Guru Berhasil!" : "Teacher Login Success!",
+          `${isId ? "Selamat datang di Panel Guru," : "Welcome to Teacher Panel,"} ${loggedUser.name || "Bapak/Ibu Guru"}!`,
+          "verified"
+        );
+      } else {
+        if (loggedUser.needsProfileCompletion || (loggedUser.role === "student" && (!loggedUser.className || loggedUser.className.trim() === ""))) {
+          showStudentProfileModal(loggedUser);
+        }
+        navigateTo("dashboard");
+        showToast(
+          isLogin ? (isId ? "Selamat Datang Kembali!" : "Welcome Back!") : (isId ? "Akun Berhasil Didaftarkan!" : "Account Registered!"),
+          `${isId ? "Masuk sebagai" : "Logged in as"} ${loggedUser.name || fullName}`,
+          "check_circle"
+        );
       }
-
-      const targetView = isUserAdmin(state.currentUser) ? "admin" : "dashboard";
-      navigateTo(targetView);
-      showToast(isLogin ? (isId ? "Selamat Datang Kembali!" : "Welcome Back!") : (isId ? "Akun Berhasil Didaftarkan!" : "Account Registered!"), `${isId ? "Masuk sebagai" : "Logged in as"} ${loggedUser.name || fullName}`, "check_circle");
     } catch (err) {
       console.error("Auth error:", err);
-      showToast(isLogin ? (isId ? "Gagal Masuk" : "Login Failed") : (isId ? "Gagal Mendaftar" : "Registration Failed"), err.message || (isId ? "Periksa kembali email dan kata sandi Anda." : "Check your email and password."), "error");
+      showToast(
+        isAdmin 
+          ? (isId ? "Gagal Masuk Guru" : "Teacher Login Failed") 
+          : (isLogin ? (isId ? "Gagal Masuk" : "Login Failed") : (isId ? "Gagal Mendaftar" : "Registration Failed")), 
+        err.message || (isId ? "Periksa kembali email dan kata sandi Anda." : "Check your email and password."), 
+        "error"
+      );
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.classList.remove("opacity-60");
+      }
+    }
+  });
+}
     } finally {
       if (submitBtn) {
         submitBtn.disabled = false;
