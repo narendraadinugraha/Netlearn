@@ -886,6 +886,84 @@ export async function getAllStudentResults() {
   });
 }
 
+export async function getAllStudentsCohort() {
+  if (isUsingLiveSupabase()) {
+    try {
+      const { data: profiles, error: profErr } = await supabaseClient
+        .from("profiles")
+        .select("id, name, email, class_name, role, avatar_url, created_at, xp, read_materials")
+        .order("created_at", { ascending: false });
+
+      const { data: results } = await supabaseClient
+        .from("results")
+        .select("id, user_id, type, score, total, created_at")
+        .order("created_at", { ascending: false });
+
+      if (!profErr && profiles && profiles.length > 0) {
+        // Filter out teachers/admins so cohort table only tracks students
+        const studentProfiles = profiles.filter(p => {
+          const r = (p.role || "").toLowerCase();
+          return r !== "teacher" && r !== "admin" && r !== "guru";
+        });
+
+        return studentProfiles.map(p => {
+          const userResults = (results || []).filter(r => r.user_id === p.id);
+          const pre = userResults.find(r => r.type === "pre" || r.type === "pretest");
+          const post = userResults.find(r => r.type === "post" || r.type === "posttest");
+          const preScore = pre ? pre.score : "-";
+          const postScore = post ? post.score : "-";
+          const maxScore = 25;
+          const gain = (pre && post && (maxScore - Number(preScore)) > 0)
+            ? Number(((Number(postScore) - Number(preScore)) / (maxScore - Number(preScore))).toFixed(2))
+            : (post ? Number((Number(postScore) / maxScore).toFixed(2)) : 0);
+
+          const readCount = Array.isArray(p.read_materials) ? p.read_materials.length : 0;
+
+          return {
+            id: p.id,
+            name: p.name || "Siswa",
+            email: p.email || "-",
+            className: p.class_name || "X TKJ 1",
+            readCount: readCount,
+            preScore: preScore,
+            postScore: postScore,
+            gain: gain,
+            isMastery: (post && Number(post.score) >= 18),
+            lastActive: (post || pre)?.created_at || p.created_at || new Date().toISOString()
+          };
+        });
+      }
+    } catch (e) {
+      console.warn("Could not load cohort profiles from Supabase:", e);
+    }
+  }
+
+  // Mock implementation
+  const db = getMockData();
+  const students = (db.users || []).filter(u => {
+    const r = (u.role || "").toLowerCase();
+    return r !== "teacher" && r !== "admin" && r !== "guru";
+  });
+
+  return students.map(u => {
+    const uRes = (db.results || []).filter(r => r.user_id === u.id);
+    const pre = uRes.find(r => r.type === "pre" || r.type === "pretest");
+    const post = uRes.find(r => r.type === "post" || r.type === "posttest");
+    return {
+      id: u.id,
+      name: u.name || "Siswa",
+      email: u.email || "-",
+      className: u.className || u.class_name || "X TKJ 1",
+      readCount: 4,
+      preScore: pre ? pre.score : 15,
+      postScore: post ? post.score : 22,
+      gain: 0.70,
+      isMastery: true,
+      lastActive: post?.created_at || u.createdAt || new Date().toISOString()
+    };
+  });
+}
+
 // ----------------------------------------------------
 // User Stats & Progress Auto-Sync (Backend Supabase)
 // ----------------------------------------------------
@@ -1066,36 +1144,50 @@ export async function getMaterialsFromDb() {
       const { data, error } = await supabaseClient
         .from("materials")
         .select("*")
-        .order("id", { ascending: true });
+        .order("id", { ascending: false });
       if (!error && data) return data;
     } catch (e) {
       console.warn("Error loading materials from Supabase:", e);
     }
   }
-  return null;
+  const db = getMockData();
+  return db.materials || [];
 }
 
 export async function saveMaterialToDb(mat) {
+  const insertPayload = {
+    title_id: mat.title_id,
+    title_en: mat.title_en || mat.title_id,
+    category: mat.category || "Umum",
+    read_time: mat.readTime || mat.read_time || "10 min",
+    summary: mat.summary || mat.summary_id || "",
+    content: mat.content || mat.content_id || "",
+    file_url: mat.file_url || mat.video?.url || ""
+  };
+
   if (isUsingLiveSupabase()) {
     try {
       const { data, error } = await supabaseClient
         .from("materials")
-        .insert({
-          title_id: mat.title_id,
-          title_en: mat.title_en || mat.title_id,
-          category: mat.category || "Umum",
-          read_time: mat.readTime || "10 min",
-          summary: mat.summary_id || "",
-          content: mat.content_id || "",
-          file_url: mat.video?.url || ""
-        })
+        .insert(insertPayload)
         .select();
       if (!error && data && data.length > 0) return data[0];
     } catch (e) {
       console.warn("Error saving material to Supabase:", e);
     }
   }
-  return null;
+
+  // Mock fallback
+  const db = getMockData();
+  if (!db.materials) db.materials = [];
+  const newRow = {
+    id: Date.now(),
+    ...insertPayload,
+    created_at: new Date().toISOString()
+  };
+  db.materials.unshift(newRow);
+  saveMockData(db);
+  return newRow;
 }
 
 export async function deleteMaterialFromDb(id) {
@@ -1105,10 +1197,16 @@ export async function deleteMaterialFromDb(id) {
         .from("materials")
         .delete()
         .eq("id", id);
-      return !error;
+      if (!error) return true;
     } catch (e) {
       console.warn("Error deleting material from Supabase:", e);
     }
+  }
+  const db = getMockData();
+  if (db.materials) {
+    db.materials = db.materials.filter(m => String(m.id) !== String(id));
+    saveMockData(db);
+    return true;
   }
   return false;
 }

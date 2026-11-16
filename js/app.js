@@ -28,6 +28,7 @@ import {
   saveTestResult,
   getUserResults,
   getAllStudentResults,
+  getAllStudentsCohort,
   saveUserProgress,
   getUserProgress,
   getVideos,
@@ -56,6 +57,23 @@ export const state = {
     results: []
   }
 };
+
+// ============================================================================
+// Role & Material Helpers
+// ============================================================================
+export function isUserAdmin(user = state.currentUser) {
+  if (!user) return false;
+  const role = (user.role || user.user?.user_metadata?.role || "").toLowerCase().trim();
+  return role === "teacher" || role === "admin" || role === "guru";
+}
+
+export function getMaterialById(id) {
+  if (window.__allLoadedMaterials && Array.isArray(window.__allLoadedMaterials)) {
+    const found = window.__allLoadedMaterials.find(m => String(m.id) === String(id));
+    if (found) return found;
+  }
+  return MATERIALS.find(item => String(item.id) === String(id)) || MATERIALS[0];
+}
 
 // ============================================================================
 // Layout View Switcher: APK vs Dedicated Auth Screen
@@ -143,10 +161,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     updateHUD();
     updateNavUser();
     updateRoleAccess();
-    if (state.currentUser.needsProfileCompletion || (state.currentUser.role === "student" && (!state.currentUser.className || state.currentUser.className.trim() === ""))) {
+    if (!isUserAdmin(state.currentUser) && (state.currentUser.needsProfileCompletion || (state.currentUser.role === "student" && (!state.currentUser.className || state.currentUser.className.trim() === "")))) {
       showStudentProfileModal(state.currentUser);
     }
-    const isTeacher = state.currentUser.role === "teacher" || state.currentUser.user?.user_metadata?.role === "teacher";
+    const isTeacher = isUserAdmin(state.currentUser);
     const targetHash = window.location.hash.replace("#", "").trim();
     const validViews = ["dashboard", "materials", "simulation", "quizzes", "minigame", "pretest", "posttest", "manual", "profile", "admin"];
     const initialView = validViews.includes(targetHash) ? targetHash : (isTeacher ? "admin" : "dashboard");
@@ -161,7 +179,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 // Role-Based Menu Filtering (GURU vs SISWA)
 // ============================================================================
 function updateRoleAccess() {
-  const isTeacher = state.currentUser && (state.currentUser.role === "teacher" || state.currentUser.user?.user_metadata?.role === "teacher");
+  const isTeacher = isUserAdmin(state.currentUser);
 
   document.querySelectorAll(".admin-nav-btn, #nav-btn-admin, #top-nav-admin").forEach(btn => {
     if (isTeacher) {
@@ -343,7 +361,7 @@ function updateNavUser() {
   if (state.currentUser) {
     const meta = state.currentUser.user?.user_metadata || {};
     const name = state.currentUser.name || meta.full_name || meta.name || (state.currentUser.user?.email ? state.currentUser.user.email.split("@")[0] : "Pengguna");
-    const isTeacher = state.currentUser.role === "teacher" || meta.role === "teacher";
+    const isTeacher = isUserAdmin(state.currentUser);
     const className = state.currentUser.className || meta.class_name || "";
     const avatar = state.currentUser.avatar || meta.avatar_url;
     const roleText = isTeacher 
@@ -454,7 +472,7 @@ export function navigateTo(viewName, params = {}) {
   showAppLayout();
 
   // Role Security Guard: Panel Guru hanya boleh diakses oleh Guru/Admin
-  const isTeacher = state.currentUser && (state.currentUser.role === "teacher" || state.currentUser.user?.user_metadata?.role === "teacher");
+  const isTeacher = isUserAdmin(state.currentUser);
   if (viewName === "admin" && !isTeacher) {
     showToast("Akses Ditolak", t("toastAccessDenied"), "lock");
     viewName = "dashboard";
@@ -793,17 +811,6 @@ function renderAuth(container, mode = "login") {
               </div>
             </div>
 
-            <div id="teacher-code-field" class="hidden">
-              <label class="block text-xs font-semibold text-on-surface mb-1 font-mono">${t("teacherCodeLabel")} *</label>
-              <input 
-                type="text" 
-                id="auth-teacher-code" 
-                placeholder="${CONFIG.TEACHER_CODE || 'GURU2026'}"
-                class="w-full px-3.5 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg text-xs text-on-surface font-mono" 
-              />
-              <span class="text-[10px] text-outline font-mono mt-0.5 block">${t("teacherCodeHint")}</span>
-            </div>
-
             <!-- Keep signed in -->
             <div class="flex items-center justify-between pt-1">
               <label class="flex items-center gap-2 cursor-pointer select-none">
@@ -890,33 +897,6 @@ function renderAuth(container, mode = "login") {
     </div>
   `;
 
-  // Attach auth interactions
-  let selectedRole = "student";
-  const teacherCodeField = document.getElementById("teacher-code-field");
-
-  container.querySelectorAll(".auth-role-btn").forEach(btn => {
-    btn.addEventListener("click", () => {
-      container.querySelectorAll(".auth-role-btn").forEach(b => {
-        b.classList.remove("active", "bg-surface-container-lowest", "text-primary", "shadow-xs");
-        b.classList.add("text-outline");
-      });
-      btn.classList.add("active", "bg-surface-container-lowest", "text-primary", "shadow-xs");
-      btn.classList.remove("text-outline");
-      selectedRole = btn.dataset.role;
-
-      if (teacherCodeField) {
-        const studentClassField = document.getElementById("student-class-field");
-        if (selectedRole === "teacher") {
-          teacherCodeField.classList.remove("hidden");
-          if (studentClassField) studentClassField.classList.add("hidden");
-        } else {
-          teacherCodeField.classList.add("hidden");
-          if (studentClassField) studentClassField.classList.remove("hidden");
-        }
-      }
-    });
-  });
-
   // Google Sign-In / Register Handler
   document.getElementById("btn-google-login")?.addEventListener("click", async () => {
     sound.click();
@@ -924,7 +904,7 @@ function renderAuth(container, mode = "login") {
     // Jika live Supabase OAuth aktif dan bisa redirect, coba terlebih dahulu
     if (isUsingLiveSupabase()) {
       try {
-        const res = await signInWithGoogle({ role: selectedRole });
+        const res = await signInWithGoogle({ role: "student" });
         if (res && res.isRedirecting) return;
       } catch (err) {
         // Jika provider belum aktif di dashboard, lanjutkan ke modal Google Quick Sign-in mandiri
@@ -933,7 +913,7 @@ function renderAuth(container, mode = "login") {
     }
 
     // Tampilkan formulir Google Quick Sign-In interaktif
-    showGoogleAccountPromptModal(selectedRole);
+    showGoogleAccountPromptModal("student");
   });
 
   // Mode switch tabs (Masuk vs Daftar Baru)
@@ -969,8 +949,6 @@ function renderAuth(container, mode = "login") {
     const fullName = nameEl ? nameEl.value.trim() : email.split("@")[0];
     const classEl = document.getElementById("auth-class");
     const className = classEl ? classEl.value.trim() : "";
-    const codeEl = document.getElementById("auth-teacher-code");
-    const teacherCode = codeEl ? codeEl.value.trim() : "";
     const submitBtn = e.target.querySelector('button[type="submit"]');
 
     if (!email || !password) {
@@ -978,7 +956,7 @@ function renderAuth(container, mode = "login") {
       return;
     }
 
-    if (!isLogin && selectedRole === "student" && !className) {
+    if (!isLogin && !className) {
       showToast(isId ? "Kelas Wajib Dipilih" : "Class is Required", isId ? "Silakan pilih kelas TKJ Anda." : "Please select your TKJ class.", "warning");
       return;
     }
@@ -997,9 +975,8 @@ function renderAuth(container, mode = "login") {
           email,
           password,
           name: fullName,
-          role: selectedRole,
-          className,
-          teacherCode
+          role: "student",
+          className
         });
       }
 
@@ -1017,11 +994,11 @@ function renderAuth(container, mode = "login") {
       updateRoleAccess();
       updateHUD();
 
-      if (loggedUser.needsProfileCompletion || (loggedUser.role === "student" && (!loggedUser.className || loggedUser.className.trim() === ""))) {
+      if (!isUserAdmin(loggedUser) && (loggedUser.needsProfileCompletion || (loggedUser.role === "student" && (!loggedUser.className || loggedUser.className.trim() === "")))) {
         showStudentProfileModal(loggedUser);
       }
 
-      const targetView = (state.currentUser.role === "teacher" || state.currentUser.user?.user_metadata?.role === "teacher") ? "admin" : "dashboard";
+      const targetView = isUserAdmin(state.currentUser) ? "admin" : "dashboard";
       navigateTo(targetView);
       showToast(isLogin ? (isId ? "Selamat Datang Kembali!" : "Welcome Back!") : (isId ? "Akun Berhasil Didaftarkan!" : "Account Registered!"), `${isId ? "Masuk sebagai" : "Logged in as"} ${loggedUser.name || fullName}`, "check_circle");
     } catch (err) {
@@ -1784,7 +1761,7 @@ function renderDashboard(container) {
 // ============================================================================
 // VIEW 3: COURSE MATERIALS & MODULES (Stitch netlearn_course_materials_modules)
 // ============================================================================
-function renderMaterials(container) {
+async function renderMaterials(container) {
   const isId = getLang() === "id";
 
   const modSvgMap = {
@@ -1795,6 +1772,36 @@ function renderMaterials(container) {
     5: "assets/images/materials/mod5_hardware_media.svg",
     6: "assets/images/materials/mod6_dns_dhcp_dora.svg"
   };
+
+  let allMaterials = [...MATERIALS.map(m => ({ ...m, isCustom: false }))];
+  try {
+    const dbMats = await getMaterialsFromDb() || [];
+    dbMats.forEach(dm => {
+      if (!allMaterials.some(u => String(u.id) === String(dm.id))) {
+        allMaterials.push({
+          id: dm.id,
+          title_id: dm.title_id || dm.title || "Modul Tambahan",
+          title_en: dm.title_en || dm.title_id || "Additional Module",
+          category: dm.category || "Jaringan Komputer",
+          readTime: dm.read_time || "10 min",
+          summary_id: dm.summary || dm.summary_id || "",
+          summary_en: dm.summary_en || dm.summary || "",
+          content_id: dm.content || dm.content_id || "",
+          content_en: dm.content_en || dm.content || "",
+          icon: "book",
+          isCustom: true,
+          video: {
+            url: dm.file_url || "",
+            duration: "10:00",
+            title: dm.title_id || "Video Pembelajaran"
+          }
+        });
+      }
+    });
+  } catch (e) {
+    console.warn("Could not merge Supabase materials:", e);
+  }
+  window.__allLoadedMaterials = allMaterials;
 
   container.innerHTML = `
     <div class="max-w-7xl mx-auto space-y-6 w-full">
@@ -1822,7 +1829,7 @@ function renderMaterials(container) {
 
       <!-- Modules Grid with Architectural Previews -->
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="modules-cards-grid">
-        ${MATERIALS.map(m => {
+        ${allMaterials.map(m => {
           const isRead = state.userStats.readMaterials.includes(m.id);
           const isWatched = state.userStats.watchedVideos.includes(m.id);
           const svgPath = modSvgMap[m.id] || modSvgMap[1];
@@ -1833,7 +1840,7 @@ function renderMaterials(container) {
               <div class="bg-[#0b1325] h-36 border-b border-outline-variant p-3 flex items-center justify-center relative overflow-hidden group">
                 <img src="${svgPath}" alt="${isId ? m.title_id : m.title_en}" class="h-full w-full object-contain filter drop-shadow-sm transition-transform duration-300 group-hover:scale-105" />
                 <span class="absolute top-2.5 left-2.5 px-2 py-0.5 rounded font-mono text-[10px] font-bold bg-black/60 text-white backdrop-blur-xs border border-white/10">
-                  MOD-0${m.id}
+                  ${m.isCustom ? (isId ? "TAMBAHAN" : "EXTRA") : `MOD-0${m.id}`}
                 </span>
                 <span class="absolute top-2.5 right-2.5 px-2 py-0.5 rounded font-mono text-[10px] ${isRead ? "bg-emerald-500/90 text-white font-bold" : "bg-slate-800/80 text-gray-300"} backdrop-blur-xs">
                   ${isRead ? (isId ? "✓ TUNTAS" : "✓ COMPLETED") : (isId ? "TERSEDIA" : "AVAILABLE")}
@@ -1862,7 +1869,7 @@ function renderMaterials(container) {
                 <div class="pt-4 border-t border-outline-variant space-y-2.5">
                   <div class="flex items-center justify-between text-xs font-mono text-outline">
                     <span>${isId ? "Vidio Pembelajaran:" : "Video Lesson:"}</span>
-                    <span class="${isWatched ? "text-secondary font-semibold" : ""}">${isWatched ? (isId ? "✓ Sudah Ditonton" : "✓ Watched") : m.video.duration}</span>
+                    <span class="${isWatched ? "text-secondary font-semibold" : ""}">${isWatched ? (isId ? "✓ Sudah Ditonton" : "✓ Watched") : (m.video?.duration || "10:00")}</span>
                   </div>
 
                   <div class="grid grid-cols-2 gap-2 pt-1">
@@ -1886,21 +1893,21 @@ function renderMaterials(container) {
 
   container.querySelectorAll(".open-material-btn").forEach(btn => {
     btn.addEventListener("click", () => {
-      const id = parseInt(btn.dataset.id, 10);
-      openMaterialModal(id);
+      const id = btn.dataset.id;
+      openMaterialModal(isNaN(Number(id)) ? id : Number(id));
     });
   });
 
   container.querySelectorAll(".open-video-btn").forEach(btn => {
     btn.addEventListener("click", () => {
-      const id = parseInt(btn.dataset.id, 10);
-      openVideoModal(id);
+      const id = btn.dataset.id;
+      openVideoModal(isNaN(Number(id)) ? id : Number(id));
     });
   });
 
   document.getElementById("btn-export-all-materials")?.addEventListener("click", () => {
     let fullHtml = `<h1>Silabus Lengkap Jaringan Komputer</h1>`;
-    MATERIALS.forEach(m => {
+    allMaterials.forEach(m => {
       fullHtml += `
         <hr/>
         <h2>${isId ? m.title_id : m.title_en}</h2>
@@ -3690,150 +3697,210 @@ function renderQuizzes(container) {
 // ============================================================================
 async function renderAdmin(container) {
   const isId = getLang() === "id";
-  let studentResults = [];
-  try {
-    studentResults = await getAllStudentResults();
-  } catch (err) {
-    console.warn("Could not load student results from DB:", err);
-  }
-
-  // Fallback demo cohort
-  if (studentResults.length === 0) {
-    studentResults = [
-      { name: "Aditya Sharma", email: "aditya@netlearn.edu", preScore: 17, postScore: 22, gain: 0.58 },
-      { name: "Alex Chen", email: "alex.chen@netlearn.edu", preScore: 15, postScore: 24, gain: 0.90 },
-      { name: "Elena Rostova", email: "elena.r@netlearn.edu", preScore: 18, postScore: 23, gain: 0.71 },
-      { name: "Marcus Brody", email: "m.brody@netlearn.edu", preScore: 14, postScore: 20, gain: 0.54 },
-      { name: "Priya Patel", email: "p.patel@netlearn.edu", preScore: 16, postScore: 25, gain: 1.00 }
-    ];
-  }
-
   container.innerHTML = `
-    <div class="max-w-7xl mx-auto space-y-6 w-full">
-      
-      <!-- Teacher Header -->
+    <div class="max-w-7xl mx-auto space-y-6 w-full animate-fade-in">
       <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-2 border-b border-outline-variant">
         <div>
           <div class="flex items-center gap-1.5 font-mono text-xs text-outline uppercase tracking-wider">
-            <span>${isId ? "Panel Manajemen Guru" : "Teacher Console"}</span>
+            <span>${isId ? "Panel Manajemen Guru & Instruktur" : "Teacher Console"}</span>
             <span class="text-outline-variant">/</span>
-            <span>Cohort Analytics</span>
+            <span>NetLearn Administration</span>
           </div>
-          <h1 class="text-2xl sm:text-3xl font-extrabold text-on-surface tracking-tight">${t("adminTitle")}</h1>
-          <p class="text-xs sm:text-sm text-on-surface-variant">${t("adminSubtitle")}</p>
+          <h1 class="text-2xl sm:text-3xl font-extrabold text-on-surface tracking-tight">${isId ? "Panel Administrasi Guru" : "Instructor Administration"}</h1>
+          <p class="text-xs sm:text-sm text-on-surface-variant">${isId ? "Monitoring progres ketuntasan siswa serta penambahan materi pembelajaran kurikulum." : "Monitor student cohort progress and manage learning materials."}</p>
         </div>
         <div class="flex items-center gap-2">
-          <button class="h-9 px-3.5 bg-primary hover:bg-primary-container text-on-primary font-mono text-xs font-bold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer" id="btn-export-cohort-csv">
-            <span class="material-symbols-outlined text-[16px]">file_download</span>
-            <span>${t("btnExportCsv")}</span>
-          </button>
+          <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary/10 text-secondary border border-secondary/20 text-xs font-mono font-bold">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            ${isId ? "Mode Guru Aktif" : "Teacher Active"}
+          </span>
         </div>
       </div>
 
-      <!-- Cohort Score Distribution Histogram (Exact Stitch Component) -->
-      <div class="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant shadow-xs space-y-4">
-        <div class="flex items-center justify-between">
+      <!-- Navigation Tabs: 2 Fitur Utama Sesuai Kebutuhan Guru -->
+      <div class="flex items-center gap-2 p-1.5 bg-surface-container-low rounded-xl border border-outline-variant">
+        <button type="button" class="admin-tab-btn flex-1 py-2.5 px-4 rounded-lg text-xs font-bold font-mono transition-all flex items-center justify-center gap-2 cursor-pointer bg-surface-container-lowest text-primary shadow-xs border border-outline-variant/50" data-tab="tab-progress">
+          <span class="material-symbols-outlined text-[18px]">monitoring</span>
+          <span>1. ${isId ? "Pantau Progres Siswa" : "Student Progress"}</span>
+        </button>
+        <button type="button" class="admin-tab-btn flex-1 py-2.5 px-4 rounded-lg text-xs font-bold font-mono transition-all flex items-center justify-center gap-2 cursor-pointer text-outline hover:text-on-surface" data-tab="tab-materials">
+          <span class="material-symbols-outlined text-[18px]">library_add</span>
+          <span>2. ${isId ? "Tambah & Kelola Materi" : "Manage Materials"}</span>
+        </button>
+      </div>
+
+      <!-- Tab Content Area -->
+      <div id="admin-tab-content" class="w-full"></div>
+    </div>
+  `;
+
+  const tabBtns = container.querySelectorAll(".admin-tab-btn");
+  const tabContentEl = container.querySelector("#admin-tab-content");
+
+  async function switchTab(tabId) {
+    tabBtns.forEach(btn => {
+      const isActive = btn.dataset.tab === tabId;
+      btn.className = `admin-tab-btn flex-1 py-2.5 px-4 rounded-lg text-xs font-bold font-mono transition-all flex items-center justify-center gap-2 cursor-pointer ${
+        isActive 
+          ? "bg-surface-container-lowest text-primary shadow-xs border border-outline-variant/50" 
+          : "text-outline hover:text-on-surface hover:bg-surface-container-high/40"
+      }`;
+    });
+
+    if (tabId === "tab-progress") {
+      await renderAdminProgressTab(tabContentEl);
+    } else {
+      await renderAdminMaterialsTab(tabContentEl);
+    }
+  }
+
+  tabBtns.forEach(btn => {
+    btn.addEventListener("click", () => {
+      sound.click();
+      switchTab(btn.dataset.tab);
+    });
+  });
+
+  await switchTab("tab-progress");
+}
+
+async function renderAdminProgressTab(container) {
+  const isId = getLang() === "id";
+  container.innerHTML = `
+    <div class="space-y-6">
+      <div id="cohort-loading" class="p-8 text-center bg-surface-container-lowest rounded-xl border border-outline-variant">
+        <span class="material-symbols-outlined text-3xl text-primary animate-spin">progress_activity</span>
+        <p class="text-xs text-outline font-mono mt-2">${isId ? "Memuat data progres kohort siswa dari Supabase..." : "Loading student cohort data..."}</p>
+      </div>
+    </div>
+  `;
+
+  let cohort = [];
+  try {
+    cohort = await getAllStudentsCohort();
+  } catch (e) {
+    console.warn("Error loading student cohort:", e);
+  }
+
+  if (!cohort || cohort.length === 0) {
+    cohort = [
+      { id: 1, name: "Ahmad Rizki", className: "X TKJ 1", email: "ahmad.rizki@gmail.com", readCount: 5, preScore: 14, postScore: 23, gain: 0.82, isMastery: true, lastActive: new Date().toISOString() },
+      { id: 2, name: "Bunga Citra", className: "X TKJ 1", email: "bunga.c@gmail.com", readCount: 4, preScore: 16, postScore: 22, gain: 0.67, isMastery: true, lastActive: new Date().toISOString() },
+      { id: 3, name: "Dimas Saputra", className: "X TKJ 2", email: "dimas.saputra@gmail.com", readCount: 3, preScore: 12, postScore: 19, gain: 0.54, isMastery: true, lastActive: new Date().toISOString() },
+      { id: 4, name: "Fajar Nugraha", className: "X TKJ 2", email: "fajar.nug@gmail.com", readCount: 2, preScore: 15, postScore: 17, gain: 0.20, isMastery: false, lastActive: new Date().toISOString() },
+      { id: 5, name: "Siti Rahmawati", className: "X TKJ 3", email: "siti.rahma@gmail.com", readCount: 6, preScore: 18, postScore: 25, gain: 1.00, isMastery: true, lastActive: new Date().toISOString() }
+    ];
+  }
+
+  const totalStudents = cohort.length;
+  const preScores = cohort.map(s => Number(s.preScore)).filter(n => !isNaN(n));
+  const postScores = cohort.map(s => Number(s.postScore)).filter(n => !isNaN(n));
+  const avgPre = preScores.length > 0 ? (preScores.reduce((a, b) => a + b, 0) / preScores.length).toFixed(1) : "0";
+  const avgPost = postScores.length > 0 ? (postScores.reduce((a, b) => a + b, 0) / postScores.length).toFixed(1) : "0";
+  const masteryCount = cohort.filter(s => s.isMastery).length;
+  const masteryRate = totalStudents > 0 ? Math.round((masteryCount / totalStudents) * 100) : 0;
+
+  container.innerHTML = `
+    <div class="space-y-6">
+      <!-- 4 KPI Cards -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant shadow-xs flex items-center gap-3.5">
+          <div class="w-11 h-11 rounded-xl bg-blue-500/10 text-primary flex items-center justify-center shrink-0 border border-primary/20">
+            <span class="material-symbols-outlined text-[24px]">group</span>
+          </div>
           <div>
-            <h3 class="text-sm font-bold text-on-surface font-mono">${isId ? "Distribusi Nilai Kohort & Pergeseran Gain Hake" : "Cohort Score Distribution & Hake Shift"}</h3>
-            <p class="text-xs text-on-surface-variant font-mono">${isId ? "Perbandingan perolehan skor Pretest vs Posttest pada 5 rentang nilai" : "Comparison between Diagnostic Pretest and HOTS Posttest across 5 score brackets"}</p>
-          </div>
-          <div class="flex items-center gap-4 text-xs font-mono">
-            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-xs bg-surface-dim"></span> Pretest</span>
-            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-xs bg-secondary"></span> Posttest</span>
+            <span class="text-[10px] font-mono uppercase tracking-wider text-outline block">${isId ? "Total Siswa Terdaftar" : "Enrolled Students"}</span>
+            <span class="text-xl font-extrabold text-on-surface font-mono">${totalStudents} <span class="text-xs font-normal text-outline">Siswa</span></span>
           </div>
         </div>
 
-        <!-- SVG Histogram Chart -->
-        <div class="w-full overflow-x-auto py-2">
-          <svg class="w-full min-w-[580px] h-48" viewBox="0 0 620 200">
-            <!-- Grid Lines -->
-            <line x1="40" y1="30" x2="600" y2="30" stroke="#c2c7d0" stroke-dasharray="3 3" opacity="0.4"></line>
-            <line x1="40" y1="80" x2="600" y2="80" stroke="#c2c7d0" stroke-dasharray="3 3" opacity="0.4"></line>
-            <line x1="40" y1="130" x2="600" y2="130" stroke="#c2c7d0" stroke-dasharray="3 3" opacity="0.4"></line>
-            <line x1="40" y1="170" x2="600" y2="170" stroke="#72777f" stroke-width="1.5"></line>
-
-            <!-- Bracket 1: 50-59 -->
-            <rect x="80" y="70" width="30" height="100" rx="3" fill="#cfdaf1"></rect>
-            <text x="95" y="62" text-anchor="middle" font-family="JetBrains Mono" font-size="11" fill="#42474f">32</text>
-            <rect x="115" y="155" width="30" height="15" rx="3" fill="#1f4e79"></rect>
-            <text x="130" y="148" text-anchor="middle" font-family="JetBrains Mono" font-size="11" fill="#00375e">4</text>
-            <text x="112" y="188" text-anchor="middle" font-family="JetBrains Mono" font-size="11" fill="#72777f">50–59%</text>
-
-            <!-- Bracket 2: 60-69 -->
-            <rect x="185" y="50" width="30" height="120" rx="3" fill="#cfdaf1"></rect>
-            <text x="200" y="42" text-anchor="middle" font-family="JetBrains Mono" font-size="11" fill="#42474f">48</text>
-            <rect x="220" y="150" width="30" height="20" rx="3" fill="#1f4e79"></rect>
-            <text x="235" y="142" text-anchor="middle" font-family="JetBrains Mono" font-size="11" fill="#00375e">8</text>
-            <text x="217" y="188" text-anchor="middle" font-family="JetBrains Mono" font-size="11" fill="#72777f">60–69%</text>
-
-            <!-- Bracket 3: 70-79 -->
-            <rect x="290" y="80" width="30" height="90" rx="3" fill="#cfdaf1"></rect>
-            <text x="305" y="72" text-anchor="middle" font-family="JetBrains Mono" font-size="11" fill="#42474f">36</text>
-            <rect x="325" y="115" width="30" height="55" rx="3" fill="#1f4e79"></rect>
-            <text x="340" y="107" text-anchor="middle" font-family="JetBrains Mono" font-size="11" fill="#00375e">22</text>
-            <text x="322" y="188" text-anchor="middle" font-family="JetBrains Mono" font-size="11" fill="#72777f">70–79%</text>
-
-            <!-- Bracket 4: 80-89 -->
-            <rect x="395" y="130" width="30" height="40" rx="3" fill="#cfdaf1"></rect>
-            <text x="410" y="122" text-anchor="middle" font-family="JetBrains Mono" font-size="11" fill="#42474f">15</text>
-            <rect x="430" y="60" width="30" height="110" rx="3" fill="#1f4e79"></rect>
-            <text x="445" y="52" text-anchor="middle" font-family="JetBrains Mono" font-size="11" fill="#00375e">44</text>
-            <text x="427" y="188" text-anchor="middle" font-family="JetBrains Mono" font-size="11" fill="#72777f">80–89%</text>
-
-            <!-- Bracket 5: 90-100 -->
-            <rect x="500" y="155" width="30" height="15" rx="3" fill="#cfdaf1"></rect>
-            <text x="515" y="148" text-anchor="middle" font-family="JetBrains Mono" font-size="11" fill="#42474f">5</text>
-            <rect x="535" y="35" width="30" height="135" rx="3" fill="#006d38"></rect>
-            <text x="550" y="28" text-anchor="middle" font-family="JetBrains Mono" font-size="11" font-weight="bold" fill="#006d38">54 ★</text>
-            <text x="532" y="188" text-anchor="middle" font-family="JetBrains Mono" font-size="11" font-weight="bold" fill="#111c2c">90–100%</text>
-          </svg>
+        <div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant shadow-xs flex items-center gap-3.5">
+          <div class="w-11 h-11 rounded-xl bg-slate-500/10 text-slate-700 dark:text-slate-200 flex items-center justify-center shrink-0 border border-slate-300">
+            <span class="material-symbols-outlined text-[24px]">assignment_turned_in</span>
+          </div>
+          <div>
+            <span class="text-[10px] font-mono uppercase tracking-wider text-outline block">${isId ? "Rata-rata Pretest" : "Avg Pretest"}</span>
+            <span class="text-xl font-extrabold text-on-surface font-mono">${avgPre} <span class="text-xs font-normal text-outline">/ 25</span></span>
+          </div>
         </div>
 
-        <div class="flex items-center justify-between text-xs font-mono text-outline pt-2 border-t border-outline-variant">
-          <span class="flex items-center gap-1.5 text-secondary">
-            <span class="material-symbols-outlined text-[16px]">info</span>
-            ${isId ? "Hasil Posttest menunjukkan pergeseran positif signifikan ke arah ketuntasan (>85%) dengan perolehan gain Hake g = 0.58." : "Posttest exhibits significant positive skew toward mastery (>85%) with normalized gain g = 0.58."}
-          </span>
-          <span class="text-primary font-bold">N = 136 Siswa</span>
+        <div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant shadow-xs flex items-center gap-3.5">
+          <div class="w-11 h-11 rounded-xl bg-indigo-500/10 text-indigo-600 flex items-center justify-center shrink-0 border border-indigo-200">
+            <span class="material-symbols-outlined text-[24px]">military_tech</span>
+          </div>
+          <div>
+            <span class="text-[10px] font-mono uppercase tracking-wider text-outline block">${isId ? "Rata-rata Posttest" : "Avg Posttest"}</span>
+            <span class="text-xl font-extrabold text-indigo-600 font-mono">${avgPost} <span class="text-xs font-normal text-outline">/ 25</span></span>
+          </div>
         </div>
+
+        <div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant shadow-xs flex items-center gap-3.5">
+          <div class="w-11 h-11 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-200">
+            <span class="material-symbols-outlined text-[24px]">check_circle</span>
+          </div>
+          <div>
+            <span class="text-[10px] font-mono uppercase tracking-wider text-outline block">${isId ? "Tingkat Ketuntasan" : "Mastery Rate"}</span>
+            <span class="text-xl font-extrabold text-emerald-600 font-mono">${masteryRate}% <span class="text-xs font-normal text-outline">(${masteryCount}/${totalStudents})</span></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filters & Action Bar -->
+      <div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+        <div class="flex flex-1 flex-col sm:flex-row items-center gap-3">
+          <div class="relative w-full sm:w-72">
+            <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-outline pointer-events-none">search</span>
+            <input 
+              type="text" 
+              id="admin-search-student" 
+              placeholder="${isId ? "Cari nama atau email siswa..." : "Search student by name or email..."}" 
+              class="w-full pl-9 pr-3 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-xs font-mono text-on-surface focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          </div>
+
+          <div class="relative w-full sm:w-48">
+            <select 
+              id="admin-filter-class" 
+              class="w-full px-3 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-xs font-mono text-on-surface focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+            >
+              <option value="ALL">${isId ? "-- Semua Kelas TKJ --" : "-- All Classes --"}</option>
+              ${TKJ_CLASSES.map(c => `<option value="${c}">${c}</option>`).join("")}
+            </select>
+          </div>
+        </div>
+
+        <button type="button" id="btn-export-cohort-csv" class="h-9 px-4 bg-primary hover:bg-primary-container text-on-primary font-mono text-xs font-bold rounded-lg flex items-center justify-center gap-2 transition-colors cursor-pointer shrink-0 shadow-xs">
+          <span class="material-symbols-outlined text-[16px]">file_download</span>
+          <span>${isId ? "Unduh Rekap CSV" : "Export CSV"}</span>
+        </button>
       </div>
 
       <!-- Cohort Table -->
       <div class="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-xs overflow-hidden">
         <div class="p-4 bg-surface-container-low border-b border-outline-variant flex items-center justify-between">
-          <h3 class="text-xs font-mono font-bold text-on-surface uppercase tracking-wider">${t("tabStudents")}</h3>
-          <span class="text-xs font-mono text-secondary font-bold">Status: Online</span>
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-[18px] text-primary">groups</span>
+            <h3 class="text-xs font-mono font-bold text-on-surface uppercase tracking-wider">${isId ? "Daftar Siswa & Rekap Capaian Belajar" : "Student Roster & Learning Outcomes"}</h3>
+          </div>
+          <span id="cohort-filtered-count" class="text-xs font-mono text-outline">${totalStudents} ${isId ? "Siswa Ditampilkan" : "Students"}</span>
         </div>
 
         <div class="overflow-x-auto">
           <table class="w-full text-left font-mono text-xs">
             <thead class="bg-surface-container text-outline text-[11px] uppercase border-b border-outline-variant">
               <tr>
-                <th class="p-3.5">${t("studentName")}</th>
+                <th class="p-3.5">${isId ? "Nama Siswa" : "Student"}</th>
                 <th class="p-3.5">${isId ? "Kelas" : "Class"}</th>
-                <th class="p-3.5">${t("studentEmail")}</th>
-                <th class="p-3.5">${t("pretestScore")}</th>
-                <th class="p-3.5">${t("posttestScore")}</th>
-                <th class="p-3.5">${t("scoreGain")}</th>
-                <th class="p-3.5">Status</th>
+                <th class="p-3.5">Email</th>
+                <th class="p-3.5 text-center">${isId ? "Materi Dibaca" : "Read Progress"}</th>
+                <th class="p-3.5 text-center">Pretest</th>
+                <th class="p-3.5 text-center">Posttest</th>
+                <th class="p-3.5 text-center">N-Gain (Hake)</th>
+                <th class="p-3.5 text-center">Status</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-outline-variant">
-              ${studentResults.map(s => `
-                <tr class="hover:bg-surface-container-low/60 transition-colors">
-                  <td class="p-3.5 font-bold text-on-surface">${s.name || s.student_name}</td>
-                  <td class="p-3.5 font-bold font-mono text-secondary">${s.className || s.class_name || "X TKJ 1"}</td>
-                  <td class="p-3.5 text-on-surface-variant">${s.email || s.student_email || "-"}</td>
-                  <td class="p-3.5 text-outline">${s.preScore || s.pre_score || 16} / 25</td>
-                  <td class="p-3.5 font-bold text-primary">${s.postScore || s.post_score || 22} / 25</td>
-                  <td class="p-3.5 font-bold text-secondary">+${Math.round((s.gain || 0.6) * 100)}% (g=${s.gain || 0.6})</td>
-                  <td class="p-3.5">
-                    <span class="px-2 py-0.5 rounded font-mono text-[10px] bg-secondary-fixed text-on-secondary-fixed font-bold">
-                      ${isId ? "Tuntas" : "Mastery"}
-                    </span>
-                  </td>
-                </tr>
-              `).join("")}
+            <tbody id="cohort-table-body" class="divide-y divide-outline-variant">
+              <!-- Rendered via updateTable() -->
             </tbody>
           </table>
         </div>
@@ -3841,10 +3908,381 @@ async function renderAdmin(container) {
     </div>
   `;
 
+  function updateTable() {
+    const searchVal = document.getElementById("admin-search-student")?.value.toLowerCase().trim() || "";
+    const classVal = document.getElementById("admin-filter-class")?.value || "ALL";
+
+    const filtered = cohort.filter(s => {
+      const matchSearch = (s.name || "").toLowerCase().includes(searchVal) || (s.email || "").toLowerCase().includes(searchVal);
+      const matchClass = (classVal === "ALL") || (s.className === classVal);
+      return matchSearch && matchClass;
+    });
+
+    const countEl = document.getElementById("cohort-filtered-count");
+    if (countEl) countEl.textContent = `${filtered.length} ${isId ? "Siswa Ditampilkan" : "Students"}`;
+
+    const tbody = document.getElementById("cohort-table-body");
+    if (!tbody) return;
+
+    if (filtered.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="8" class="p-8 text-center text-outline font-mono text-xs">
+            ${isId ? "Tidak ada siswa yang sesuai kriteria pencarian." : "No students match the criteria."}
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    tbody.innerHTML = filtered.map(s => {
+      const gainVal = s.gain !== undefined && s.gain !== null ? Number(s.gain) : 0;
+      const gainPercent = Math.round(gainVal * 100);
+      const isPass = s.isMastery || (s.postScore !== "-" && Number(s.postScore) >= 18);
+
+      return `
+        <tr class="hover:bg-surface-container-low/60 transition-colors">
+          <td class="p-3.5 font-bold text-on-surface">
+            <div class="flex items-center gap-2.5">
+              <div class="w-7 h-7 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0 font-mono">
+                ${(s.name || "S").charAt(0).toUpperCase()}
+              </div>
+              <span class="truncate">${s.name || "-"}</span>
+            </div>
+          </td>
+          <td class="p-3.5 font-bold font-mono text-secondary">
+            <span class="px-2 py-0.5 rounded bg-surface-container text-on-surface border border-outline-variant text-[11px]">${s.className || "X TKJ 1"}</span>
+          </td>
+          <td class="p-3.5 text-on-surface-variant text-[11px]">${s.email || "-"}</td>
+          <td class="p-3.5 text-center font-mono">
+            <span class="font-bold ${s.readCount >= 6 ? "text-emerald-600" : "text-primary"}">${s.readCount || 0}</span>
+            <span class="text-outline text-[10px]">/ 6 Modul</span>
+          </td>
+          <td class="p-3.5 text-center text-outline">${s.preScore !== "-" ? `${s.preScore} / 25` : "-"}</td>
+          <td class="p-3.5 text-center font-bold ${isPass ? "text-emerald-600" : "text-primary"}">${s.postScore !== "-" ? `${s.postScore} / 25` : "-"}</td>
+          <td class="p-3.5 text-center font-bold ${gainVal >= 0.7 ? "text-emerald-600" : (gainVal >= 0.3 ? "text-secondary" : "text-outline")}">
+            ${s.postScore !== "-" ? `+${gainPercent}% (g=${gainVal.toFixed(2)})` : "-"}
+          </td>
+          <td class="p-3.5 text-center">
+            ${isPass ? `
+              <span class="px-2 py-0.5 rounded font-mono text-[10px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 font-bold">
+                ✓ ${isId ? "Tuntas" : "Mastery"}
+              </span>
+            ` : `
+              <span class="px-2 py-0.5 rounded font-mono text-[10px] bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 font-medium">
+                ${isId ? "Bimbingan" : "Pending"}
+              </span>
+            `}
+          </td>
+        </tr>
+      `;
+    }).join("");
+  }
+
+  updateTable();
+  document.getElementById("admin-search-student")?.addEventListener("input", updateTable);
+  document.getElementById("admin-filter-class")?.addEventListener("change", updateTable);
+
   document.getElementById("btn-export-cohort-csv")?.addEventListener("click", () => {
-    exportToCsv("Rekapitulasi_Nilai_Siswa", studentResults);
-    showToast(isId ? "Nilai Berhasil Diekspor" : "Gradebook Exported", isId ? "File CSV rekapitulasi telah diunduh." : "CSV gradebook downloaded.", "table_chart");
+    sound.click();
+    exportToCsv("Rekapitulasi_Progres_Siswa_NetLearn", cohort);
+    showToast(isId ? "Nilai Berhasil Diekspor" : "Gradebook Exported", isId ? "File CSV rekapitulasi progres dan nilai telah diunduh." : "Cohort CSV exported successfully.", "table_chart");
   });
+}
+
+async function renderAdminMaterialsTab(container) {
+  const isId = getLang() === "id";
+
+  container.innerHTML = `
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      
+      <!-- LEFT COLUMN: Formulir Tambah Materi Baru (5 cols) -->
+      <div class="lg:col-span-5 bg-surface-container-lowest p-5 sm:p-6 rounded-xl border border-outline-variant shadow-xs space-y-4">
+        <div class="border-b border-outline-variant pb-3">
+          <div class="flex items-center gap-2 text-primary mb-1">
+            <span class="material-symbols-outlined text-[20px]">post_add</span>
+            <h3 class="font-bold text-sm text-on-surface font-mono">${isId ? "Tambah Modul Materi Baru" : "Add New Learning Module"}</h3>
+          </div>
+          <p class="text-xs text-on-surface-variant">${isId ? "Materi yang ditambahkan langsung disimpan di Supabase dan dapat dibaca oleh seluruh siswa di portal Materi." : "Materials are saved directly to Supabase and published to all students."}</p>
+        </div>
+
+        <form id="form-admin-add-material" class="space-y-3.5">
+          <div>
+            <label class="block text-xs font-semibold text-on-surface mb-1 font-mono">${isId ? "Judul Materi (Bahasa Indonesia) *" : "Module Title (Indonesian) *"}</label>
+            <input 
+              type="text" 
+              id="mat-title-id" 
+              placeholder="${isId ? "Contoh: Konfigurasi Virtual LAN (VLAN) Cisco" : "e.g. Virtual LAN Configuration"}" 
+              required
+              class="w-full px-3 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-xs font-mono text-on-surface focus:outline-none focus:ring-1 focus:ring-primary focus:bg-white"
+            />
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-on-surface mb-1 font-mono">${isId ? "Judul Materi (English / Opsional)" : "Module Title (English / Optional)"}</label>
+            <input 
+              type="text" 
+              id="mat-title-en" 
+              placeholder="${isId ? "Contoh: Virtual LAN (VLAN) Configuration" : "e.g. VLAN Configuration"}" 
+              class="w-full px-3 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-xs font-mono text-on-surface focus:outline-none focus:ring-1 focus:ring-primary focus:bg-white"
+            />
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-on-surface mb-1 font-mono">${isId ? "Kategori Modul *" : "Category *"}</label>
+              <select 
+                id="mat-category" 
+                class="w-full px-3 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-xs font-mono text-on-surface focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+              >
+                <option value="Pengenalan Jaringan">${isId ? "Pengenalan Jaringan" : "Network Scopes"}</option>
+                <option value="Topologi Jaringan">${isId ? "Topologi & Media" : "Topology & Media"}</option>
+                <option value="Arsitektur Protokol">${isId ? "Model OSI & TCP/IP" : "OSI & TCP/IP"}</option>
+                <option value="Pengalamatan IP">${isId ? "Subnetting & IPv4" : "Subnetting & IP"}</option>
+                <option value="Perangkat Keras">${isId ? "Perangkat Keras Lab" : "Hardware & Media"}</option>
+                <option value="Layanan Jaringan">${isId ? "Layanan Jaringan (DNS/DHCP)" : "Network Services"}</option>
+                <option value="Keamanan Jaringan">${isId ? "Keamanan & Routing" : "Security & Routing"}</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-on-surface mb-1 font-mono">${isId ? "Estimasi Waktu Baca *" : "Read Time *"}</label>
+              <input 
+                type="text" 
+                id="mat-read-time" 
+                value="10 min" 
+                placeholder="10 min" 
+                required
+                class="w-full px-3 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-xs font-mono text-on-surface focus:outline-none focus:ring-1 focus:ring-primary focus:bg-white"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-on-surface mb-1 font-mono">${isId ? "Ringkasan Singkat (Summary) *" : "Short Summary *"}</label>
+            <textarea 
+              id="mat-summary" 
+              rows="2" 
+              required
+              placeholder="${isId ? "Tuliskan ringkasan inti materi dalam 1-2 kalimat..." : "Brief overview of what students will learn..."}"
+              class="w-full px-3 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-xs font-mono text-on-surface focus:outline-none focus:ring-1 focus:ring-primary focus:bg-white resize-y"
+            ></textarea>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-on-surface mb-1 font-mono">${isId ? "Konten Lengkap Modul Pembelajaran *" : "Full Module Content *"}</label>
+            <textarea 
+              id="mat-content" 
+              rows="6" 
+              required
+              placeholder="${isId ? "Ketikkan pembahasan lengkap materi di sini. Mendukung format paragraf, daftar poin, dan instruksi lab..." : "Write complete study material..."}"
+              class="w-full px-3 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-xs font-mono text-on-surface focus:outline-none focus:ring-1 focus:ring-primary focus:bg-white resize-y"
+            ></textarea>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-on-surface mb-1 font-mono">${isId ? "URL Video Pembelajaran YouTube (Opsional)" : "YouTube Video URL (Optional)"}</label>
+            <input 
+              type="url" 
+              id="mat-video-url" 
+              placeholder="https://www.youtube.com/watch?v=..." 
+              class="w-full px-3 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-xs font-mono text-on-surface focus:outline-none focus:ring-1 focus:ring-primary focus:bg-white"
+            />
+          </div>
+
+          <button 
+            type="submit" 
+            id="btn-submit-material"
+            class="w-full py-2.5 px-4 bg-primary hover:bg-primary-container text-on-primary font-mono font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <span class="material-symbols-outlined text-[18px]">publish</span>
+            <span>${isId ? "Simpan & Terbitkan Materi ke Supabase" : "Publish Material to Supabase"}</span>
+          </button>
+        </form>
+      </div>
+
+      <!-- RIGHT COLUMN: Daftar Modul Aktif (7 cols) -->
+      <div class="lg:col-span-7 bg-surface-container-lowest p-5 sm:p-6 rounded-xl border border-outline-variant shadow-xs space-y-4">
+        <div class="border-b border-outline-variant pb-3 flex items-center justify-between">
+          <div>
+            <div class="flex items-center gap-2 text-primary mb-1">
+              <span class="material-symbols-outlined text-[20px]">menu_book</span>
+              <h3 class="font-bold text-sm text-on-surface font-mono">${isId ? "Daftar Modul Pembelajaran Aktif" : "Active Learning Modules"}</h3>
+            </div>
+            <p class="text-xs text-on-surface-variant">${isId ? "Semua materi yang dapat diakses oleh siswa di aplikasi." : "All materials accessible to students."}</p>
+          </div>
+          <span id="materials-count-badge" class="px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-primary/10 text-primary border border-primary/20">
+            ...
+          </span>
+        </div>
+
+        <!-- Material items list -->
+        <div id="admin-materials-items-list" class="space-y-3">
+          <div class="p-6 text-center text-outline font-mono text-xs">
+            <span class="material-symbols-outlined text-2xl text-primary animate-spin">progress_activity</span>
+            <p class="mt-2">${isId ? "Memuat daftar materi..." : "Loading materials..."}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  async function refreshMaterialsList() {
+    const listContainer = document.getElementById("admin-materials-items-list");
+    const countBadge = document.getElementById("materials-count-badge");
+    if (!listContainer) return;
+
+    let dbMats = [];
+    try {
+      dbMats = await getMaterialsFromDb() || [];
+    } catch (e) {
+      console.warn("Could not load db materials:", e);
+    }
+
+    const unified = [...MATERIALS.map(m => ({ ...m, isCustom: false }))];
+    (dbMats || []).forEach(dm => {
+      if (!unified.some(u => String(u.id) === String(dm.id))) {
+        unified.push({
+          id: dm.id,
+          title_id: dm.title_id || dm.title || "Modul Tambahan",
+          title_en: dm.title_en || dm.title_id || "Additional Module",
+          category: dm.category || "Jaringan Komputer",
+          readTime: dm.read_time || "10 min",
+          summary_id: dm.summary || dm.summary_id || "",
+          summary_en: dm.summary_en || dm.summary || "",
+          content_id: dm.content || dm.content_id || "",
+          content_en: dm.content_en || dm.content || "",
+          icon: "book",
+          isCustom: true,
+          video: {
+            url: dm.file_url || "",
+            duration: "10:00",
+            title: dm.title_id || "Video Pembelajaran"
+          }
+        });
+      }
+    });
+
+    window.__allLoadedMaterials = unified;
+
+    if (countBadge) {
+      countBadge.textContent = `${unified.length} ${isId ? "Modul Aktif" : "Modules"}`;
+    }
+
+    if (unified.length === 0) {
+      listContainer.innerHTML = `<p class="p-6 text-center text-outline font-mono text-xs">${isId ? "Belum ada materi." : "No materials available."}</p>`;
+      return;
+    }
+
+    listContainer.innerHTML = unified.map(m => `
+      <div class="p-4 rounded-xl border border-outline-variant bg-surface-container-low hover:bg-surface-container transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center gap-2 mb-1 flex-wrap">
+            <span class="px-2 py-0.5 rounded font-mono text-[10px] font-bold ${m.isCustom ? "bg-secondary-fixed text-on-secondary-fixed" : "bg-primary/10 text-primary border border-primary/20"}">
+              ${m.isCustom ? (isId ? "★ Tambahan Guru (Supabase)" : "★ Custom Guru") : (isId ? "Kurikulum Inti" : "Core Curriculum")}
+            </span>
+            <span class="text-[10px] font-mono text-outline">${m.category} • ${m.readTime}</span>
+          </div>
+          <h4 class="font-bold text-xs text-on-surface truncate">${isId ? m.title_id : m.title_en}</h4>
+          <p class="text-[11px] text-on-surface-variant line-clamp-1 mt-0.5">${isId ? m.summary_id : m.summary_en}</p>
+        </div>
+
+        <div class="flex items-center gap-2 shrink-0">
+          <button type="button" class="btn-preview-admin-mat h-8 px-3 rounded-lg bg-surface-container-lowest hover:bg-surface-container text-on-surface border border-outline-variant text-xs font-mono font-medium flex items-center gap-1.5 transition-colors cursor-pointer" data-id="${m.id}">
+            <span class="material-symbols-outlined text-[15px] text-primary">visibility</span>
+            <span>${isId ? "Lihat" : "Preview"}</span>
+          </button>
+          ${m.isCustom ? `
+            <button type="button" class="btn-delete-admin-mat h-8 px-2.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-600 border border-red-200 text-xs font-mono font-medium flex items-center gap-1 transition-colors cursor-pointer" data-id="${m.id}" title="${isId ? "Hapus Materi dari Supabase" : "Delete Material"}">
+              <span class="material-symbols-outlined text-[15px]">delete</span>
+            </button>
+          ` : ""}
+        </div>
+      </div>
+    `).join("");
+
+    listContainer.querySelectorAll(".btn-preview-admin-mat").forEach(btn => {
+      btn.addEventListener("click", () => {
+        sound.click();
+        const matId = btn.dataset.id;
+        openMaterialModal(isNaN(Number(matId)) ? matId : Number(matId));
+      });
+    });
+
+    listContainer.querySelectorAll(".btn-delete-admin-mat").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        sound.click();
+        const matId = btn.dataset.id;
+        const confirmDelete = window.confirm(isId ? "Apakah Anda yakin ingin menghapus materi ini dari Supabase?" : "Are you sure you want to delete this material?");
+        if (!confirmDelete) return;
+
+        btn.disabled = true;
+        btn.innerHTML = `<span class="material-symbols-outlined text-[15px] animate-spin">progress_activity</span>`;
+        const ok = await deleteMaterialFromDb(matId);
+        if (ok) {
+          showToast(isId ? "Materi Dihapus" : "Material Deleted", isId ? "Materi berhasil dihapus dari database Supabase." : "Material deleted from database.", "check_circle");
+          await refreshMaterialsList();
+        } else {
+          showToast(isId ? "Gagal Menghapus" : "Delete Failed", isId ? "Terjadi kesalahan saat menghapus materi." : "Error deleting material.", "error");
+          btn.disabled = false;
+        }
+      });
+    });
+  }
+
+  document.getElementById("form-admin-add-material")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    sound.click();
+
+    const submitBtn = document.getElementById("btn-submit-material");
+    const titleId = document.getElementById("mat-title-id")?.value.trim();
+    const titleEn = document.getElementById("mat-title-en")?.value.trim() || titleId;
+    const category = document.getElementById("mat-category")?.value || "Jaringan Komputer";
+    const readTime = document.getElementById("mat-read-time")?.value.trim() || "10 min";
+    const summary = document.getElementById("mat-summary")?.value.trim() || "";
+    const content = document.getElementById("mat-content")?.value.trim() || "";
+    const videoUrl = document.getElementById("mat-video-url")?.value.trim() || "";
+
+    if (!titleId || !summary || !content) {
+      showToast(isId ? "Formulir Belum Lengkap" : "Incomplete Form", isId ? "Harap lengkapi semua bidang bertanda bintang (*)." : "Please fill all required fields.", "warning");
+      return;
+    }
+
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = `<span class="material-symbols-outlined text-[18px] animate-spin">progress_activity</span> <span>${isId ? "Menyimpan ke Supabase..." : "Saving..."}</span>`;
+    }
+
+    try {
+      const saved = await saveMaterialToDb({
+        title_id: titleId,
+        title_en: titleEn,
+        category: category,
+        readTime: readTime,
+        summary: summary,
+        content: content,
+        file_url: videoUrl
+      });
+
+      if (saved) {
+        showToast(isId ? "Materi Berhasil Diterbitkan!" : "Material Published!", `${isId ? "Modul baru tersimpan di Supabase:" : "Saved to Supabase:"} ${titleId}`, "check_circle");
+        document.getElementById("form-admin-add-material")?.reset();
+        await refreshMaterialsList();
+      } else {
+        showToast(isId ? "Gagal Menyimpan" : "Save Failed", isId ? "Tidak dapat menyimpan ke database Supabase." : "Could not save to Supabase.", "error");
+      }
+    } catch (err) {
+      console.error("Save material error:", err);
+      showToast(isId ? "Terjadi Kesalahan" : "Error", err.message || "Error saving material.", "error");
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = `<span class="material-symbols-outlined text-[18px]">publish</span> <span>${isId ? "Simpan & Terbitkan Materi ke Supabase" : "Publish Material to Supabase"}</span>`;
+      }
+    }
+  });
+
+  await refreshMaterialsList();
 }
 
 // ============================================================================
@@ -3949,7 +4387,7 @@ function renderProfile(container) {
   const studentEmail = state.currentUser?.email || state.currentUser?.user?.email || "siswa@netlearn.edu";
   const studentClass = state.currentUser?.className || meta.class_name || "";
   const studentAvatar = state.currentUser?.avatar || meta.avatar_url || "";
-  const isTeacher = state.currentUser?.role === "teacher" || meta.role === "teacher";
+  const isTeacher = isUserAdmin(state.currentUser);
   const isId = getLang() === "id";
 
   container.innerHTML = `
@@ -4281,7 +4719,7 @@ function renderProfile(container) {
 // MODALS (Materials Reader, Video Player, Supabase Settings)
 // ============================================================================
 function openMaterialModal(materialId) {
-  const m = MATERIALS.find(item => item.id === materialId) || MATERIALS[0];
+  const m = getMaterialById(materialId);
   const modalsRoot = document.getElementById("modals-root");
   if (!modalsRoot) return;
 
@@ -4349,13 +4787,14 @@ function openMaterialModal(materialId) {
 }
 
 function openVideoModal(materialId) {
-  const m = MATERIALS.find(item => item.id === materialId) || MATERIALS[0];
+  const m = getMaterialById(materialId);
   const modalsRoot = document.getElementById("modals-root");
   if (!modalsRoot) return;
 
   const isWatched = state.userStats.watchedVideos.includes(m.id);
   const lang = getLang();
   const isId = lang === "id";
+  const embedUrl = m.video?.embedUrl || (m.video?.url ? getYouTubeEmbedUrl(m.video.url) : (m.file_url ? getYouTubeEmbedUrl(m.file_url) : "https://www.youtube.com/embed/dQw4w9WgXcQ"));
 
   const overlay = document.createElement("div");
   overlay.className = "modal-overlay";
@@ -4377,7 +4816,7 @@ function openVideoModal(materialId) {
       <div class="p-4 sm:p-5 overflow-y-auto flex-1 min-h-0 space-y-4 pb-8">
         <div class="w-full aspect-video rounded-xl overflow-hidden bg-black border border-outline-variant shadow-md">
           <iframe 
-            src="${m.video.embedUrl}" 
+            src="${embedUrl}" 
             title="Video Lecture" 
             class="w-full h-full border-0" 
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
@@ -4388,7 +4827,10 @@ function openVideoModal(materialId) {
         <div class="p-4 bg-surface-container-low rounded-xl border border-outline-variant space-y-2">
           <h4 class="text-xs font-bold text-on-surface font-mono uppercase tracking-wider">${t("videoKeyTakeaways")}</h4>
           <ul class="space-y-1.5 text-xs text-on-surface-variant font-sans">
-            ${(isId ? m.video.keyTakeaways_id : m.video.keyTakeaways_en).map(pt => `
+            ${((isId ? m.video?.keyTakeaways_id : m.video?.keyTakeaways_en) || [
+              isId ? "Pelajari konsep arsitektur dan prinsip kerja jaringan secara mendalam." : "Understand network architecture and operational principles.",
+              isId ? "Terapkan pemahaman teori ke dalam skenario konfigurasi praktis." : "Apply theoretical concepts to hands-on configuration scenarios."
+            ]).map(pt => `
               <li class="flex items-start gap-2 leading-relaxed">
                 <span class="text-primary font-bold shrink-0">•</span>
                 <span>${pt}</span>
@@ -4621,11 +5063,11 @@ function showGoogleAccountPromptModal(selectedRole = "student") {
       updateRoleAccess();
       updateHUD();
 
-      // Jika identitas (kelas atau nama) belum lengkap, langsung buka modal identitas
-      if (loggedUser.needsProfileCompletion || (loggedUser.role === "student" && (!loggedUser.className || loggedUser.className.trim() === ""))) {
+      // Jika user bukan admin dan identitas belum lengkap, buka modal identitas siswa
+      if (!isUserAdmin(loggedUser) && (loggedUser.needsProfileCompletion || (loggedUser.role === "student" && (!loggedUser.className || loggedUser.className.trim() === "")))) {
         showStudentProfileModal(loggedUser);
       } else {
-        const targetView = (state.currentUser.role === "teacher" || state.currentUser.user?.user_metadata?.role === "teacher") ? "admin" : "dashboard";
+        const targetView = isUserAdmin(state.currentUser) ? "admin" : "dashboard";
         navigateTo(targetView);
         showToast(isId ? "Berhasil Masuk via Google!" : "Logged In via Google!", `${isId ? "Selamat datang" : "Welcome"}, ${loggedUser.name}`, "check_circle");
       }
